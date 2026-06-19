@@ -25,13 +25,9 @@ export type CashSession = {
 };
 
 async function readAll(): Promise<CashSession[]> {
-  const { data } = await db().from("cash_sessions").select("data");
+  const { data, error } = await db().from("cash_sessions").select("data");
+  if (error) throw new Error("Erro ao ler caixa: " + error.message); // nunca tratar erro como vazio
   return (data ?? []).map((r) => (r as { data: CashSession }).data);
-}
-async function writeAll(s: CashSession[]) {
-  const d = db();
-  await d.from("cash_sessions").delete().neq("id", -1); // limpa tudo
-  if (s.length) await d.from("cash_sessions").insert(s.map((x) => ({ id: x.id, data: x })));
 }
 
 export async function getOpenSession(): Promise<CashSession | null> {
@@ -44,43 +40,59 @@ export async function listClosedSessions(): Promise<CashSession[]> {
     .sort((a, b) => (b.closedAt ?? "").localeCompare(a.closedAt ?? ""));
 }
 
+// patch por-linha: lê 1 row, muta o data, atualiza só dela (não toca o resto da tabela).
+async function patchSession(id: number, mut: (s: CashSession) => CashSession): Promise<CashSession | null> {
+  const d = db();
+  const { data: row, error } = await d.from("cash_sessions").select("data").eq("id", id).maybeSingle();
+  if (error) throw new Error("Erro ao ler caixa: " + error.message);
+  if (!row) return null;
+  const session = mut((row as { data: CashSession }).data);
+  const { error: e2 } = await d.from("cash_sessions").update({ data: session }).eq("id", id);
+  if (e2) throw new Error("Erro ao atualizar caixa: " + e2.message);
+  return session;
+}
+
+// INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.
 export async function openCash(floatCents: number, at: string, operator?: string): Promise<CashSession> {
-  const all = await readAll();
-  if (all.some((s) => s.status === "aberto")) throw new Error("Já existe caixa aberto");
-  const id = (all.reduce((m, s) => Math.max(m, s.id), 0) || 0) + 1;
-  const session: CashSession = {
-    id,
+  const d = db();
+  if (await getOpenSession()) throw new Error("Já existe caixa aberto");
+  const base = {
     openedAt: at,
     operator,
     openingFloatCents: Math.max(0, Math.round(floatCents)),
-    movements: [],
-    status: "aberto",
+    movements: [] as CashMovement[],
+    status: "aberto" as const,
   };
-  all.push(session);
-  await writeAll(all);
+  const { data: row, error } = await d.from("cash_sessions").insert({ data: base }).select("id").single();
+  if (error || !row) throw new Error("Falha ao abrir o caixa: " + (error?.message ?? "sem retorno"));
+  const id = Number((row as { id: number }).id);
+  const session: CashSession = { ...base, id };
+  const { error: e2 } = await d.from("cash_sessions").update({ data: session }).eq("id", id);
+  if (e2) throw new Error("Falha ao gravar o caixa: " + e2.message);
   return session;
 }
 
 export async function addMovement(type: "sangria" | "suprimento", amountCents: number, reason: string, at: string): Promise<CashSession | null> {
-  const all = await readAll();
-  const s = all.find((x) => x.status === "aberto");
-  if (!s) return null;
-  s.movements.unshift({ type, amountCents: Math.max(0, Math.round(amountCents)), reason, at });
-  await writeAll(all);
-  return s;
+  const open = await getOpenSession();
+  if (!open) return null;
+  return patchSession(open.id, (s) => ({
+    ...s,
+    movements: [{ type, amountCents: Math.max(0, Math.round(amountCents)), reason, at }, ...s.movements],
+  }));
 }
 
 export async function closeCash(countedCents: number, expectedCents: number, salesCashCents: number, salesTotalCents: number, at: string): Promise<CashSession | null> {
-  const all = await readAll();
-  const s = all.find((x) => x.status === "aberto");
-  if (!s) return null;
-  s.status = "fechado";
-  s.closedAt = at;
-  s.countedCents = Math.max(0, Math.round(countedCents));
-  s.expectedCents = expectedCents;
-  s.diffCents = s.countedCents - expectedCents;
-  s.salesCashCents = salesCashCents;
-  s.salesTotalCents = salesTotalCents;
-  await writeAll(all);
-  return s;
+  const open = await getOpenSession();
+  if (!open) return null;
+  const counted = Math.max(0, Math.round(countedCents));
+  return patchSession(open.id, (s) => ({
+    ...s,
+    status: "fechado",
+    closedAt: at,
+    countedCents: counted,
+    expectedCents,
+    diffCents: counted - expectedCents,
+    salesCashCents,
+    salesTotalCents,
+  }));
 }

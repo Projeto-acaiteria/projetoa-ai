@@ -51,18 +51,19 @@ const SEED: StockItem[] = [
   { id: "colher", name: "Colher descartável", category: "embalagem", qty: 80, unit: "un", minQty: 100, updatedAt: "2026-06-11", history: [] },
 ];
 
-async function readAll(): Promise<StockItem[]> {
-  const { data } = await db().from("stock_items").select("data");
-  const list = (data ?? []).map((r) => (r as { data: StockItem }).data);
-  if (list.length) return list;
+function seedClone(): StockItem[] {
   // clone do seed — nunca retornar a referência da constante (mutações
   // em moveStock/addItem corromperiam o default em memória)
   return JSON.parse(JSON.stringify(SEED)) as StockItem[];
 }
-async function writeAll(items: StockItem[]) {
-  const d = db();
-  await d.from("stock_items").delete().neq("id", " "); // limpa tudo
-  if (items.length) await d.from("stock_items").insert(items.map((x) => ({ id: x.id, data: x })));
+
+async function readAll(): Promise<StockItem[]> {
+  const { data, error } = await db().from("stock_items").select("data");
+  if (error) throw new Error("Erro ao ler estoque: " + error.message); // nunca tratar erro como vazio
+  const list = (data ?? []).map((r) => (r as { data: StockItem }).data);
+  if (list.length) return list;
+  // query OK e vazia → primeira vez: devolve o seed clonado (comportamento de SEED preservado)
+  return seedClone();
 }
 
 export async function listStock(): Promise<StockItem[]> {
@@ -72,40 +73,46 @@ export async function listStock(): Promise<StockItem[]> {
 export type NewStockItem = Omit<StockItem, "id" | "updatedAt" | "history">;
 
 export async function addItem(input: NewStockItem, at: string): Promise<StockItem> {
-  const all = await readAll();
   const item: StockItem = {
     ...input,
     id: "s" + Math.random().toString(36).slice(2, 9),
     updatedAt: at,
     history: [],
   };
-  all.push(item);
-  await writeAll(all);
+  const { error } = await db().from("stock_items").upsert({ id: item.id, data: item });
+  if (error) throw new Error("Falha ao criar item: " + error.message);
   return item;
 }
 
 export async function updateItem(id: string, patch: Partial<StockItem>, at: string): Promise<StockItem | null> {
+  // o item pode ainda não existir no banco (estado seed) — usa readAll p/ achar o seed também
   const all = await readAll();
-  const i = all.findIndex((x) => x.id === id);
-  if (i < 0) return null;
-  all[i] = { ...all[i], ...patch, id, updatedAt: at };
-  await writeAll(all);
-  return (await readAll()).find((x) => x.id === id) ?? null;
+  const cur = all.find((x) => x.id === id);
+  if (!cur) return null;
+  const item: StockItem = { ...cur, ...patch, id, updatedAt: at };
+  const { error } = await db().from("stock_items").upsert({ id, data: item });
+  if (error) throw new Error("Falha ao atualizar item: " + error.message);
+  return item;
 }
 
 export async function moveStock(id: string, type: "entrada" | "saida", qty: number, reason: string, at: string): Promise<StockItem | null> {
+  // o item pode ainda não existir no banco (estado seed) — usa readAll p/ achar o seed também
   const all = await readAll();
-  const i = all.findIndex((x) => x.id === id);
-  if (i < 0) return null;
+  const cur = all.find((x) => x.id === id);
+  if (!cur) return null;
   const delta = type === "entrada" ? Math.abs(qty) : -Math.abs(qty);
-  all[i].qty = Math.max(0, +(all[i].qty + delta).toFixed(3));
-  all[i].updatedAt = at;
-  all[i].history.unshift({ type, qty: Math.abs(qty), reason, at });
-  await writeAll(all);
-  return (await readAll()).find((x) => x.id === id) ?? null;
+  const item: StockItem = {
+    ...cur,
+    qty: Math.max(0, +(cur.qty + delta).toFixed(3)),
+    updatedAt: at,
+    history: [{ type, qty: Math.abs(qty), reason, at }, ...cur.history],
+  };
+  const { error } = await db().from("stock_items").upsert({ id, data: item });
+  if (error) throw new Error("Falha ao movimentar estoque: " + error.message);
+  return item;
 }
 
 export async function removeItem(id: string): Promise<void> {
-  const all = await readAll();
-  await writeAll(all.filter((x) => x.id !== id));
+  const { error } = await db().from("stock_items").delete().eq("id", id); // delete por-id pontual é OK
+  if (error) throw new Error("Falha ao remover item: " + error.message);
 }

@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
+import { listMesaPayments } from "@/lib/tables-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Vendas reais (pagas/entregues) + despesas, pro financeiro montar fluxo de caixa.
+// Vendas reais (balcão/delivery entregues + comandas de mesa pagas) + despesas.
 export async function GET() {
   const orders = (await listOrders()).filter((o) => o.status === "entregue");
-  const vendas = orders.map((o) => ({
+  const vendasOrders = orders.map((o) => ({
     display: o.display,
     date: o.createdAt,
     mode: o.mode,
@@ -18,6 +19,18 @@ export async function GET() {
     netCents: o.totalCents - (o.cardFeeCents ?? 0),
     customerName: o.customerName,
   }));
+  // receita das MESAS (tab_payments) — antes invisível no financeiro
+  const vendasMesa = (await listMesaPayments()).map((m) => ({
+    display: m.display,
+    date: m.date,
+    mode: "mesa",
+    paymentMethod: m.method,
+    grossCents: m.grossCents,
+    cardFeeCents: m.cardFeeCents,
+    netCents: m.grossCents - m.cardFeeCents,
+    customerName: m.customerName,
+  }));
+  const vendas = [...vendasOrders, ...vendasMesa];
   const despesas = await listExpenses();
   return NextResponse.json({ vendas, despesas });
 }

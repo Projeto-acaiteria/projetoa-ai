@@ -334,3 +334,36 @@ export async function getPendingCalls(): Promise<ServiceCall[]> {
 export async function markCallAttended(id: number): Promise<void> {
   await db().from("service_calls").update({ status: "atendido" }).eq("id", id);
 }
+
+// ── Receita das mesas para o financeiro/caixa ────────────────────────────────
+export type MesaVenda = {
+  display: string;
+  date: string; // paid_at
+  method: string;
+  grossCents: number;
+  cardFeeCents: number;
+  customerName: string | null;
+};
+
+/** Pagamentos de comanda no MESMO formato das vendas, pro financeiro e o caixa. */
+export async function listMesaPayments(): Promise<MesaVenda[]> {
+  const { data, error } = await db()
+    .from("tab_payments")
+    .select("amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))");
+  if (error) throw new Error("Erro ao ler pagamentos de mesa: " + error.message);
+  return (data ?? []).map((p) => {
+    const row = p as {
+      amount_cents: number; method: string; fee_percent: number | null; paid_at: string;
+      tabs?: { customer_name?: string | null; label?: string | null; tables?: { number?: number } | null } | null;
+    };
+    const num = row.tabs?.tables?.number;
+    return {
+      display: num ? `Mesa ${num}` : row.tabs?.label ?? "Comanda",
+      date: row.paid_at,
+      method: row.method,
+      grossCents: row.amount_cents,
+      cardFeeCents: Math.round((row.amount_cents * (row.fee_percent ?? 0)) / 100),
+      customerName: row.tabs?.customer_name ?? null,
+    };
+  });
+}

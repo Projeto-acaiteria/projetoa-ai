@@ -35,65 +35,49 @@ export type Order = {
 
 export type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito";
 
-const ID_BASE = 1042; // continua a numeração dos exemplos
-
 async function readAll(): Promise<Order[]> {
-  const { data } = await db().from("orders").select("data");
+  const { data, error } = await db().from("orders").select("data");
+  if (error) throw new Error("Erro ao ler pedidos: " + error.message); // nunca tratar erro como vazio
   return (data ?? []).map((r) => (r as { data: Order }).data);
 }
 
-async function writeAll(orders: Order[]): Promise<void> {
-  const d = db();
-  await d.from("orders").delete().neq("id", -1); // limpa tudo
-  if (orders.length) await d.from("orders").insert(orders.map((o) => ({ id: o.id, data: o })));
-}
-
 export async function listOrders(): Promise<Order[]> {
-  const all = await readAll();
-  return all.sort((a, b) => b.id - a.id);
+  return (await readAll()).sort((a, b) => b.id - a.id);
 }
 
 export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 
+// INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.
 export async function addOrder(input: NewOrder, nowIso: string, status: OrderStatus = "recebido"): Promise<Order> {
-  const all = await readAll();
-  const nextId = (all.reduce((m, o) => Math.max(m, o.id), ID_BASE) || ID_BASE) + 1;
-  const order: Order = {
-    ...input,
-    id: nextId,
-    display: `#${nextId}`,
-    createdAt: nowIso,
-    status,
-  };
-  all.push(order);
-  await writeAll(all);
-  // read-after-write (λ.prova-na-fonte): confirma que persistiu
-  const back = (await readAll()).find((o) => o.id === nextId);
-  if (!back) throw new Error("Falha ao persistir o pedido");
-  return back;
+  const d = db();
+  const base = { ...input, createdAt: nowIso, status };
+  const { data: row, error } = await d.from("orders").insert({ data: base }).select("id").single();
+  if (error || !row) throw new Error("Falha ao criar o pedido: " + (error?.message ?? "sem retorno"));
+  const id = Number((row as { id: number }).id);
+  const order: Order = { ...base, id, display: `#${id}` };
+  const { error: e2 } = await d.from("orders").update({ data: order }).eq("id", id);
+  if (e2) throw new Error("Falha ao gravar o pedido: " + e2.message);
+  return order;
+}
+
+// patch por-linha: lê 1 row, muta o data, atualiza só dela (não toca o resto da tabela).
+async function patchOrder(id: number, mut: (o: Order) => Order): Promise<Order | null> {
+  const d = db();
+  const { data: row, error } = await d.from("orders").select("data").eq("id", id).maybeSingle();
+  if (error) throw new Error("Erro ao ler pedido: " + error.message);
+  if (!row) return null;
+  const order = mut((row as { data: Order }).data);
+  const { error: e2 } = await d.from("orders").update({ data: order }).eq("id", id);
+  if (e2) throw new Error("Erro ao atualizar pedido: " + e2.message);
+  return order;
 }
 
 export async function setStatus(id: number, status: OrderStatus): Promise<Order | null> {
-  const all = await readAll();
-  const idx = all.findIndex((o) => o.id === id);
-  if (idx < 0) return null;
-  all[idx].status = status;
-  await writeAll(all);
-  return (await readAll()).find((o) => o.id === id) ?? null;
+  return patchOrder(id, (o) => ({ ...o, status }));
 }
-
 export async function markPointsAwarded(id: number, points: number): Promise<void> {
-  const all = await readAll();
-  const idx = all.findIndex((o) => o.id === id);
-  if (idx < 0) return;
-  all[idx].pointsAwarded = points;
-  await writeAll(all);
+  await patchOrder(id, (o) => ({ ...o, pointsAwarded: points }));
 }
-
 export async function markConsumed(id: number): Promise<void> {
-  const all = await readAll();
-  const idx = all.findIndex((o) => o.id === id);
-  if (idx < 0) return;
-  all[idx].consumed = true;
-  await writeAll(all);
+  await patchOrder(id, (o) => ({ ...o, consumed: true }));
 }

@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { getOpenSession, openCash, addMovement, closeCash, type CashSession } from "@/lib/cash-store";
 import { listOrders } from "@/lib/orders-store";
+import { listMesaPayments } from "@/lib/tables-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// resumo do caixa aberto a partir das vendas registradas desde a abertura
+// resumo do caixa aberto: vendas de balcão + pagamentos de mesa desde a abertura
 async function resumo(session: CashSession) {
   const orders = (await listOrders()).filter((o) => o.mode === "balcao" && o.createdAt >= session.openedAt);
-  const salesCashCents = orders.filter((o) => o.paymentMethod === "dinheiro").reduce((s, o) => s + o.totalCents, 0);
-  const salesTotalCents = orders.reduce((s, o) => s + o.totalCents, 0);
+  const mesas = (await listMesaPayments()).filter((m) => m.date >= session.openedAt);
+  const mesaCashCents = mesas.filter((m) => m.method === "dinheiro").reduce((s, m) => s + m.grossCents, 0);
+  const mesaTotalCents = mesas.reduce((s, m) => s + m.grossCents, 0);
+  const salesCashCents = orders.filter((o) => o.paymentMethod === "dinheiro").reduce((s, o) => s + o.totalCents, 0) + mesaCashCents;
+  const salesTotalCents = orders.reduce((s, o) => s + o.totalCents, 0) + mesaTotalCents;
   const suprimentoCents = session.movements.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);
   const sangriaCents = session.movements.filter((m) => m.type === "sangria").reduce((s, m) => s + m.amountCents, 0);
   const saldoCaixaCents = session.openingFloatCents + salesCashCents + suprimentoCents - sangriaCents;
-  return { salesCashCents, salesTotalCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length };
+  return { salesCashCents, salesTotalCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + mesas.length };
 }
 
 export async function GET() {
