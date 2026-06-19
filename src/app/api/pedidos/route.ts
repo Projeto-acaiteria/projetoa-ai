@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { addOrder, listOrders, type NewOrder } from "@/lib/orders-store";
+import { addOrder, listOrders, type OrderItem } from "@/lib/orders-store";
+import { readMenu } from "@/lib/menu-store";
+import { getStore } from "@/lib/settings-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,24 +11,94 @@ export async function GET() {
   return NextResponse.json({ orders });
 }
 
+type RecvItem = { group?: string; name?: string; qty?: number };
+type RecvBody = {
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  mode?: string;
+  sizeLabel?: string;
+  bairro?: string;
+  items?: RecvItem[];
+};
+
+type Calc =
+  | { error: string }
+  | { sizeLabel: string; items: OrderItem[]; subtotalCents: number; feeCents: number; totalCents: number; consumes: { stockId: string; qty: number }[] };
+
+// Recalcula o pedido SÓ pelo menu/loja — descarta qualquer preço/consumo enviado
+// pelo cliente (o link é público; não dá pra confiar no que vem do navegador).
+async function recompute(body: RecvBody): Promise<Calc> {
+  const menu = await readMenu();
+  const store = await getStore();
+
+  const size = menu.sizes.find((s) => s.label === body.sizeLabel);
+  if (!size) return { error: "Tamanho inválido" };
+
+  const recv = (body.items ?? []).filter((it) => Number(it.qty) > 0);
+  const consumes: Record<string, number> = {};
+  for (const ing of size.recipe ?? []) consumes[ing.stockId] = (consumes[ing.stockId] || 0) + ing.qty;
+
+  // reaplica grátis-até-N na ordem do menu, com o preço REAL de cada modificador
+  let modifiersCents = 0;
+  const items: OrderItem[] = [];
+  for (const g of menu.groups) {
+    let freeLeft = g.paid ? 0 : g.freeUpTo;
+    for (const mod of g.items) {
+      const r = recv.find((x) => x.group === g.title && x.name === mod.name);
+      const q = Math.max(0, Math.floor(Number(r?.qty) || 0));
+      if (q === 0) continue;
+      let paidCents = 0;
+      for (let i = 0; i < q; i++) {
+        if (freeLeft > 0) freeLeft--;
+        else paidCents += mod.priceCents;
+      }
+      modifiersCents += paidCents;
+      items.push({ group: g.title, name: mod.name, qty: q, paidCents });
+      for (const ing of mod.recipe ?? []) consumes[ing.stockId] = (consumes[ing.stockId] || 0) + ing.qty * q;
+    }
+  }
+
+  const subtotalCents = size.priceCents + modifiersCents;
+  let feeCents = 0;
+  if (body.mode === "entrega") {
+    if (store.deliveryZones.length > 0) {
+      const zona = store.deliveryZones.find((z) => z.bairro === body.bairro);
+      if (!zona) return { error: "Escolha um bairro de entrega válido" };
+      feeCents = zona.feeCents;
+    } else {
+      feeCents = store.deliveryFeeCents;
+    }
+  }
+  const totalCents = subtotalCents + feeCents;
+  if (totalCents < store.minOrderCents) {
+    return { error: `Pedido mínimo de R$ ${(store.minOrderCents / 100).toFixed(2).replace(".", ",")}` };
+  }
+  const consumesArr = Object.entries(consumes).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));
+  return { sizeLabel: size.label, items, subtotalCents, feeCents, totalCents, consumes: consumesArr };
+}
+
 export async function POST(req: Request) {
-  let body: Partial<NewOrder>;
+  let body: RecvBody;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  // validação mínima
   if (!body.customerName?.trim() || !body.phone?.trim()) {
     return NextResponse.json({ error: "Nome e telefone são obrigatórios" }, { status: 400 });
   }
-  if (!body.sizeLabel || !Array.isArray(body.items) || typeof body.totalCents !== "number") {
+  if (!body.sizeLabel || !Array.isArray(body.items)) {
     return NextResponse.json({ error: "Pedido incompleto" }, { status: 400 });
   }
   if (body.mode === "entrega" && !body.address?.trim()) {
     return NextResponse.json({ error: "Endereço é obrigatório na entrega" }, { status: 400 });
   }
+
+  // tudo recalculado no servidor — o preço do client é ignorado
+  const calc = await recompute(body);
+  if ("error" in calc) return NextResponse.json({ error: calc.error }, { status: 400 });
 
   const order = await addOrder(
     {
@@ -34,12 +106,12 @@ export async function POST(req: Request) {
       phone: body.phone.trim(),
       address: body.address?.trim(),
       mode: body.mode === "entrega" ? "entrega" : "retirada",
-      sizeLabel: body.sizeLabel,
-      items: body.items,
-      subtotalCents: body.subtotalCents ?? 0,
-      feeCents: body.feeCents ?? 0,
-      totalCents: body.totalCents,
-      consumes: Array.isArray(body.consumes) ? body.consumes : undefined,
+      sizeLabel: calc.sizeLabel,
+      items: calc.items,
+      subtotalCents: calc.subtotalCents,
+      feeCents: calc.feeCents,
+      totalCents: calc.totalCents,
+      consumes: calc.consumes,
       bairro: body.bairro,
     },
     new Date().toISOString(),

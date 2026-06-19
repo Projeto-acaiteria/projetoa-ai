@@ -43,6 +43,8 @@ function ticketFromOrder(o: Order, storeName: string): TicketData {
     customerName: o.customerName,
     phone: o.phone || undefined,
     address: o.address,
+    bairro: o.bairro,
+    feeCents: o.feeCents || undefined,
     items: [{ qty: 1, name: o.sizeLabel }, ...o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined }))],
     totalCents: o.totalCents,
     pointsInfo: o.pointsAwarded ? `Pontos ganhos: +${o.pointsAwarded}` : undefined,
