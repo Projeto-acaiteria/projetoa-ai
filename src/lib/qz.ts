@@ -5,13 +5,25 @@
 // A conexão é POR ABA: sempre chamar qzConnect() antes de imprimir, não gatear
 // em isActive() (aba nova retorna false e cai no fallback). — lição do Verbo.
 
+import { QZ_CERT } from "./qz-cert";
+
 type QZ = any;
 let qzMod: QZ = null;
 
 async function getQz(): Promise<QZ> {
   if (qzMod) return qzMod;
   const mod: any = await import("qz-tray");
-  qzMod = mod.default ?? mod;
+  const qz = mod.default ?? mod;
+  // modo ASSINADO — com o override.crt na máquina, o QZ não pede "Allow"
+  qz.security.setCertificatePromise((resolve: any) => resolve(QZ_CERT));
+  if (qz.security.setSignatureAlgorithm) qz.security.setSignatureAlgorithm("SHA512");
+  qz.security.setSignaturePromise((toSign: string) => (resolve: any, reject: any) => {
+    fetch(`/api/qz-sign?request=${encodeURIComponent(toSign)}`)
+      .then((r) => r.text())
+      .then(resolve)
+      .catch(reject);
+  });
+  qzMod = qz;
   return qzMod;
 }
 
