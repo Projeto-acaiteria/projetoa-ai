@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   Açaí System — Design System
+   Identidade própria (NÃO clonar Palace): roxo açaí + fúcsia + creme
+   Light-only. Mobile-first. Apetitoso, fresco, premium.
+═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand · Açaí ── */
+  --brand-900: #2E1065;  /* roxo profundo (quase açaí puro) */
+  --brand-800: #4C1D95;
+  --brand-700: #5B21B6;
+  --brand-600: #6D28D9;  /* primary · CTAs */
+  --brand-500: #7C3AED;
+  --brand-400: #9F67F0;
+  --accent:    #A87B0E;  /* dourado escuro · texto/destaque legível (marca Cantinho) */
+  --accent-2:  #E0A82E;  /* dourado vibrante · fundos/detalhes */
+  --lime:      #65A30D;  /* verde fresco · "grátis", positivo */
+  --gold:      #C2890E;  /* dourado · premium / pago */
+
+  /* ── Backgrounds ── */
+  --bg-base:      #FBF7FF;  /* creme lilás */
+  --bg-elevated:  #FFFFFF;
+  --bg-surface-2: #F4ECFF;
+
+  /* ── Texto ── */
+  --text-primary:   #1F1235;
+  --text-secondary: #4A3B63;
+  --text-muted:     #7C6E92;
+  --text-faded:     #A89BBC;
+
+  /* ── Linhas / status ── */
+  --line:        #EBE0FA;
+  --green-ok:    #16A34A;
+  --yellow-warn: #F59E0B;
+  --red-no:      #EF4444;
+
+  /* ── Sombras ── */
+  --shadow-card:    0 1px 2px rgba(46, 16, 101, 0.06), 0 8px 24px rgba(46, 16, 101, 0.06);
+  --shadow-pop:     0 12px 40px rgba(46, 16, 101, 0.18);
+  --shadow-brand:   0 10px 30px rgba(109, 40, 217, 0.35);
+}
+
+@theme inline {
+  --color-brand-900: var(--brand-900);
+  --color-brand-800: var(--brand-800);
+  --color-brand-700: var(--brand-700);
+  --color-brand-600: var(--brand-600);
+  --color-brand-500: var(--brand-500);
+  --color-brand-400: var(--brand-400);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-lime: var(--lime);
+  --color-gold: var(--gold);
+  --color-bg-base: var(--bg-base);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-surface-2: var(--bg-surface-2);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-faded: var(--text-faded);
+  --color-line: var(--line);
+  --font-sans: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+}
+
+/* ── Tema escuro (só no cardápio público — wrapper .theme-dark) ── */
+.theme-dark {
+  --bg-base: #160823;
+  --bg-elevated: rgba(40, 22, 62, 0.72);
+  --bg-surface-2: rgba(52, 30, 78, 0.72);
+  --text-primary: #F6F0FC;
+  --text-secondary: #DBCDEF;
+  --text-muted: #AB9AC6;
+  --text-faded: #7d6b98;
+  --line: #3a2552;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.4);
+  background: var(--bg-base);
+}
+
+/* ── Fundo aurora animado (um só, do topo ao fim) ── */
+.aurora-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #160823;
+  pointer-events: none;
+}
+.aurora-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(75px);
+  will-change: transform;
+}
+@keyframes aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(9%, -7%) scale(1.18); }
+  66% { transform: translate(-7%, 9%) scale(0.92); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-11%, 7%) scale(1.22); }
+}
+@keyframes aurora-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(8%, 11%) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora-orb { animation: none !important; }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, var(--brand-800) 0%, var(--brand-600) 60%, var(--brand-500) 100%);
+}
+.text-gradient {
+  background: linear-gradient(120deg, var(--brand-600), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop {
+  animation: pop-in 0.18s ease-out;
+}
+
+/* Cartaz de mesa / cupom: escondidos na tela, só aparecem na impressão */
+#print-cartaz,
+#print-cupom {
+  position: fixed;
+  left: -200vw;
+  top: 0;
+}
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #print-cartaz,
+  #print-cartaz *,
+  #print-cupom,
+  #print-cupom * {
+    visibility: visible !important;
+  }
+  #print-cartaz {
+    left: 0 !important;
+    inset: 0 !important;
+    display: flex !important;
+  }
+  #print-cupom {
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+  }
+  @page {
+    margin: 0;
+  }
+}

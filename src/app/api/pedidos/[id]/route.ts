@@ -1,0 +1,50 @@
+import { NextResponse } from "next/server";
+import { setStatus, markPointsAwarded, markConsumed, type OrderStatus } from "@/lib/orders-store";
+import { awardPoints, getByPhone } from "@/lib/customers-store";
+import { moveStock } from "@/lib/stock-store";
+import { pointsForSale } from "@/lib/loyalty";
+import { getLoyalty } from "@/lib/loyalty-store";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const VALID: OrderStatus[] = ["recebido", "preparo", "saiu", "entregue"];
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  let body: { status?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  if (!body.status || !VALID.includes(body.status as OrderStatus)) {
+    return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+  }
+  const order = await setStatus(Number(id), body.status as OrderStatus);
+  if (!order) return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
+
+  // Pedido entregue = pago. Credita pontos uma única vez, sobre o valor dos
+  // produtos (sem a taxa de entrega). Regra: pontua só em venda paga.
+  let awarded = 0;
+  if (order.status === "entregue" && !order.pointsAwarded && order.phone) {
+    const cfg = await getLoyalty();
+    const existing = await getByPhone(order.phone);
+    const isFirstPurchase = !existing || existing.history.length === 0;
+    awarded = pointsForSale(order.subtotalCents, cfg, { isFirstPurchase });
+    if (awarded > 0) {
+      await awardPoints(order.phone, order.customerName, awarded, order.display, order.createdAt);
+      await markPointsAwarded(order.id, awarded);
+    }
+  }
+
+  // Baixa de estoque do delivery: abate a ficha técnica ao entregar (uma vez).
+  if (order.status === "entregue" && !order.consumed && order.consumes?.length) {
+    for (const c of order.consumes) {
+      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Pedido ${order.display}`, order.createdAt.slice(0, 10));
+    }
+    await markConsumed(order.id);
+  }
+
+  return NextResponse.json({ ok: true, order, pointsAwarded: awarded });
+}

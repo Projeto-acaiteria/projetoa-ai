@@ -1,0 +1,15 @@
+/node_modules
+/.next
+/out
+/build
+.env*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+_audit-*.png
+
+/.data
+
+# screenshots de validação
+shot.png
+_teste.png

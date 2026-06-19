@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card } from "@/components/admin/ui";
+import { IconPrinter, IconCheck } from "@/components/Icons";
+import { qzConnect, qzIsActive, qzListPrinters, qzPrintHtml, getStationPrinter, setStationPrinter } from "@/lib/qz";
+import { ticketHtml } from "@/lib/ticket";
+
+function testTicket(loja: string) {
+  return ticketHtml({
+    loja,
+    display: "TESTE",
+    dateLabel: new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    modeLabel: "Cupom de teste",
+    customerName: "Cliente Teste",
+    items: [
+      { qty: 1, name: "Açaí 500ml" },
+      { qty: 1, name: "Granola" },
+      { qty: 1, name: "Leite condensado", totalCents: 200 },
+    ],
+    totalCents: 1800,
+    pointsInfo: "Pontos ganhos: +18",
+    origem: "balcao",
+  });
+}
+
+export default function ImpressoraClient({ storeName }: { storeName: string }) {
+  const [active, setActive] = useState<boolean | null>(null);
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [sel, setSel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSel(getStationPrinter("caixa") ?? "");
+    qzIsActive().then(setActive);
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await qzConnect();
+      setActive(true);
+      setPrinters(await qzListPrinters());
+      setMsg("QZ Tray conectado — escolha a impressora abaixo.");
+    } catch {
+      setActive(false);
+      setMsg("Não encontrei o QZ Tray rodando. Abra o app QZ Tray e clique em Conectar de novo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function save(name: string) {
+    setSel(name);
+    setStationPrinter("caixa", name);
+    setMsg(name ? `Impressora salva: ${name}` : null);
+  }
+
+  async function test() {
+    if (!sel) {
+      setMsg("Escolha a impressora primeiro.");
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await qzPrintHtml(sel, testTicket(storeName));
+      setMsg("Cupom de teste enviado. Confira se saiu papel na impressora.");
+    } catch (e) {
+      setMsg("Falha ao imprimir: " + (e instanceof Error ? e.message : "erro"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      {/* Status do QZ */}
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className={`grid h-11 w-11 place-items-center rounded-2xl ${active ? "brand-gradient text-white" : "bg-bg-surface-2 text-[var(--text-muted)]"}`}>
+              <IconPrinter width={22} height={22} />
+            </span>
+            <div>
+              <div className="font-extrabold text-ink">{active ? "QZ Tray conectado" : "QZ Tray não conectado"}</div>
+              <div className="text-xs text-[var(--text-muted)]">{active ? "pronto pra imprimir silencioso" : "necessário pra impressão automática"}</div>
+            </div>
+          </div>
+          <button onClick={connect} disabled={busy} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)] disabled:opacity-60">
+            {busy ? "..." : active ? "Atualizar lista" : "Conectar"}
+          </button>
+        </div>
+        {active === false && (
+          <p className="mt-3 rounded-xl bg-bg-surface-2 p-3 text-sm text-[var(--text-secondary)]">
+            Pra impressão automática, instale o QZ Tray (grátis) na máquina do caixa:{" "}
+            <a href="https://qz.io/download/" target="_blank" rel="noreferrer" className="font-bold text-brand-600 underline">qz.io/download</a>.
+            Sem ele, os pedidos ainda imprimem, mas abrindo a janela de impressão do navegador.
+          </p>
+        )}
+      </Card>
+
+      {/* Seleção da impressora */}
+      <Card className="p-4 sm:p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Impressora do caixa</h3>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <select
+            value={sel}
+            onChange={(e) => save(e.target.value)}
+            className="flex-1 rounded-xl border border-line bg-bg-elevated px-4 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-600"
+          >
+            <option value="">{printers.length ? "Escolha a impressora…" : "Conecte o QZ pra listar"}</option>
+            {printers.map((p) => <option key={p} value={p}>{p}</option>)}
+            {sel && !printers.includes(sel) && <option value={sel}>{sel} (salva)</option>}
+          </select>
+          <button onClick={test} disabled={busy || !sel} className="rounded-xl border-2 border-brand-600 px-5 py-2.5 text-sm font-bold text-brand-600 disabled:opacity-40">
+            Imprimir teste
+          </button>
+        </div>
+        {sel && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--green-ok)]">
+            <IconCheck width={14} height={14} /> {sel}
+          </p>
+        )}
+        <p className="mt-3 text-xs text-[var(--text-faded)]">
+          A escolha fica salva neste navegador. Configure no mesmo navegador (Chrome ou Edge) que vai operar o caixa.
+        </p>
+      </Card>
+
+      {/* Como instalar (resumo do checklist) */}
+      <Card className="p-4 sm:p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Como deixar 100% automático</h3>
+        <ol className="space-y-2 text-sm text-[var(--text-secondary)]">
+          <li><b className="text-ink">1.</b> Instalar o driver da impressora (Epson: APD + TMUSB). Se travar na fila, apontar a porta pra <b>TMUSB001</b> e deixar como impressora padrão do Windows.</li>
+          <li><b className="text-ink">2.</b> Instalar o <b>QZ Tray</b> (x86_64) e deixar abrir junto com o Windows.</li>
+          <li><b className="text-ink">3.</b> Pra não pedir permissão a cada impressão, adicionar o certificado (<code>override.crt</code>) na pasta do QZ Tray.</li>
+          <li><b className="text-ink">4.</b> Voltar aqui → <b>Conectar</b> → escolher a impressora → <b>Imprimir teste</b>.</li>
+        </ol>
+        <p className="mt-3 rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
+          Os pedidos feitos pelo link imprimem sozinhos na tela <b>Pedidos</b> (com a impressão automática ligada). As vendas do balcão imprimem ao finalizar no Caixa.
+        </p>
+      </Card>
+
+      {msg && <div className="rounded-xl border border-line bg-bg-elevated p-3.5 text-sm font-medium text-ink">{msg}</div>}
+    </div>
+  );
+}

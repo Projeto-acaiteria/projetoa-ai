@@ -1,0 +1,336 @@
+// Store de mesas e comandas · salão da açaiteria (server-side, Supabase via db()).
+// Tabelas reais e relacionais já existem no schema (NÃO são o padrão {id,data} dos
+// protótipos): tables / tabs / tab_orders / tab_order_items / tab_payments / service_calls.
+// Salão simples: SEM cover artístico, SEM dose/garrafa, SEM roteamento de estação,
+// SEM garçom/comissão. Todos os valores em CENTAVOS (int).
+import { db } from "@/lib/supabase";
+import { moveStock } from "@/lib/stock-store";
+import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
+import { pointsForSale } from "@/lib/loyalty";
+import { getLoyalty } from "@/lib/loyalty-store";
+
+const num = (v: unknown) => Number(v ?? 0);
+
+// ── Tipos ──────────────────────────────────────────────────────────────────
+export type TabStatus = "aberta" | "fechada";
+
+export type StockConsume = { stockId: string; qty: number };
+
+export type Tab = {
+  id: number;
+  table_id: number | null;
+  label: string | null;
+  status: TabStatus;
+  opened_at: string;
+  closed_at: string | null;
+  service_fee_cents: number;
+  customer_phone: string | null;
+  customer_name: string | null;
+};
+
+export type TabItem = {
+  id: number;
+  tab_order_id: number;
+  name: string;
+  size_label: string | null;
+  qty: number;
+  unit_price_cents: number;
+  consumes: StockConsume[] | null;
+};
+
+export type TabOrder = {
+  id: number;
+  tab_id: number;
+  note: string | null;
+  status: string; // 'pendente'
+  created_at: string;
+};
+
+export type TabPayment = {
+  id: number;
+  tab_id: number;
+  method: string;
+  amount_cents: number;
+  fee_percent: number;
+  paid_at: string;
+};
+
+export type ServiceCallType = "conta" | "atendente";
+export type ServiceCall = {
+  id: number;
+  table_number: number;
+  tab_id: number | null;
+  type: ServiceCallType;
+  status: "pendente" | "atendido";
+  created_at: string;
+};
+
+export type TableCard = {
+  number: number;
+  area: string;
+  tabId: number | null;
+  openTotalCents: number;
+  openedAt: string | null;
+};
+
+// Item novo a lançar numa comanda
+export type NewTabItem = {
+  name: string;
+  sizeLabel?: string | null;
+  qty: number;
+  unitPriceCents: number;
+  consumes?: StockConsume[] | null;
+};
+
+// ── Mesas ────────────────────────────────────────────────────────────────────
+
+/** Mesas com o estado da comanda aberta (se houver). Total = soma qty*unit_price. */
+export async function getTables(): Promise<TableCard[]> {
+  const d = db();
+  const { data: tables } = await d.from("tables").select("id, number, area").order("number");
+  if (!tables?.length) return [];
+
+  // comandas abertas → indexa por mesa
+  const { data: openTabs } = await d
+    .from("tabs")
+    .select("id, table_id, opened_at")
+    .eq("status", "aberta");
+  const tabByTable = new Map<number, { id: number; opened_at: string }>();
+  for (const t of openTabs ?? []) {
+    if (t.table_id != null) tabByTable.set(num(t.table_id), { id: num(t.id), opened_at: t.opened_at });
+  }
+
+  // total dos itens das comandas abertas
+  const tabIds = [...tabByTable.values()].map((t) => t.id);
+  const totalByTab = new Map<number, number>();
+  if (tabIds.length) {
+    const { data: orders } = await d.from("tab_orders").select("id, tab_id").in("tab_id", tabIds);
+    const orderToTab = new Map((orders ?? []).map((o) => [num(o.id), num(o.tab_id)]));
+    const orderIds = (orders ?? []).map((o) => num(o.id));
+    if (orderIds.length) {
+      const { data: items } = await d
+        .from("tab_order_items")
+        .select("tab_order_id, qty, unit_price_cents")
+        .in("tab_order_id", orderIds);
+      for (const it of items ?? []) {
+        const tabId = orderToTab.get(num(it.tab_order_id));
+        if (tabId == null) continue;
+        totalByTab.set(tabId, (totalByTab.get(tabId) ?? 0) + num(it.qty) * num(it.unit_price_cents));
+      }
+    }
+  }
+
+  return (tables ?? []).map((tbl) => {
+    const open = tabByTable.get(num(tbl.id));
+    return {
+      number: num(tbl.number),
+      area: (tbl.area as string) ?? "salao",
+      tabId: open?.id ?? null,
+      openTotalCents: open ? totalByTab.get(open.id) ?? 0 : 0,
+      openedAt: open?.opened_at ?? null,
+    };
+  });
+}
+
+/** Cria as mesas 1..n (area 'salao') que ainda não existem. Idempotente. */
+export async function ensureTables(n: number): Promise<void> {
+  const d = db();
+  const { data: existing } = await d.from("tables").select("number");
+  const have = new Set((existing ?? []).map((t) => num(t.number)));
+  const missing: { number: number; area: string }[] = [];
+  for (let i = 1; i <= n; i++) if (!have.has(i)) missing.push({ number: i, area: "salao" });
+  if (missing.length) await d.from("tables").insert(missing);
+}
+
+// ── Comandas ─────────────────────────────────────────────────────────────────
+
+/** Comanda aberta da mesa (status='aberta') ou cria uma nova. */
+export async function getOrCreateOpenTab(tableId: number, label?: string): Promise<Tab> {
+  const d = db();
+  const { data: existing } = await d
+    .from("tabs")
+    .select("*")
+    .eq("table_id", tableId)
+    .eq("status", "aberta")
+    .maybeSingle();
+  if (existing) return existing as Tab;
+
+  const { data, error } = await d
+    .from("tabs")
+    .insert({ table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0 })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Tab;
+}
+
+/** Lança itens numa comanda: 1 tab_order + os tab_order_items. Baixa estoque por ficha técnica. */
+export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<TabOrder> {
+  const d = db();
+  const { data: order, error } = await d
+    .from("tab_orders")
+    .insert({ tab_id: tabId, status: "pendente" })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const rows = items.map((it) => ({
+    tab_order_id: (order as TabOrder).id,
+    name: it.name,
+    size_label: it.sizeLabel ?? null,
+    qty: it.qty,
+    unit_price_cents: it.unitPriceCents,
+    consumes: it.consumes ?? [],
+  }));
+  if (rows.length) {
+    const { error: e2 } = await d.from("tab_order_items").insert(rows);
+    if (e2) throw e2;
+  }
+
+  // baixa de estoque por ficha técnica (consumes = [{stockId, qty}])
+  const today = new Date().toISOString().slice(0, 10);
+  for (const it of items) {
+    for (const c of it.consumes ?? []) {
+      await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today);
+    }
+  }
+  return order as TabOrder;
+}
+
+export type TabFull = {
+  tab: Tab;
+  orders: (TabOrder & { items: TabItem[] })[];
+  payments: TabPayment[];
+  totalCents: number;
+  paidCents: number;
+};
+
+/** Comanda completa: tab + pedidos com itens + pagamentos + totais. */
+export async function getTabFull(tabId: number): Promise<TabFull> {
+  const d = db();
+  const { data: tab } = await d.from("tabs").select("*").eq("id", tabId).single();
+  const { data: orders } = await d
+    .from("tab_orders")
+    .select("*")
+    .eq("tab_id", tabId)
+    .order("created_at");
+  const orderIds = (orders ?? []).map((o) => num(o.id));
+  const { data: items } = orderIds.length
+    ? await d.from("tab_order_items").select("*").in("tab_order_id", orderIds)
+    : { data: [] as TabItem[] };
+  const { data: payments } = await d
+    .from("tab_payments")
+    .select("*")
+    .eq("tab_id", tabId)
+    .order("paid_at");
+
+  const withItems = (orders ?? []).map((o) => ({
+    ...(o as TabOrder),
+    items: ((items ?? []) as TabItem[])
+      .filter((i) => num(i.tab_order_id) === num(o.id))
+      .map((i) => ({ ...i, qty: num(i.qty), unit_price_cents: num(i.unit_price_cents) })),
+  }));
+  const totalCents = ((items ?? []) as TabItem[]).reduce(
+    (s, i) => s + num(i.qty) * num(i.unit_price_cents),
+    0,
+  );
+  const paidCents = ((payments ?? []) as TabPayment[]).reduce((s, p) => s + num(p.amount_cents), 0);
+
+  return {
+    tab: tab as Tab,
+    orders: withItems,
+    payments: (payments ?? []) as TabPayment[],
+    totalCents,
+    paidCents,
+  };
+}
+
+/** Registra um pagamento na comanda. */
+export async function addPayment(
+  tabId: number,
+  method: string,
+  amountCents: number,
+  feePercent = 0,
+): Promise<TabPayment> {
+  const { data, error } = await db()
+    .from("tab_payments")
+    .insert({ tab_id: tabId, method, amount_cents: amountCents, fee_percent: feePercent })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TabPayment;
+}
+
+export type CloseTabOpts = {
+  serviceFeeCents?: number;
+  customerPhone?: string;
+  customerName?: string;
+};
+
+/** Fecha a comanda. Se vier telefone, pontua fidelidade sobre o total dos PRODUTOS (sem taxa). */
+export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<{ pointsAwarded: number }> {
+  const d = db();
+
+  // total dos produtos (sem taxa) antes de fechar
+  const full = await getTabFull(tabId);
+  const productCents = full.totalCents;
+
+  const phone = opts.customerPhone ? normPhone(opts.customerPhone) : "";
+  const name = opts.customerName?.trim() || full.tab.customer_name || "";
+
+  const patch: Record<string, unknown> = {
+    status: "fechada",
+    closed_at: new Date().toISOString(),
+    service_fee_cents: opts.serviceFeeCents ?? full.tab.service_fee_cents ?? 0,
+  };
+  if (phone) patch.customer_phone = phone;
+  if (name) patch.customer_name = name;
+  const { error } = await d.from("tabs").update(patch).eq("id", tabId);
+  if (error) throw error;
+
+  // fidelidade — pontua só sobre os produtos; detecta 1ª compra pelo cadastro
+  let pointsAwarded = 0;
+  if (phone && productCents > 0) {
+    const cfg = await getLoyalty();
+    const existing = await getByPhone(phone);
+    const isFirstPurchase = !existing;
+    pointsAwarded = pointsForSale(productCents, cfg, { isFirstPurchase });
+    if (pointsAwarded > 0) {
+      const ref = full.tab.table_id ? `Mesa (comanda #${tabId})` : `Comanda #${tabId}`;
+      await awardPoints(phone, name || "Cliente", pointsAwarded, ref, new Date().toISOString());
+    }
+  }
+  return { pointsAwarded };
+}
+
+// ── Chamados de mesa ─────────────────────────────────────────────────────────
+
+/** Cria um chamado de mesa (cliente pede a conta ou um atendente). */
+export async function createServiceCall(
+  tableNumber: number,
+  type: ServiceCallType,
+  tabId?: number | null,
+): Promise<ServiceCall> {
+  const { data, error } = await db()
+    .from("service_calls")
+    .insert({ table_number: tableNumber, type, tab_id: tabId ?? null, status: "pendente" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ServiceCall;
+}
+
+/** Chamados ainda pendentes (fila de atendimento). */
+export async function getPendingCalls(): Promise<ServiceCall[]> {
+  const { data } = await db()
+    .from("service_calls")
+    .select("*")
+    .eq("status", "pendente")
+    .order("created_at");
+  return (data ?? []) as ServiceCall[];
+}
+
+/** Marca o chamado como atendido. */
+export async function markCallAttended(id: number): Promise<void> {
+  await db().from("service_calls").update({ status: "atendido" }).eq("id", id);
+}

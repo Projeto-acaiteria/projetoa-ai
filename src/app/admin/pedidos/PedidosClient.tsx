@@ -1,0 +1,229 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Card, Badge } from "@/components/admin/ui";
+import { brl } from "@/lib/format";
+import { IconMoto, IconBag, IconArrowRight, IconPrinter, IconCheck } from "@/components/Icons";
+import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
+import { printTicket } from "@/lib/print";
+import { ticketHtml, type TicketData } from "@/lib/ticket";
+import type { Order, OrderStatus } from "@/lib/orders-store";
+
+const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão débito", credito: "Cartão crédito" };
+const MODE_LABEL: Record<string, string> = { balcao: "Balcão", retirada: "Retirada", entrega: "Entrega" };
+
+function cupomFromOrder(o: Order, storeName: string): CupomData {
+  const d = new Date(o.createdAt);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    loja: storeName,
+    display: o.display,
+    dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
+    modeLabel: MODE_LABEL[o.mode] ?? o.mode,
+    paymentLabel: o.paymentMethod ? PAY_LABEL[o.paymentMethod] : undefined,
+    customerName: o.customerName,
+    phone: o.phone || undefined,
+    address: o.address,
+    items: o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents })),
+    totalCents: o.totalCents,
+    pointsInfo: o.pointsAwarded ? `Pontos ganhos: +${o.pointsAwarded}` : undefined,
+  };
+}
+
+// cupom térmico (auto-impressão) — tamanho em destaque + acompanhamentos
+function ticketFromOrder(o: Order, storeName: string): TicketData {
+  const d = new Date(o.createdAt);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    loja: storeName,
+    display: o.display,
+    dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
+    modeLabel: MODE_LABEL[o.mode] ?? o.mode,
+    paymentLabel: o.paymentMethod ? PAY_LABEL[o.paymentMethod] : undefined,
+    customerName: o.customerName,
+    phone: o.phone || undefined,
+    address: o.address,
+    items: [{ qty: 1, name: o.sizeLabel }, ...o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined }))],
+    totalCents: o.totalCents,
+    pointsInfo: o.pointsAwarded ? `Pontos ganhos: +${o.pointsAwarded}` : undefined,
+    origem: o.mode === "balcao" ? "balcao" : "link",
+  };
+}
+
+const COLS: { key: OrderStatus; label: string; tone: "accent" | "gold" | "brand" | "lime" }[] = [
+  { key: "recebido", label: "Recebido", tone: "accent" },
+  { key: "preparo", label: "Em preparo", tone: "gold" },
+  { key: "saiu", label: "Saiu p/ entrega", tone: "brand" },
+  { key: "entregue", label: "Entregue", tone: "lime" },
+];
+const NEXT: Record<OrderStatus, OrderStatus | null> = {
+  recebido: "preparo",
+  preparo: "saiu",
+  saiu: "entregue",
+  entregue: null,
+};
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+export default function PedidosClient({ storeName }: { storeName: string }) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [autoPrint, setAutoPrint] = useState(true);
+  const seen = useRef<Set<number>>(new Set());
+  const first = useRef(true);
+
+  useEffect(() => {
+    setAutoPrint(localStorage.getItem("autoprint:caixa") !== "0");
+  }, []);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/pedidos", { cache: "no-store" });
+      const data = await res.json();
+      const list: Order[] = data.orders ?? [];
+      setOrders(list);
+      // auto-impressão: 1ª carga só marca os existentes; depois imprime os pedidos NOVOS do link
+      if (first.current) {
+        list.forEach((o) => seen.current.add(o.id));
+        first.current = false;
+      } else {
+        const novos = list.filter((o) => !seen.current.has(o.id));
+        novos.forEach((o) => seen.current.add(o.id));
+        if (autoPrint) {
+          for (const o of novos) {
+            if (o.mode !== "balcao") void printTicket(ticketHtml(ticketFromOrder(o, storeName)));
+          }
+        }
+      }
+    } catch {
+      /* mantém estado anterior */
+    } finally {
+      setLoaded(true);
+    }
+  }, [autoPrint, storeName]);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 4000); // tempo real (polling)
+    return () => clearInterval(t);
+  }, [load]);
+
+  function toggleAuto() {
+    setAutoPrint((v) => {
+      const nv = !v;
+      localStorage.setItem("autoprint:caixa", nv ? "1" : "0");
+      return nv;
+    });
+  }
+
+  async function advance(o: Order) {
+    const next = NEXT[o.status];
+    if (!next) return;
+    setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: next } : x)));
+    await fetch(`/api/pedidos/${o.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    load();
+  }
+
+  return (
+    <>
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-3.5">
+      <div className="flex items-center gap-2.5">
+        <span className={`grid h-9 w-9 place-items-center rounded-lg ${autoPrint ? "brand-gradient text-white" : "bg-bg-surface-2 text-[var(--text-muted)]"}`}>
+          <IconPrinter width={18} height={18} />
+        </span>
+        <div className="leading-tight">
+          <div className="text-sm font-bold text-ink">Impressão automática {autoPrint ? "ligada" : "desligada"}</div>
+          <div className="text-xs text-[var(--text-muted)]">pedidos do link saem na impressora do caixa</div>
+        </div>
+      </div>
+      <button onClick={toggleAuto} aria-label="Ligar/desligar impressão automática" className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoPrint ? "bg-brand-600" : "bg-bg-surface-2"}`}>
+        <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${autoPrint ? "left-6" : "left-1"}`} />
+      </button>
+    </div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {COLS.map((col) => {
+        const list = orders.filter((o) => o.status === col.key);
+        return (
+          <div key={col.key}>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-sm font-bold text-ink">{col.label}</span>
+              <Badge tone={col.tone}>{list.length}</Badge>
+            </div>
+            <div className="space-y-2.5">
+              {loaded && list.length === 0 && (
+                <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-[var(--text-faded)]">
+                  nenhum
+                </div>
+              )}
+              {list.map((o) => (
+                <Card key={o.id} className="p-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-ink">{o.display}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                      {o.mode === "entrega" ? <IconMoto width={14} height={14} /> : <IconBag width={14} height={14} />}
+                      {hhmm(o.createdAt)}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-ink-2">{o.customerName}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{o.phone}</div>
+
+                  {/* pedido completo */}
+                  <div className="mt-2 rounded-lg bg-bg-surface-2 p-2.5">
+                    <div className="text-xs font-bold text-ink">{o.sizeLabel}</div>
+                    <ul className="mt-1 space-y-0.5">
+                      {o.items.map((it, i) => (
+                        <li key={i} className="flex justify-between text-[11px] text-ink-2">
+                          <span>{it.qty}x {it.name}</span>
+                          <span className={it.paidCents > 0 ? "font-semibold text-ink" : "text-lime"}>
+                            {it.paidCents > 0 ? `+${brl(it.paidCents)}` : "grátis"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {o.mode === "entrega" && o.address && (
+                    <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                      <span className="font-semibold">Entrega:</span> {o.address}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-sm font-extrabold text-brand-600">{brl(o.totalCents)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setPrintOrder(o)}
+                        title="Imprimir cupom"
+                        className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-muted)] hover:border-brand-600 hover:text-brand-600"
+                      >
+                        <IconPrinter width={14} height={14} />
+                      </button>
+                      {NEXT[o.status] && (
+                        <button
+                          onClick={() => advance(o)}
+                          className="inline-flex items-center gap-1 rounded-lg brand-gradient px-2.5 py-1.5 text-[11px] font-bold text-white"
+                        >
+                          {col.key === "recebido" ? "Preparar" : col.key === "preparo" ? "Saiu" : "Entregue"}
+                          <IconArrowRight width={13} height={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      {printOrder && <CupomPrinter data={cupomFromOrder(printOrder, storeName)} onClose={() => setPrintOrder(null)} />}
+    </div>
+    </>
+  );
+}
