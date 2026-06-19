@@ -52,7 +52,11 @@ export async function POST(req: Request) {
   if (uErr || !created?.user)
     return NextResponse.json({ error: "Não consegui criar a conta (e-mail já cadastrado?)." }, { status: 400 });
   const userId = created.user.id;
-  const rollbackUser = () => db().auth.admin.deleteUser(userId).catch(() => {});
+  const rollbackUser = async () => {
+    try {
+      await db().auth.admin.deleteUser(userId);
+    } catch {}
+  };
 
   // 2. loja
   const { data: store, error: sErr } = await db()
@@ -66,7 +70,9 @@ export async function POST(req: Request) {
   }
   const storeId = store.id as string;
   const rollbackStore = async () => {
-    await db().from("stores").delete().eq("id", storeId).catch(() => {});
+    try {
+      await db().from("stores").delete().eq("id", storeId);
+    } catch {}
     await rollbackUser();
   };
 
