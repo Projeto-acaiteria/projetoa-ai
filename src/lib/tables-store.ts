@@ -8,6 +8,9 @@ import { moveStock } from "@/lib/stock-store";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { readMenu } from "@/lib/menu-store";
+
+const POLPA_STOCK_ID = "polpa"; // insumo base do açaí pesado (kg)
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -80,6 +83,8 @@ export type NewTabItem = {
   qty: number;
   unitPriceCents: number;
   consumes?: StockConsume[] | null;
+  sizeId?: string; // copo: ficha técnica resolvida pelo tamanho no servidor
+  grams?: number; // peso: polpa proporcional resolvida no servidor
 };
 
 // ── Mesas ────────────────────────────────────────────────────────────────────
@@ -167,6 +172,19 @@ export async function getOrCreateOpenTab(tableId: number, label?: string): Promi
 /** Lança itens numa comanda: 1 tab_order + os tab_order_items. Baixa estoque por ficha técnica. */
 export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<TabOrder> {
   const d = db();
+  const menu = await readMenu();
+  // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
+  const resolved = items.map((it) => {
+    let consumes: StockConsume[] = [];
+    if (it.sizeId) {
+      const size = menu.sizes.find((s) => s.id === it.sizeId);
+      consumes = (size?.recipe ?? []).map((r) => ({ stockId: r.stockId, qty: r.qty }));
+    } else if (it.grams && it.grams > 0) {
+      consumes = [{ stockId: POLPA_STOCK_ID, qty: +(it.grams / 1000).toFixed(3) }];
+    }
+    return { ...it, consumes };
+  });
+
   const { data: order, error } = await d
     .from("tab_orders")
     .insert({ tab_id: tabId, status: "pendente" })
@@ -174,23 +192,23 @@ export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<T
     .single();
   if (error) throw error;
 
-  const rows = items.map((it) => ({
+  const rows = resolved.map((it) => ({
     tab_order_id: (order as TabOrder).id,
     name: it.name,
     size_label: it.sizeLabel ?? null,
     qty: it.qty,
     unit_price_cents: it.unitPriceCents,
-    consumes: it.consumes ?? [],
+    consumes: it.consumes,
   }));
   if (rows.length) {
     const { error: e2 } = await d.from("tab_order_items").insert(rows);
     if (e2) throw e2;
   }
 
-  // baixa de estoque por ficha técnica (consumes = [{stockId, qty}])
+  // baixa de estoque pela ficha técnica resolvida
   const today = new Date().toISOString().slice(0, 10);
-  for (const it of items) {
-    for (const c of it.consumes ?? []) {
+  for (const it of resolved) {
+    for (const c of it.consumes) {
       await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today);
     }
   }

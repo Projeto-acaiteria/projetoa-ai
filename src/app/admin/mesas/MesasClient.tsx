@@ -35,7 +35,7 @@ type Comanda = {
   paidCents: number;
 };
 
-type CartLine = { name: string; sizeLabel?: string; qty: number; unitPriceCents: number; consumes?: unknown };
+type CartLine = { name: string; sizeLabel?: string; qty: number; unitPriceCents: number; consumes?: unknown; sizeId?: string; grams?: number };
 
 const METHODS: { key: string; label: string }[] = [
   { key: "dinheiro", label: "Dinheiro" },
@@ -186,13 +186,13 @@ export default function MesasClient({
         nx[i] = { ...nx[i], qty: nx[i].qty + 1 };
         return nx;
       }
-      return [...c, { name: s.label, sizeLabel: s.label, qty: 1, unitPriceCents: s.priceCents }];
+      return [...c, { name: s.label, sizeLabel: s.label, qty: 1, unitPriceCents: s.priceCents, sizeId: s.id }];
     });
   }
 
   function addPesado() {
     if (gramsNum <= 0) return;
-    setCart((c) => [...c, { name: `Açaí ${gramsNum}g`, qty: 1, unitPriceCents: gramsPriceCents }]);
+    setCart((c) => [...c, { name: `Açaí ${gramsNum}g`, qty: 1, unitPriceCents: gramsPriceCents, grams: gramsNum }]);
     setGrams("");
   }
 
