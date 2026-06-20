@@ -6,6 +6,7 @@
 // em isActive() (aba nova retorna false e cai no fallback). — lição do Verbo.
 
 import { QZ_CERT } from "./qz-cert";
+import { parseScaleWeight } from "./scale";
 
 type QZ = any;
 let qzMod: QZ = null;
@@ -62,4 +63,67 @@ export function getStationPrinter(station = "caixa"): string | null {
 }
 export function setStationPrinter(station: string, name: string): void {
   if (typeof window !== "undefined") localStorage.setItem("printer:" + station, name);
+}
+
+// ── Balança serial via QZ Tray (V2 — leitura automática do peso) ──────────────
+// Reusa a MESMA ponte do QZ que já roda pra impressão. Protocolo Toledo (parseScaleWeight).
+// ⚠️ Caminho de HARDWARE — só valida com balança física + QZ rodando; o parser é provado isolado.
+export type ScaleConfig = { port: string; baudRate: number; dataBits: number; parity: string; stopBits: number };
+const SCALE_KEY = "scale:config";
+
+export function getScaleConfig(): ScaleConfig | null {
+  if (typeof window === "undefined") return null;
+  try { const v = localStorage.getItem(SCALE_KEY); return v ? (JSON.parse(v) as ScaleConfig) : null; } catch { return null; }
+}
+export function setScaleConfig(cfg: ScaleConfig): void {
+  if (typeof window !== "undefined") localStorage.setItem(SCALE_KEY, JSON.stringify(cfg));
+}
+
+export async function qzListSerialPorts(): Promise<string[]> {
+  const qz = await qzConnect();
+  const ports = await qz.serial.findPorts();
+  return Array.isArray(ports) ? ports : ports ? [ports] : [];
+}
+
+/** Lê UM peso estável da balança (gramas). null = nada estável no tempo limite. Fecha a porta no fim.
+ *  request = comando que pede o peso (Toledo PRT1 responde a ENQ 0x05). */
+export async function qzReadScaleGrams(cfg?: Partial<ScaleConfig>, request = "\x05", timeoutMs = 2500): Promise<number | null> {
+  const saved = getScaleConfig();
+  const c: ScaleConfig = {
+    port: cfg?.port ?? saved?.port ?? "",
+    baudRate: cfg?.baudRate ?? saved?.baudRate ?? 9600,
+    dataBits: cfg?.dataBits ?? saved?.dataBits ?? 8,
+    parity: cfg?.parity ?? saved?.parity ?? "none",
+    stopBits: cfg?.stopBits ?? saved?.stopBits ?? 1,
+  };
+  if (!c.port) throw new Error("Balança não configurada (porta).");
+  const qz = await qzConnect();
+  const bounds = { baudRate: c.baudRate, dataBits: c.dataBits, parity: c.parity, stopBits: c.stopBits, flowControl: "none" };
+
+  return new Promise<number | null>((resolve) => {
+    let buffer = "";
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = (val: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      qz.serial.closePort(c.port).catch(() => {});
+      resolve(val);
+    };
+    timer = setTimeout(() => finish(parseScaleWeight(buffer)), timeoutMs);
+    try {
+      qz.serial.setSerialCallbacks((evt: any) => {
+        const data = (evt && (evt.output ?? evt.data)) ?? "";
+        buffer += String(data);
+        const g = parseScaleWeight(buffer);
+        if (g != null) finish(g);
+      });
+      Promise.resolve(qz.serial.openPort(c.port, bounds))
+        .then(() => (request ? qz.serial.sendData(c.port, request) : undefined))
+        .catch(() => finish(null));
+    } catch {
+      finish(null);
+    }
+  });
 }
