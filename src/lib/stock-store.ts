@@ -31,12 +31,21 @@ export type StockItem = {
   expiry?: string; // YYYY-MM-DD (validade do lote atual)
   sellPriceCents?: number; // preço de venda (só p/ produtos de revenda)
   // bar (opt-in): destilado controlado em DOSE/GARRAFA. qty fica em doses; entrada por garrafa
-  // soma dosesPerBottle. garrafas = qty / dosesPerBottle. custoPorGarrafa pro CMV (futuro).
+  // soma dosesPerBottle. garrafas = qty / dosesPerBottle. custoPorGarrafa pro CMV.
   dosesPerBottle?: number;
   costPerBottleCents?: number;
+  costCents?: number; // custo por UNIDADE do insumo (kg/un/L...) — base do CMV (ficha técnica)
   updatedAt: string;
   history: StockMove[];
 };
+
+/** Custo de UMA unidade consumida (a mesma unidade da ficha técnica). Dose = custo/garrafa ÷ doses. */
+export function unitCostCents(item: Pick<StockItem, "dosesPerBottle" | "costPerBottleCents" | "costCents">): number {
+  if (item.dosesPerBottle && item.dosesPerBottle > 0 && item.costPerBottleCents) {
+    return Math.round(item.costPerBottleCents / item.dosesPerBottle);
+  }
+  return Math.max(0, Math.round(item.costCents ?? 0));
+}
 
 // Seed de exemplo (demonstra os 3 grupos + alertas: vencendo, baixo, normal)
 const SEED: StockItem[] = [
@@ -72,8 +81,8 @@ async function readAll(storeId?: string): Promise<StockItem[]> {
   return seedClone();
 }
 
-export async function listStock(): Promise<StockItem[]> {
-  return (await readAll()).sort((a, b) => a.name.localeCompare(b.name));
+export async function listStock(storeId?: string): Promise<StockItem[]> {
+  return (await readAll(storeId)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export type NewStockItem = Omit<StockItem, "id" | "updatedAt" | "history">;
@@ -103,9 +112,12 @@ export async function updateItem(id: string, patch: Partial<StockItem>, at: stri
   return item;
 }
 
-export async function moveStock(id: string, type: "entrada" | "saida", qty: number, reason: string, at: string): Promise<StockItem | null> {
+export async function moveStock(id: string, type: "entrada" | "saida", qty: number, reason: string, at: string, storeId?: string): Promise<StockItem | null> {
+  // storeId explícito é OBRIGATÓRIO no caminho público (pedido pela mesa, sem auth) — senão
+  // resolveStoreId cai na loja errada, o item não é achado e a baixa falha em silêncio.
+  const sid = storeId ?? (await resolveStoreId());
   // o item pode ainda não existir no banco (estado seed) — usa readAll p/ achar o seed também
-  const all = await readAll();
+  const all = await readAll(sid);
   const cur = all.find((x) => x.id === id);
   if (!cur) return null;
   const delta = type === "entrada" ? Math.abs(qty) : -Math.abs(qty);
@@ -115,7 +127,6 @@ export async function moveStock(id: string, type: "entrada" | "saida", qty: numb
     updatedAt: at,
     history: [{ type, qty: Math.abs(qty), reason, at }, ...cur.history],
   };
-  const sid = await resolveStoreId();
   const { error } = await db().from("stock_items").upsert({ store_id: sid, id, data: item });
   if (error) throw new Error("Falha ao movimentar estoque: " + error.message);
   return item;

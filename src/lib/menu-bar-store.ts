@@ -32,6 +32,9 @@ export type ModifierGroup = {
   modifiers: Modifier[];
 };
 
+// Ficha técnica: insumo do estoque consumido por unidade vendida (baixa automática + CMV)
+export type RecipeLine = { stockId: string; qty: number };
+
 export type BarProduct = {
   id: string;
   category_id: string;
@@ -41,8 +44,16 @@ export type BarProduct = {
   img: string | null;
   sort: number;
   active: boolean;
+  recipe: RecipeLine[]; // ficha técnica (baixa automática de estoque na venda)
   groups: ModifierGroup[]; // personalização (adicionais, ponto, remover, meio-a-meio...)
 };
+
+function toRecipe(v: unknown): RecipeLine[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((r) => ({ stockId: String((r as RecipeLine)?.stockId ?? ""), qty: num((r as RecipeLine)?.qty) }))
+    .filter((r) => r.stockId && r.qty > 0);
+}
 
 export type BarCategory = {
   id: string;
@@ -64,6 +75,7 @@ const toProduct = (r: Record<string, unknown>): BarProduct => ({
   img: (r.img as string) ?? null,
   sort: num(r.sort),
   active: Boolean(r.active),
+  recipe: toRecipe(r.recipe),
   groups: [],
 });
 
@@ -149,7 +161,7 @@ export async function readBarMenu(storeId?: string, includeInactive = false): Pr
 /** Resolve itens de um pedido a partir de {productId, qty} — preço, nome, size_label e ESTAÇÃO
  *  vêm do BANCO (nunca do client). station = da categoria do produto. Ignora produto inativo. */
 export type ResolvedMod = { name: string; price_cents: number };
-export type ResolvedItem = { name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; mods: ResolvedMod[] | null };
+export type ResolvedItem = { productId: string; name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; mods: ResolvedMod[] | null; recipe: RecipeLine[] };
 
 export async function resolveOrderItems(
   storeId: string,
@@ -159,7 +171,7 @@ export async function resolveOrderItems(
   if (!ids.length) return [];
   const d = db();
   const [{ data: prods }, { data: cats }, { data: mods }, { data: groups }] = await Promise.all([
-    d.from("menu_products").select("id, name, size_label, price_cents, category_id").eq("store_id", storeId).eq("active", true).in("id", ids),
+    d.from("menu_products").select("id, name, size_label, price_cents, category_id, recipe").eq("store_id", storeId).eq("active", true).in("id", ids),
     d.from("menu_categories").select("id, station").eq("store_id", storeId),
     d.from("menu_modifiers").select("id, group_id, name, price_cents").eq("store_id", storeId).eq("active", true),
     d.from("menu_modifier_groups").select("id, free_up_to, price_mode").eq("store_id", storeId),
@@ -211,12 +223,14 @@ export async function resolveOrderItems(
     }
 
     out.push({
+      productId: String(p.id),
       name: String(p.name),
       sizeLabel: (p.size_label as string) ?? null,
       qty,
       unitPriceCents: num(p.price_cents) + modsTotal,
       station: stationByCat.get(String(p.category_id)) ?? "cozinha",
       mods: modsOut.length ? modsOut : null,
+      recipe: toRecipe(p.recipe),
     });
   }
   return out;
@@ -279,6 +293,7 @@ export type ProductInput = {
   img?: string | null;
   sort?: number;
   active?: boolean;
+  recipe?: RecipeLine[]; // ficha técnica (baixa automática)
 };
 
 export async function createProduct(input: ProductInput, storeId?: string): Promise<BarProduct> {
@@ -294,6 +309,7 @@ export async function createProduct(input: ProductInput, storeId?: string): Prom
       img: input.img ?? null,
       sort: input.sort ?? 0,
       active: input.active ?? true,
+      recipe: toRecipe(input.recipe),
     })
     .select("*")
     .single();
@@ -303,7 +319,8 @@ export async function createProduct(input: ProductInput, storeId?: string): Prom
 
 export async function updateProduct(id: string, patch: Partial<ProductInput>, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
-  await db().from("menu_products").update(patch).eq("id", id).eq("store_id", sid);
+  const clean = "recipe" in patch ? { ...patch, recipe: toRecipe(patch.recipe) } : patch;
+  await db().from("menu_products").update(clean).eq("id", id).eq("store_id", sid);
 }
 
 export async function deleteProduct(id: string, storeId?: string): Promise<void> {

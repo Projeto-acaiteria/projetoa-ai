@@ -34,6 +34,8 @@ export async function POST(req: Request) {
       expiry: b.expiry || undefined,
       sellPriceCents: b.sellPriceCents ? Math.max(0, Math.round(Number(b.sellPriceCents))) : undefined,
       dosesPerBottle: b.dosesPerBottle ? Math.max(1, Math.round(Number(b.dosesPerBottle))) : undefined,
+      costPerBottleCents: b.costPerBottleCents ? Math.max(0, Math.round(Number(b.costPerBottleCents))) : undefined,
+      costCents: b.costCents ? Math.max(0, Math.round(Number(b.costCents))) : undefined,
     },
     new Date().toISOString().slice(0, 10),
   );

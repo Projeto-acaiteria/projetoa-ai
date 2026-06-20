@@ -213,6 +213,7 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [expiry, setExpiry] = useState("");
   const [sell, setSell] = useState("");
   const [dpb, setDpb] = useState(""); // doses por garrafa (destilado)
+  const [cost, setCost] = useState(""); // custo (CMV): por garrafa se dose, senão por unidade
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
@@ -222,6 +223,7 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     if (!name.trim()) return;
     setSaving(true);
     const doses = isBebida && dpb ? Math.round(parseFloat(dpb.replace(",", ".")) || 0) : 0;
+    const costC = cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : 0;
     await fetch("/api/estoque", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,6 +236,9 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         expiry: expiry || undefined,
         sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : undefined,
         dosesPerBottle: doses > 0 ? doses : undefined,
+        // custo p/ CMV: dose → por garrafa; demais → por unidade
+        costPerBottleCents: doses > 0 && costC ? costC : undefined,
+        costCents: doses === 0 && costC ? costC : undefined,
       }),
     });
     onSaved();
@@ -272,6 +277,16 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           </div>
         </div>
       )}
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">
+          {isBebida && dpb ? "Custo por garrafa (CMV — opcional)" : "Custo por unidade (CMV — opcional)"}
+        </label>
+        <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
+          <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+          <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} />
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--text-faded)]">Quanto VOCÊ paga. Vira o custo da ficha técnica → relatório de CMV e margem.</p>
+      </div>
       <div>
         <label className="text-xs font-semibold text-[var(--text-muted)]">Validade (opcional)</label>
         <input className={`${inp} mt-1`} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />

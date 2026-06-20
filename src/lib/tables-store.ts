@@ -91,6 +91,7 @@ export type NewTabItem = {
   consumes?: StockConsume[] | null;
   sizeId?: string; // copo: ficha técnica resolvida pelo tamanho no servidor
   grams?: number; // peso: polpa proporcional resolvida no servidor
+  productId?: string; // bar: ficha técnica do menu_product resolvida no servidor (baixa automática)
   station?: string; // estação de preparo (bar). Ausente = 'cozinha' (açaí).
   mods?: { name: string; price_cents: number }[] | null; // personalização escolhida (espelha no KDS/cupom)
 };
@@ -214,6 +215,20 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
   const menu = await readMenu(storeId);
+
+  // ficha técnica do BAR resolvida no SERVIDOR pelo productId (recipe do menu_products, nunca do client)
+  const prodIds = [...new Set(items.map((it) => it.productId).filter(Boolean) as string[])];
+  const recipeByProduct = new Map<string, StockConsume[]>();
+  if (prodIds.length) {
+    const { data: prods } = await d.from("menu_products").select("id, recipe").eq("store_id", sid).in("id", prodIds);
+    for (const p of (prods ?? []) as { id: string; recipe: unknown }[]) {
+      const r = Array.isArray(p.recipe)
+        ? (p.recipe as StockConsume[]).map((x) => ({ stockId: String(x?.stockId ?? ""), qty: num(x?.qty) })).filter((x) => x.stockId && x.qty > 0)
+        : [];
+      recipeByProduct.set(String(p.id), r);
+    }
+  }
+
   // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
   const resolved = items.map((it) => {
     let consumes: StockConsume[] = [];
@@ -222,6 +237,8 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       consumes = (size?.recipe ?? []).map((r) => ({ stockId: r.stockId, qty: r.qty }));
     } else if (it.grams && it.grams > 0) {
       consumes = [{ stockId: POLPA_STOCK_ID, qty: +(it.grams / 1000).toFixed(3) }];
+    } else if (it.productId) {
+      consumes = recipeByProduct.get(it.productId) ?? [];
     }
     return { ...it, consumes, station: it.station || "cozinha" };
   });
@@ -262,7 +279,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const today = new Date().toISOString().slice(0, 10);
   for (const it of resolved) {
     for (const c of it.consumes) {
-      await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today);
+      await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today, sid);
     }
   }
   return created;

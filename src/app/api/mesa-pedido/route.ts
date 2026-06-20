@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const tab = await getOrCreateOpenTab(tableId, `Mesa ${tableNumber}`, storeId);
     const orders = await addTabItems(
       tab.id,
-      items.map((it) => ({ name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods })),
+      items.map((it) => ({ name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods, productId: it.productId })),
       storeId,
       note,
     );
