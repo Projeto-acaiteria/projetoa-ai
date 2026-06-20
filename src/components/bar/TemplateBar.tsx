@@ -254,7 +254,7 @@ export default function TemplateBar({
                       </p>
                       <div className="mt-0.5 flex items-center gap-2">
                         <p className="font-bold" style={{ color: ACCENT_HI }}>
-                          {(() => { const fp = fromPrice(p); return <>{fp.from && <span className="text-[10px] font-medium text-white/40">a partir de </span>}{brl(fp.cents)}</>; })()}
+                          {(() => { const fp = fromPrice(p); return <>{fp.from && <span className="text-[10px] font-medium text-white/40">a partir de </span>}{brl(fp.cents)}{fp.perKg && <span className="text-[11px] font-medium text-white/40">/kg</span>}</>; })()}
                         </p>
                         {hasGroups && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,59,78,0.15)", color: ACCENT_HI }}>monta</span>}
                       </div>

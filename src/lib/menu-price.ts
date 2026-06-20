@@ -3,7 +3,9 @@ import type { BarProduct } from "@/lib/menu-bar-store";
 // Preço de exibição no card. Produtos cujo preço vem de grupos OBRIGATÓRIOS (combinado por tamanho,
 // pizza por sabor) têm base 0 — mostrar "a partir de R$ X" (base + a opção mais barata de cada grupo
 // obrigatório) em vez de "R$ 0,00". Client-safe (só usa o tipo, não o db).
-export function fromPrice(p: BarProduct): { cents: number; from: boolean } {
+export function fromPrice(p: BarProduct): { cents: number; from: boolean; perKg: boolean } {
+  // por peso: o preço é R$/kg (não soma grupos nem "a partir de")
+  if (p.by_weight) return { cents: p.price_cents, from: false, perKg: true };
   let base = p.price_cents;
   let from = false;
   for (const g of p.groups) {
@@ -12,5 +14,5 @@ export function fromPrice(p: BarProduct): { cents: number; from: boolean } {
       from = true;
     }
   }
-  return { cents: base, from };
+  return { cents: base, from, perKg: false };
 }

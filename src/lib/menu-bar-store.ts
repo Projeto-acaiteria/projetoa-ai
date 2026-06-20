@@ -39,11 +39,13 @@ export type BarProduct = {
   id: string;
   category_id: string;
   name: string;
-  price_cents: number;
+  price_cents: number; // preço fixo OU, se by_weight, preço por KG
   size_label: string | null;
   img: string | null;
   sort: number;
   active: boolean;
+  by_weight: boolean; // vendido por peso (marmita/a quilo): price_cents = R$/kg
+  tare_grams: number; // tara (g) descontada do peso bruto
   recipe: RecipeLine[]; // ficha técnica (baixa automática de estoque na venda)
   groups: ModifierGroup[]; // personalização (adicionais, ponto, remover, meio-a-meio...)
 };
@@ -75,6 +77,8 @@ const toProduct = (r: Record<string, unknown>): BarProduct => ({
   img: (r.img as string) ?? null,
   sort: num(r.sort),
   active: Boolean(r.active),
+  by_weight: Boolean(r.by_weight),
+  tare_grams: num(r.tare_grams),
   recipe: toRecipe(r.recipe),
   groups: [],
 });
@@ -165,13 +169,13 @@ export type ResolvedItem = { productId: string; name: string; sizeLabel: string 
 
 export async function resolveOrderItems(
   storeId: string,
-  sel: { productId: string; qty: number; modifierIds?: string[] }[],
+  sel: { productId: string; qty: number; modifierIds?: string[]; grams?: number }[],
 ): Promise<ResolvedItem[]> {
   const ids = sel.map((s) => s.productId).filter(Boolean);
   if (!ids.length) return [];
   const d = db();
   const [{ data: prods }, { data: cats }, { data: mods }, { data: groups }] = await Promise.all([
-    d.from("menu_products").select("id, name, size_label, price_cents, category_id, recipe").eq("store_id", storeId).eq("active", true).in("id", ids),
+    d.from("menu_products").select("id, name, size_label, price_cents, category_id, recipe, by_weight, tare_grams").eq("store_id", storeId).eq("active", true).in("id", ids),
     d.from("menu_categories").select("id, station").eq("store_id", storeId),
     d.from("menu_modifiers").select("id, group_id, name, price_cents").eq("store_id", storeId).eq("active", true),
     d.from("menu_modifier_groups").select("id, free_up_to, price_mode").eq("store_id", storeId),
@@ -222,12 +226,22 @@ export async function resolveOrderItems(
       }
     }
 
+    // por peso (marmita/a quilo): preço-base = (peso bruto - tara)/1000 × R$/kg (price_cents). Senão, preço fixo.
+    let baseCents = num(p.price_cents);
+    let sizeLabel = (p.size_label as string) ?? null;
+    if (p.by_weight) {
+      const bruto = Math.max(0, Math.round(Number(s.grams) || 0));
+      const liquido = Math.max(0, bruto - num(p.tare_grams));
+      baseCents = Math.round((liquido / 1000) * num(p.price_cents));
+      sizeLabel = liquido > 0 ? `${liquido}g` : "0g";
+    }
+
     out.push({
       productId: String(p.id),
       name: String(p.name),
-      sizeLabel: (p.size_label as string) ?? null,
+      sizeLabel,
       qty,
-      unitPriceCents: num(p.price_cents) + modsTotal,
+      unitPriceCents: baseCents + modsTotal,
       station: stationByCat.get(String(p.category_id)) ?? "cozinha",
       mods: modsOut.length ? modsOut : null,
       recipe: toRecipe(p.recipe),
@@ -293,6 +307,8 @@ export type ProductInput = {
   img?: string | null;
   sort?: number;
   active?: boolean;
+  by_weight?: boolean; // vendido por peso (R$/kg)
+  tare_grams?: number;
   recipe?: RecipeLine[]; // ficha técnica (baixa automática)
 };
 
@@ -309,6 +325,8 @@ export async function createProduct(input: ProductInput, storeId?: string): Prom
       img: input.img ?? null,
       sort: input.sort ?? 0,
       active: input.active ?? true,
+      by_weight: input.by_weight ?? false,
+      tare_grams: Math.max(0, Math.round(input.tare_grams ?? 0)),
       recipe: toRecipe(input.recipe),
     })
     .select("*")

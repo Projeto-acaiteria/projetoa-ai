@@ -12,7 +12,7 @@ const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
 
 type CatForm = { id?: string; name: string; station: string; description: string; active: boolean };
-type ProdForm = { id?: string; category_id: string; name: string; priceReais: string; size_label: string; img: string; active: boolean };
+type ProdForm = { id?: string; category_id: string; name: string; priceReais: string; size_label: string; img: string; active: boolean; by_weight: boolean; tara: string };
 
 const ImgIcon = () => (
   <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
@@ -165,8 +165,9 @@ export default function CardapioBarEditor() {
     const f = prodModal;
     if (!f || !f.name.trim()) return;
     const cents = Math.round((parseFloat(f.priceReais.replace(",", ".")) || 0) * 100);
-    if (f.id) await api("prod.update", { id: f.id, patch: { name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, active: f.active } });
-    else await api("prod.create", { category_id: f.category_id, name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, sort: 0 });
+    const tara = Math.max(0, Math.round(parseFloat(f.tara.replace(",", ".")) || 0));
+    if (f.id) await api("prod.update", { id: f.id, patch: { name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, active: f.active, by_weight: f.by_weight, tare_grams: tara } });
+    else await api("prod.create", { category_id: f.category_id, name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, sort: 0, by_weight: f.by_weight, tare_grams: tara });
     setProdModal(null);
   }
   async function delProd(p: BarProduct) {
@@ -223,13 +224,13 @@ export default function CardapioBarEditor() {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                     {(p.recipe?.length ?? 0) > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">{p.recipe.length}</span>}
                   </button>
-                  <button onClick={() => setProdModal({ id: p.id, category_id: p.category_id, name: p.name, priceReais: (p.price_cents / 100).toFixed(2).replace(".", ","), size_label: p.size_label ?? "", img: p.img ?? "", active: p.active })} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
+                  <button onClick={() => setProdModal({ id: p.id, category_id: p.category_id, name: p.name, priceReais: (p.price_cents / 100).toFixed(2).replace(".", ","), size_label: p.size_label ?? "", img: p.img ?? "", active: p.active, by_weight: p.by_weight, tara: String(p.tare_grams || "") })} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
                   <button onClick={() => delProd(p)} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-red-50 hover:text-red-500"><Trash /></button>
                 </div>
               </li>
             ))}
           </ul>
-          <button onClick={() => setProdModal({ category_id: c.id, name: "", priceReais: "", size_label: "", img: "", active: true })} className="mt-3 text-sm font-bold text-brand-600">+ Adicionar produto</button>
+          <button onClick={() => setProdModal({ category_id: c.id, name: "", priceReais: "", size_label: "", img: "", active: true, by_weight: false, tara: "" })} className="mt-3 text-sm font-bold text-brand-600">+ Adicionar produto</button>
         </Card>
       ))}
 
@@ -248,10 +249,18 @@ export default function CardapioBarEditor() {
 
       {prodModal && (
         <Modal title={prodModal.id ? "Editar produto" : "Novo produto"} onClose={() => setProdModal(null)} onSave={saveProd} saving={saving}>
-          <Field label="Nome"><input autoFocus value={prodModal.name} onChange={(e) => setProdModal({ ...prodModal, name: e.target.value })} placeholder="Ex: Batata frita" className={inputCls} /></Field>
+          <Field label="Nome"><input autoFocus value={prodModal.name} onChange={(e) => setProdModal({ ...prodModal, name: e.target.value })} placeholder={prodModal.by_weight ? "Ex: Comida a quilo" : "Ex: Batata frita"} className={inputCls} /></Field>
+          <label className="flex items-center gap-2 rounded-lg bg-bg-surface-2 px-3 py-2.5 text-sm font-semibold text-ink">
+            <input type="checkbox" checked={prodModal.by_weight} onChange={(e) => setProdModal({ ...prodModal, by_weight: e.target.checked })} />
+            Vender por peso (R$/kg) — marmita / a quilo
+          </label>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Preço (R$)"><input value={prodModal.priceReais} onChange={(e) => setProdModal({ ...prodModal, priceReais: e.target.value })} inputMode="decimal" placeholder="0,00" className={inputCls} /></Field>
-            <Field label="Tamanho (opcional)"><input value={prodModal.size_label} onChange={(e) => setProdModal({ ...prodModal, size_label: e.target.value })} placeholder="500g / 600ml" className={inputCls} /></Field>
+            <Field label={prodModal.by_weight ? "Preço por kg (R$)" : "Preço (R$)"}><input value={prodModal.priceReais} onChange={(e) => setProdModal({ ...prodModal, priceReais: e.target.value })} inputMode="decimal" placeholder="0,00" className={inputCls} /></Field>
+            {prodModal.by_weight ? (
+              <Field label="Tara do prato (g)"><input value={prodModal.tara} onChange={(e) => setProdModal({ ...prodModal, tara: e.target.value })} inputMode="numeric" placeholder="0" className={inputCls} /></Field>
+            ) : (
+              <Field label="Tamanho (opcional)"><input value={prodModal.size_label} onChange={(e) => setProdModal({ ...prodModal, size_label: e.target.value })} placeholder="500g / 600ml" className={inputCls} /></Field>
+            )}
           </div>
           <Field label="Foto (opcional)"><ImagePicker value={prodModal.img} onChange={(url) => setProdModal({ ...prodModal, img: url })} /></Field>
           <label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={prodModal.active} onChange={(e) => setProdModal({ ...prodModal, active: e.target.checked })} /> Disponível</label>
