@@ -1,6 +1,7 @@
 // Sessão de caixa · abertura, sangria, suprimento, fechamento com conferência.
 // Modelo de PDV sério (espelha o caixa do palace-system). JSON → tabela Supabase.
 import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export type CashMovement = {
   type: "sangria" | "suprimento";
@@ -24,8 +25,9 @@ export type CashSession = {
   salesTotalCents?: number; // snapshot total vendido
 };
 
-async function readAll(): Promise<CashSession[]> {
-  const { data, error } = await db().from("cash_sessions").select("data");
+async function readAll(storeId?: string): Promise<CashSession[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("cash_sessions").select("data").eq("store_id", sid);
   if (error) throw new Error("Erro ao ler caixa: " + error.message); // nunca tratar erro como vazio
   return (data ?? []).map((r) => (r as { data: CashSession }).data);
 }
@@ -63,7 +65,8 @@ export async function openCash(floatCents: number, at: string, operator?: string
     movements: [] as CashMovement[],
     status: "aberto" as const,
   };
-  const { data: row, error } = await d.from("cash_sessions").insert({ data: base }).select("id").single();
+  const sid = await resolveStoreId();
+  const { data: row, error } = await d.from("cash_sessions").insert({ data: base, store_id: sid }).select("id").single();
   if (error || !row) throw new Error("Falha ao abrir o caixa: " + (error?.message ?? "sem retorno"));
   const id = Number((row as { id: number }).id);
   const session: CashSession = { ...base, id };
