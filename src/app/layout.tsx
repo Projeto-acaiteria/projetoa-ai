@@ -3,10 +3,10 @@ import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
-  title: "Açaí do Vidal — Sistema",
-  description: "Cardápio digital, pedidos por WhatsApp, fidelidade e gestão.",
+  title: "ComandaPRO — Sistema de food service",
+  description: "Cardápio digital, comanda, mesa, delivery, balcão e gestão — num sistema só.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Açaí do Vidal" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "ComandaPRO" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 

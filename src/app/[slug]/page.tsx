@@ -14,6 +14,20 @@ import InstallApp from "@/components/InstallApp";
 
 export const dynamic = "force-dynamic"; // reflete edições do adm na hora
 
+// título/preview por LOJA (compartilhar o link no WhatsApp mostra o nome da loja, não "ComandaPRO")
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const { data: loja } = await db().from("stores").select("id").eq("slug", slug).eq("active", true).maybeSingle();
+  if (!loja) return { title: "Cardápio" };
+  const store = await getStore((loja as { id: string }).id);
+  const logo = store.logoUrl || undefined;
+  return {
+    title: store.name,
+    description: store.tagline || "Faça seu pedido pelo cardápio digital.",
+    openGraph: { title: store.name, description: store.tagline || "Cardápio digital", images: logo ? [logo] : undefined },
+  };
+}
+
 // Cardápio público POR LOJA (ComandaPRO — ativação). Resolve o tenant pelo slug da URL
 // (comandapro.com.br/cantinho) e passa o storeId pros stores. Visual genérico (qualquer loja).
 export default async function LojaCardapio({ params }: { params: Promise<{ slug: string }> }) {
