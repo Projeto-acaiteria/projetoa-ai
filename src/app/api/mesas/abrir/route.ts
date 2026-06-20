@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrCreateOpenTab } from "@/lib/tables-store";
+import { resolveStoreId } from "@/lib/auth/current";
 import { db } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -19,15 +20,17 @@ export async function POST(req: Request) {
   }
 
   try {
+    const storeId = await resolveStoreId();
     const { data: table, error } = await db()
       .from("tables")
       .select("id")
+      .eq("store_id", storeId) // multi-tenant: a mesa N é da LOJA logada (várias lojas têm mesa N)
       .eq("number", b.tableNumber)
-      .single();
+      .maybeSingle();
     if (error || !table) {
       return NextResponse.json({ error: "Mesa não encontrada" }, { status: 400 });
     }
-    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined, undefined, b.pax);
+    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined, storeId, b.pax);
     return NextResponse.json({ tab });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

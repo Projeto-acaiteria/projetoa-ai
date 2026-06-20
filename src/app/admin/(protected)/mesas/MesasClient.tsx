@@ -58,12 +58,17 @@ function agoMin(iso: string | null): string {
 export default function MesasClient({
   pricePerKgCents,
   sizes,
+  coverShow = null,
 }: {
   pricePerKgCents: number;
   sizes: SizeOption[];
+  coverShow?: { artist: string; coverCents: number } | null;
 }) {
   const [tables, setTables] = useState<TableCell[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // couvert: ao abrir mesa nova com show hoje, pergunta o nº de pessoas
+  const [paxCell, setPaxCell] = useState<TableCell | null>(null);
+  const [paxValue, setPaxValue] = useState(2);
 
   // modal / comanda aberta
   const [tabId, setTabId] = useState<number | null>(null);
@@ -109,7 +114,13 @@ export default function MesasClient({
     setComanda(data);
   }, []);
 
-  async function openTable(cell: TableCell) {
+  // clique na mesa: ocupada abre direto; mesa NOVA com show hoje pergunta nº de pessoas (pro couvert)
+  function onTableClick(cell: TableCell) {
+    if (!cell.tabId && coverShow) { setPaxValue(2); setPaxCell(cell); return; }
+    openTable(cell, 1);
+  }
+
+  async function openTable(cell: TableCell, pax: number) {
     setBusy(true);
     try {
       let id = cell.tabId;
@@ -117,12 +128,13 @@ export default function MesasClient({
         const res = await fetch("/api/mesas/abrir", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tableNumber: cell.number }),
+          body: JSON.stringify({ tableNumber: cell.number, pax }),
         });
         const data = await res.json();
         id = data.tab?.id ?? null;
       }
       if (!id) return;
+      setPaxCell(null);
       setTabId(id);
       setTableNumber(cell.number);
       setPayMode(false);
@@ -305,7 +317,7 @@ export default function MesasClient({
     const ocupada = t.tabId != null;
     return (
       <button
-        onClick={() => openTable(t)}
+        onClick={() => onTableClick(t)}
         disabled={busy}
         className={`card flex aspect-square flex-col items-center justify-center p-3 text-center transition disabled:opacity-60 ${
           ocupada
@@ -659,6 +671,27 @@ export default function MesasClient({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {paxCell && coverShow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPaxCell(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-xs rounded-2xl bg-bg-elevated p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-extrabold text-ink">Mesa {paxCell.number}</h3>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">Couvert · atração ao vivo: {coverShow.artist}</p>
+            <p className="mb-3 mt-4 text-sm font-semibold text-ink">Quantas pessoas na mesa?</p>
+            <div className="flex items-center justify-center gap-5">
+              <button onClick={() => setPaxValue((v) => Math.max(1, v - 1))} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">−</button>
+              <span className="w-10 text-center text-3xl font-extrabold tabular-nums text-ink">{paxValue}</span>
+              <button onClick={() => setPaxValue((v) => v + 1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">+</button>
+            </div>
+            <p className="mt-4 text-center text-sm text-[var(--text-muted)]">Couvert: <b className="text-ink">{brl(coverShow.coverCents * paxValue)}</b> <span className="text-xs">({brl(coverShow.coverCents)}/pessoa)</span></p>
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setPaxCell(null)} className="flex-1 rounded-xl border border-line py-2.5 text-sm font-bold text-[var(--text-secondary)]">Cancelar</button>
+              <button onClick={() => openTable(paxCell, paxValue)} disabled={busy} className="flex-1 rounded-xl brand-gradient py-2.5 text-sm font-bold text-white disabled:opacity-50">Abrir mesa</button>
+            </div>
           </div>
         </div>
       )}
