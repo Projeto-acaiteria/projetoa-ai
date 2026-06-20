@@ -45,19 +45,13 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       slug,
       coverNotice,
       branding: { logoUrl: lojaStore.logoUrl, bannerUrl: lojaStore.bannerUrl, primaryColor: lojaStore.primaryColor },
+      hasDelivery: cfg.has_delivery !== false,
+      whatsapp: lojaStore.whatsapp,
+      deliveryFeeCents: lojaStore.deliveryFeeCents,
+      minOrderCents: lojaStore.minOrderCents,
+      deliveryZones: lojaStore.deliveryZones,
     };
-    return cfg.menu_template === "grid" ? (
-      <TemplateGrid
-        {...props}
-        hasDelivery={cfg.has_delivery !== false}
-        whatsapp={lojaStore.whatsapp}
-        deliveryFeeCents={lojaStore.deliveryFeeCents}
-        minOrderCents={lojaStore.minOrderCents}
-        deliveryZones={lojaStore.deliveryZones}
-      />
-    ) : (
-      <TemplateBar {...props} />
-    );
+    return cfg.menu_template === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
   }
   // default = açaí (montagem no copo).
 
