@@ -44,7 +44,7 @@ export default function EstoqueClient() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<FamilyKey | "todos">("todos");
-  const [modal, setModal] = useState<null | { kind: "add" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" }>(null);
+  const [modal, setModal] = useState<null | { kind: "add" } | { kind: "inventory" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" }>(null);
 
   const load = useCallback(async () => {
     try {
@@ -91,12 +91,19 @@ export default function EstoqueClient() {
         <StatCard label="Itens" value={String(items.length)} hint="cadastrados" Icon={IconBox} tone="brand" />
         <StatCard label="Em falta" value={String(low.length)} hint="abaixo do mínimo" Icon={IconAlert} tone="accent" />
         <StatCard label="Vencendo" value={String(expAlert.length)} hint="≤ 7 dias ou vencido" Icon={IconClock} tone="gold" />
-        <div className="card flex items-center justify-center p-4">
+        <div className="card flex flex-col items-center justify-center gap-2 p-4">
           <button
             onClick={() => setModal({ kind: "add" })}
-            className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]"
           >
             <IconPlus width={16} height={16} /> Novo item
+          </button>
+          <button
+            onClick={() => setModal({ kind: "inventory" })}
+            disabled={items.length === 0}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink-2 hover:border-brand-400 disabled:opacity-40"
+          >
+            Conferir estoque
           </button>
         </div>
       </div>
@@ -134,6 +141,7 @@ export default function EstoqueClient() {
       </div>
 
       {modal?.kind === "add" && <AddModal onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.kind === "inventory" && <InventoryModal items={items} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal?.kind === "move" && (
         <MoveModal item={modal.item} dir={modal.dir} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
       )}
@@ -329,11 +337,104 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
   );
 }
 
-function Overlay({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+// custo por unidade (mesma regra do server unitCostCents): dose = custo/garrafa ÷ doses; senão costCents
+function unitCost(it: StockItem): number {
+  if (it.dosesPerBottle && it.dosesPerBottle > 0 && it.costPerBottleCents) return Math.round(it.costPerBottleCents / it.dosesPerBottle);
+  return Math.max(0, Math.round(it.costCents ?? 0));
+}
+
+function InventoryModal({ items, onClose, onApplied }: { items: StockItem[]; onClose: () => void; onApplied: () => void }) {
+  const [counts, setCounts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  // só itens efetivamente contados (campo preenchido) entram no desvio
+  const counted = items
+    .map((it) => {
+      const raw = counts[it.id];
+      if (raw === undefined || raw === "") return null;
+      const real = Math.max(0, parseFloat(raw.replace(",", ".")) || 0);
+      const deltaQty = +(real - it.qty).toFixed(3);
+      const deltaValue = Math.round(deltaQty * unitCost(it));
+      return { it, real, deltaQty, deltaValue };
+    })
+    .filter(Boolean) as { it: StockItem; real: number; deltaQty: number; deltaValue: number }[];
+
+  const falta = counted.reduce((s, c) => s + (c.deltaValue < 0 ? -c.deltaValue : 0), 0);
+  const sobra = counted.reduce((s, c) => s + (c.deltaValue > 0 ? c.deltaValue : 0), 0);
+  const liquido = sobra - falta;
+  const changed = counted.filter((c) => c.deltaQty !== 0);
+
+  async function apply() {
+    if (!changed.length) return;
+    setSaving(true);
+    const payload: Record<string, number> = {};
+    for (const c of changed) payload[c.it.id] = c.real;
+    await fetch("/api/estoque/inventario", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ counts: payload, apply: true }),
+    });
+    onApplied();
+  }
+
+  return (
+    <Overlay title="Conferir estoque" onClose={onClose} wide>
+      <p className="-mt-2 text-sm text-[var(--text-muted)]">Conte o que tem na prateleira e digite o REAL. O sistema compara com o teórico e mostra a quebra (em R$ pelo custo).</p>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Mini label="Falta (perda)" value={brl(falta)} tone="red" />
+        <Mini label="Sobra" value={brl(sobra)} tone="lime" />
+        <Mini label="Líquido" value={brl(liquido)} tone={liquido < 0 ? "red" : "lime"} />
+      </div>
+
+      <div className="max-h-[45vh] divide-y divide-line overflow-y-auto rounded-xl border border-line">
+        {items.map((it) => {
+          const raw = counts[it.id] ?? "";
+          const real = raw === "" ? null : Math.max(0, parseFloat(raw.replace(",", ".")) || 0);
+          const delta = real === null ? null : +(real - it.qty).toFixed(3);
+          const dv = delta === null ? 0 : Math.round(delta * unitCost(it));
+          return (
+            <div key={it.id} className="flex items-center gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-ink">{it.name}</div>
+                <div className="text-[11px] text-[var(--text-faded)]">teórico {it.qty} {it.unit}{unitCost(it) ? ` · custo ${brl(unitCost(it))}/${it.unit}` : " · sem custo"}</div>
+              </div>
+              {delta !== null && delta !== 0 && (
+                <span className={`shrink-0 text-xs font-bold ${dv < 0 ? "text-[var(--red-no)]" : "text-lime"}`}>
+                  {delta > 0 ? "+" : ""}{delta} {it.unit} {dv ? `(${dv > 0 ? "+" : ""}${brl(dv)})` : ""}
+                </span>
+              )}
+              <input
+                type="number" min={0} inputMode="decimal" placeholder={String(it.qty)}
+                value={raw} onChange={(e) => setCounts((c) => ({ ...c, [it.id]: e.target.value }))}
+                className="w-20 shrink-0 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm text-ink outline-none focus:border-brand-600"
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={apply} disabled={saving || !changed.length} className="w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
+        {saving ? "Aplicando..." : changed.length ? `Aplicar ajuste em ${changed.length} ${changed.length === 1 ? "item" : "itens"}` : "Nada a ajustar"}
+      </button>
+      <p className="-mt-1 text-[11px] text-[var(--text-faded)]">Aplicar seta o estoque ao real e registra a diferença como &quot;Ajuste inventário&quot; no histórico.</p>
+    </Overlay>
+  );
+}
+
+function Mini({ label, value, tone }: { label: string; value: string; tone: "red" | "lime" }) {
+  return (
+    <div className="rounded-xl border border-line bg-bg-base p-2.5 text-center">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faded)]">{label}</div>
+      <div className={`text-sm font-extrabold ${tone === "red" ? "text-[var(--red-no)]" : "text-lime"}`}>{value}</div>
+    </div>
+  );
+}
+
+function Overlay({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-md animate-pop rounded-t-3xl bg-bg-elevated p-5 shadow-[var(--shadow-pop)] sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
+      <div className={`absolute inset-x-0 bottom-0 mx-auto ${wide ? "max-w-2xl" : "max-w-md"} max-h-[90vh] overflow-y-auto animate-pop rounded-t-3xl bg-bg-elevated p-5 shadow-[var(--shadow-pop)] sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl`}>
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line sm:hidden" />
         <h2 className="mb-4 text-lg font-extrabold text-ink">{title}</h2>
         <div className="space-y-3">{children}</div>

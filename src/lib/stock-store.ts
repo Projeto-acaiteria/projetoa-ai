@@ -141,6 +141,56 @@ export async function addBottles(id: string, bottles: number, at: string): Promi
   return moveStock(id, "entrada", doses, `Entrada ${bottles} garrafa(s)`, at);
 }
 
+/** Ajuste por CONTAGEM (inventário): seta o estoque ao valor REAL contado e loga a diferença
+ *  (sobra = entrada, falta = saída) como "Ajuste inventário". Retorna o delta aplicado (real − teórico). */
+export async function adjustToCount(id: string, realQty: number, at: string, storeId?: string): Promise<{ item: StockItem; deltaQty: number } | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  const all = await readAll(sid);
+  const cur = all.find((x) => x.id === id);
+  if (!cur) return null;
+  const real = Math.max(0, +Number(realQty).toFixed(3));
+  const deltaQty = +(real - cur.qty).toFixed(3);
+  if (deltaQty === 0) return { item: cur, deltaQty: 0 };
+  const type = deltaQty > 0 ? "entrada" : "saida";
+  const item = await moveStock(id, type, Math.abs(deltaQty), "Ajuste inventário", at, sid);
+  return item ? { item, deltaQty } : null;
+}
+
+/** Foto do desvio (descasamento) de inventário: teórico × real × diferença, com valor em R$ pelo custo.
+ *  counts = {id: realQty}. Só itens contados entram. faltaCents/sobraCents pra fechar a quebra. */
+export type InventoryDiffLine = {
+  id: string; name: string; unit: string;
+  theoreticalQty: number; realQty: number; deltaQty: number;
+  unitCostCents: number; deltaValueCents: number; // negativo = falta (perda), positivo = sobra
+};
+export type InventoryDiff = {
+  lines: InventoryDiffLine[];
+  faltaCents: number; // perda total (|deltas negativos| × custo)
+  sobraCents: number; // sobra total
+  liquidoCents: number; // sobra − falta
+};
+
+export async function inventoryDiff(counts: Record<string, number>, storeId?: string): Promise<InventoryDiff> {
+  const sid = storeId ?? (await resolveStoreId());
+  const all = await readAll(sid);
+  const byId = new Map(all.map((x) => [x.id, x]));
+  const lines: InventoryDiffLine[] = [];
+  let faltaCents = 0, sobraCents = 0;
+  for (const [id, raw] of Object.entries(counts)) {
+    const cur = byId.get(id);
+    if (!cur) continue;
+    const real = Math.max(0, +Number(raw).toFixed(3));
+    const deltaQty = +(real - cur.qty).toFixed(3);
+    const uc = unitCostCents(cur);
+    const deltaValueCents = Math.round(deltaQty * uc);
+    if (deltaValueCents < 0) faltaCents += -deltaValueCents;
+    else sobraCents += deltaValueCents;
+    lines.push({ id, name: cur.name, unit: cur.unit, theoreticalQty: cur.qty, realQty: real, deltaQty, unitCostCents: uc, deltaValueCents });
+  }
+  lines.sort((a, b) => a.deltaValueCents - b.deltaValueCents); // maiores perdas primeiro
+  return { lines, faltaCents, sobraCents, liquidoCents: sobraCents - faltaCents };
+}
+
 export async function removeItem(id: string): Promise<void> {
   const sid = await resolveStoreId();
   const { error } = await db().from("stock_items").delete().eq("store_id", sid).eq("id", id);
