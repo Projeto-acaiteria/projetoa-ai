@@ -1,9 +1,11 @@
-// Config de fidelidade editável pelo dono. JSON local → migrar Supabase.
+// Config de fidelidade editável pelo dono. Multi-tenant: por store_id (default Cantinho na
+// transição — ver src/lib/tenant.ts).
 import { db } from "@/lib/supabase";
+import { CANTINHO_STORE_ID } from "@/lib/tenant";
 import { DEFAULT_LOYALTY, type LoyaltyConfig, type Reward } from "@/lib/loyalty";
 
-export async function getLoyalty(): Promise<LoyaltyConfig> {
-  const { data } = await db().from("app_loyalty").select("data").eq("id", 1).maybeSingle();
+export async function getLoyalty(storeId: string = CANTINHO_STORE_ID): Promise<LoyaltyConfig> {
+  const { data } = await db().from("app_loyalty").select("data").eq("store_id", storeId).maybeSingle();
   const raw = (data?.data as Partial<LoyaltyConfig>) ?? {};
   return {
     ...DEFAULT_LOYALTY,
@@ -12,8 +14,11 @@ export async function getLoyalty(): Promise<LoyaltyConfig> {
   };
 }
 
-export async function setLoyalty(input: Partial<LoyaltyConfig>): Promise<LoyaltyConfig> {
-  const cur = await getLoyalty();
+export async function setLoyalty(
+  input: Partial<LoyaltyConfig>,
+  storeId: string = CANTINHO_STORE_ID,
+): Promise<LoyaltyConfig> {
+  const cur = await getLoyalty(storeId);
   const clean: LoyaltyConfig = { ...cur };
 
   if (input.pointsPerBrl != null) clean.pointsPerBrl = Math.max(0.1, Math.min(100, Number(input.pointsPerBrl) || 1));
@@ -32,6 +37,6 @@ export async function setLoyalty(input: Partial<LoyaltyConfig>): Promise<Loyalty
     if (!clean.rewards.length) clean.rewards = cur.rewards;
   }
 
-  await db().from("app_loyalty").upsert({ id: 1, data: clean });
+  await db().from("app_loyalty").upsert({ store_id: storeId, data: clean }, { onConflict: "store_id" });
   return clean;
 }

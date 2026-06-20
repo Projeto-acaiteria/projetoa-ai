@@ -1,6 +1,9 @@
 // Configurações da loja · taxas da maquininha por forma de pagamento.
 // Percentual sobre o valor da venda (ex: 3.5 = 3,5%). JSON → tabela Supabase.
+// Multi-tenant: lê/escreve a config DA LOJA (store_id). Default = Cantinho durante a transição
+// da ativação (enquanto os callers não passam storeId). Ver src/lib/tenant.ts.
 import { db } from "@/lib/supabase";
+import { CANTINHO_STORE_ID } from "@/lib/tenant";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export type PaymentFees = Record<PaymentMethod, number>; // % por método
@@ -40,21 +43,24 @@ const DEFAULT_STORE: StoreSettings = {
 
 type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings> };
 
-async function readSettings(): Promise<SettingsBlob> {
-  const { data } = await db().from("app_settings").select("data").eq("id", 1).maybeSingle();
+async function readSettings(storeId: string): Promise<SettingsBlob> {
+  const { data } = await db().from("app_settings").select("data").eq("store_id", storeId).maybeSingle();
   return (data?.data as SettingsBlob) ?? {};
 }
-async function writeSettings(data: SettingsBlob) {
-  await db().from("app_settings").upsert({ id: 1, data });
+async function writeSettings(storeId: string, data: SettingsBlob) {
+  await db().from("app_settings").upsert({ store_id: storeId, data }, { onConflict: "store_id" });
 }
 
-export async function getStore(): Promise<StoreSettings> {
-  const raw = await readSettings();
+export async function getStore(storeId: string = CANTINHO_STORE_ID): Promise<StoreSettings> {
+  const raw = await readSettings(storeId);
   return { ...DEFAULT_STORE, ...(raw.store || {}) };
 }
 
-export async function setStore(store: Partial<StoreSettings>): Promise<StoreSettings> {
-  const raw = await readSettings();
+export async function setStore(
+  store: Partial<StoreSettings>,
+  storeId: string = CANTINHO_STORE_ID,
+): Promise<StoreSettings> {
+  const raw = await readSettings(storeId);
   const clean: StoreSettings = { ...DEFAULT_STORE, ...(raw.store || {}) };
   if (typeof store.name === "string") clean.name = store.name.trim().slice(0, 60) || DEFAULT_STORE.name;
   if (typeof store.tagline === "string") clean.tagline = store.tagline.trim().slice(0, 100);
@@ -74,7 +80,7 @@ export async function setStore(store: Partial<StoreSettings>): Promise<StoreSett
       closed: Boolean(h.closed),
     }));
   }
-  await writeSettings({ ...raw, store: clean });
+  await writeSettings(storeId, { ...raw, store: clean });
   return clean;
 }
 
@@ -86,19 +92,22 @@ export function isOpenNow(hours: OpenHours[], now = new Date()): boolean {
   return cur >= h.open && cur <= h.close;
 }
 
-export async function getFees(): Promise<PaymentFees> {
-  const raw = await readSettings();
+export async function getFees(storeId: string = CANTINHO_STORE_ID): Promise<PaymentFees> {
+  const raw = await readSettings(storeId);
   return { ...DEFAULT_FEES, ...(raw.fees || {}) };
 }
 
-export async function setFees(fees: Partial<PaymentFees>): Promise<PaymentFees> {
-  const raw = await readSettings();
+export async function setFees(
+  fees: Partial<PaymentFees>,
+  storeId: string = CANTINHO_STORE_ID,
+): Promise<PaymentFees> {
+  const raw = await readSettings(storeId);
   const clean: PaymentFees = { ...DEFAULT_FEES };
   for (const k of Object.keys(clean) as PaymentMethod[]) {
     const v = Number(fees[k]);
     if (!Number.isNaN(v)) clean[k] = Math.max(0, Math.min(100, v));
   }
-  await writeSettings({ ...raw, fees: clean });
+  await writeSettings(storeId, { ...raw, fees: clean });
   return clean;
 }
 
