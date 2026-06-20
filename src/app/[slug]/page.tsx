@@ -4,6 +4,7 @@ import { db } from "@/lib/supabase";
 import { readMenu } from "@/lib/menu-store";
 import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { getActiveEvent } from "@/lib/events-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
 import { IconClock, IconStar, IconArrowRight } from "@/components/Icons";
 import AcaiBuilder from "../cardapio/AcaiBuilder";
@@ -29,29 +30,22 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
 
   // switch(menu_template): cada modelo de cardápio tem sua própria tela pública.
   const cfg = await getStoreConfig(storeId);
-  if (cfg?.menu_template === "bar") {
-    const [categories, lojaStore] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
-    return (
-      <TemplateBar
-        storeName={lojaStore.name}
-        tagline={lojaStore.tagline}
-        aberto={isOpenNow(lojaStore.hours)}
-        categories={categories}
-        slug={slug}
-      />
-    );
-  }
-  if (cfg?.menu_template === "grid") {
-    const [categories, lojaStore] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
-    return (
-      <TemplateGrid
-        storeName={lojaStore.name}
-        tagline={lojaStore.tagline}
-        aberto={isOpenNow(lojaStore.hours)}
-        categories={categories}
-        slug={slug}
-      />
-    );
+  if (cfg?.menu_template === "bar" || cfg?.menu_template === "grid") {
+    const [categories, lojaStore, ev] = await Promise.all([
+      readBarMenu(storeId),
+      getStore(storeId),
+      cfg.cover_enabled ? getActiveEvent(storeId) : Promise.resolve(null),
+    ]);
+    const coverNotice = ev ? { artist: ev.artist, coverCents: ev.cover_cents } : null;
+    const props = {
+      storeName: lojaStore.name,
+      tagline: lojaStore.tagline,
+      aberto: isOpenNow(lojaStore.hours),
+      categories,
+      slug,
+      coverNotice,
+    };
+    return cfg.menu_template === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
   }
   // default = açaí (montagem no copo).
 

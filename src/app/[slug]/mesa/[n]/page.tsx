@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/supabase";
 import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { getActiveEvent } from "@/lib/events-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
 import TemplateBar from "@/components/bar/TemplateBar";
 import TemplateGrid from "@/components/grid/TemplateGrid";
@@ -19,10 +20,16 @@ export default async function MesaCardapio({ params }: { params: Promise<{ slug:
   if (!loja) notFound();
   const storeId = (loja as { id: string }).id;
 
-  const tpl = (await getStoreConfig(storeId))?.menu_template;
+  const cfg = await getStoreConfig(storeId);
+  const tpl = cfg?.menu_template;
   if (tpl !== "bar" && tpl !== "grid") notFound();
 
-  const [categories, store] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
+  const [categories, store, ev] = await Promise.all([
+    readBarMenu(storeId),
+    getStore(storeId),
+    cfg?.cover_enabled ? getActiveEvent(storeId) : Promise.resolve(null),
+  ]);
+  const coverNotice = ev ? { artist: ev.artist, coverCents: ev.cover_cents } : null;
   const props = {
     storeName: store.name,
     tagline: store.tagline,
@@ -30,6 +37,7 @@ export default async function MesaCardapio({ params }: { params: Promise<{ slug:
     categories,
     slug,
     tableNumber,
+    coverNotice,
   };
   return tpl === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
 }

@@ -34,6 +34,7 @@ export default function TemplateGrid({
   categories,
   slug,
   tableNumber = null,
+  coverNotice = null,
 }: {
   storeName: string;
   tagline?: string | null;
@@ -41,6 +42,7 @@ export default function TemplateGrid({
   categories: BarCategory[];
   slug: string;
   tableNumber?: number | null;
+  coverNotice?: { artist: string; coverCents: number } | null;
 }) {
   const [cart, setCart] = useState<Record<string, Line>>({});
   const [open, setOpen] = useState(false);
@@ -112,6 +114,12 @@ export default function TemplateGrid({
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9h18M5 9l1 11M19 9l-1 11M4 5h16v4H4z" /></svg>
             Mesa {tableNumber}
           </span>
+        )}
+        {coverNotice && (
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: "#FED7AA", background: "#FFF7ED", color: "#C2410C" }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
+            Couvert {brl(coverNotice.coverCents)}/pessoa · ao vivo: {coverNotice.artist}
+          </div>
         )}
       </header>
 
