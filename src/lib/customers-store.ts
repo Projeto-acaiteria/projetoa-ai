@@ -2,6 +2,7 @@
 // Vira tabelas `customers` + `points_transactions` no Supabase depois.
 // Chave do cliente = telefone só com dígitos.
 import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export type PointsTx = {
   type: "earn" | "redeem" | "adjust";
@@ -21,8 +22,9 @@ export type Customer = {
 
 export const normPhone = (s: string) => (s || "").replace(/\D+/g, "");
 
-async function readAll(): Promise<Customer[]> {
-  const { data, error } = await db().from("customers").select("data");
+async function readAll(storeId?: string): Promise<Customer[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("customers").select("data").eq("store_id", sid);
   if (error) throw new Error("Erro ao ler clientes: " + error.message); // nunca tratar erro como vazio
   return (data ?? []).map((r) => (r as { data: Customer }).data);
 }
@@ -33,7 +35,8 @@ export async function listCustomers(): Promise<Customer[]> {
 
 export async function getByPhone(phone: string): Promise<Customer | null> {
   const key = normPhone(phone);
-  const { data, error } = await db().from("customers").select("data").eq("phone", key).maybeSingle();
+  const sid = await resolveStoreId();
+  const { data, error } = await db().from("customers").select("data").eq("store_id", sid).eq("phone", key).maybeSingle();
   if (error) throw new Error("Erro ao ler cliente: " + error.message);
   return data ? (data as { data: Customer }).data : null;
 }
@@ -45,8 +48,9 @@ async function upsert(
   tx: PointsTx,
 ): Promise<Customer> {
   const key = normPhone(phone);
+  const sid = await resolveStoreId();
   const d = db();
-  const { data: row, error } = await d.from("customers").select("data").eq("phone", key).maybeSingle();
+  const { data: row, error } = await d.from("customers").select("data").eq("store_id", sid).eq("phone", key).maybeSingle();
   if (error) throw new Error("Erro ao ler cliente: " + error.message);
   let c = row ? (row as { data: Customer }).data : null;
   if (!c) {
@@ -55,7 +59,7 @@ async function upsert(
   if (name && c.name === "Cliente") c.name = name;
   c.points = Math.max(0, c.points + tx.points);
   c.history.unshift(tx);
-  const { error: e2 } = await d.from("customers").upsert({ phone: key, data: c });
+  const { error: e2 } = await d.from("customers").upsert({ store_id: sid, phone: key, data: c });
   if (e2) throw new Error("Falha ao persistir cliente: " + e2.message);
   return c;
 }
@@ -67,8 +71,9 @@ export function awardPoints(phone: string, name: string, points: number, ref: st
 // cadastro rápido (sem pontos) — cria ou atualiza nome/aniversário
 export async function saveCustomer(phone: string, name: string, birthday: string | undefined, at: string): Promise<Customer> {
   const key = normPhone(phone);
+  const sid = await resolveStoreId();
   const d = db();
-  const { data: row, error } = await d.from("customers").select("data").eq("phone", key).maybeSingle();
+  const { data: row, error } = await d.from("customers").select("data").eq("store_id", sid).eq("phone", key).maybeSingle();
   if (error) throw new Error("Erro ao ler cliente: " + error.message);
   let c = row ? (row as { data: Customer }).data : null;
   if (!c) {
@@ -77,7 +82,7 @@ export async function saveCustomer(phone: string, name: string, birthday: string
     if (name?.trim()) c.name = name.trim();
     if (birthday !== undefined) c.birthday = birthday;
   }
-  const { error: e2 } = await d.from("customers").upsert({ phone: key, data: c });
+  const { error: e2 } = await d.from("customers").upsert({ store_id: sid, phone: key, data: c });
   if (e2) throw new Error("Falha ao salvar cliente: " + e2.message);
   return c;
 }
