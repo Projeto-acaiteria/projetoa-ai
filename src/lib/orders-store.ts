@@ -38,8 +38,9 @@ export type Order = {
 // código curto sem caracteres ambíguos (sem O/0/I/1/L) — fácil de ditar e digitar
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 function genCode(): string {
+  // 6 chars (~887M combinações) — colisão por loja desprezível sem precisar consultar o banco
   let s = "";
-  for (let i = 0; i < 5; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  for (let i = 0; i < 6; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   return s;
 }
 

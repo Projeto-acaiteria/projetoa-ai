@@ -50,7 +50,7 @@ export default async function StatusPedido({ params }: { params: Promise<{ slug:
         {!order ? (
           <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center">
             <p className="text-lg font-bold">Pedido não encontrado</p>
-            <p className="mt-1 text-sm text-zinc-500">Confira o código <b>{code.toUpperCase()}</b> — ele tem 5 caracteres e está na sua confirmação.</p>
+            <p className="mt-1 text-sm text-zinc-500">Confira o código <b>{code.toUpperCase()}</b> — está na sua confirmação de pedido.</p>
           </div>
         ) : (
           <>

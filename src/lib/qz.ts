@@ -108,6 +108,7 @@ export async function qzReadScaleGrams(cfg?: Partial<ScaleConfig>, request = "\x
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      try { qz.serial.setSerialCallbacks(null); } catch {} // não vazar callback global entre leituras
       qz.serial.closePort(c.port).catch(() => {});
       resolve(val);
     };
