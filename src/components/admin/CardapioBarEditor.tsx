@@ -1,14 +1,84 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
+import { IMAGE_BANK } from "@/config/image-bank";
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
 
 type CatForm = { id?: string; name: string; station: string; description: string; active: boolean };
-type ProdForm = { id?: string; category_id: string; name: string; priceReais: string; size_label: string; active: boolean };
+type ProdForm = { id?: string; category_id: string; name: string; priceReais: string; size_label: string; img: string; active: boolean };
+
+const ImgIcon = () => (
+  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
+);
+
+function ImagePicker({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function upload(file: File) {
+    setUploading(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/upload-foto", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "falha no upload");
+      onChange(d.url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Falha no upload");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-bg-surface-2">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[var(--text-faded)]"><ImgIcon /></div>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink disabled:opacity-50">{uploading ? "Subindo…" : "Subir foto"}</button>
+            <button type="button" onClick={() => setBankOpen((v) => !v)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink">Banco de imagens</button>
+            {value && <button type="button" onClick={() => onChange("")} className="rounded-lg px-2 py-1.5 text-xs font-bold text-red-500">Remover</button>}
+          </div>
+          {err && <span className="text-xs text-red-500">{err}</span>}
+        </div>
+        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+      </div>
+      {bankOpen && (
+        <div className="mt-3 max-h-52 overflow-y-auto rounded-xl border border-line p-2">
+          {IMAGE_BANK.map((cat) => (
+            <div key={cat.key} className="mb-2 last:mb-0">
+              <p className="mb-1 text-xs font-bold text-[var(--text-muted)]">{cat.label}</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {cat.photos.map((url) => (
+                  <button type="button" key={url} onClick={() => { onChange(url); setBankOpen(false); }} className="aspect-square overflow-hidden rounded-lg border border-line transition hover:ring-2 hover:ring-brand-600">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const Pencil = () => (
   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
@@ -84,8 +154,8 @@ export default function CardapioBarEditor() {
     const f = prodModal;
     if (!f || !f.name.trim()) return;
     const cents = Math.round((parseFloat(f.priceReais.replace(",", ".")) || 0) * 100);
-    if (f.id) await api("prod.update", { id: f.id, patch: { name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, active: f.active } });
-    else await api("prod.create", { category_id: f.category_id, name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, sort: 0 });
+    if (f.id) await api("prod.update", { id: f.id, patch: { name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, active: f.active } });
+    else await api("prod.create", { category_id: f.category_id, name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, sort: 0 });
     setProdModal(null);
   }
   async function delProd(p: BarProduct) {
@@ -134,13 +204,13 @@ export default function CardapioBarEditor() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-brand-600">{brl(p.price_cents)}</span>
-                  <button onClick={() => setProdModal({ id: p.id, category_id: p.category_id, name: p.name, priceReais: (p.price_cents / 100).toFixed(2).replace(".", ","), size_label: p.size_label ?? "", active: p.active })} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
+                  <button onClick={() => setProdModal({ id: p.id, category_id: p.category_id, name: p.name, priceReais: (p.price_cents / 100).toFixed(2).replace(".", ","), size_label: p.size_label ?? "", img: p.img ?? "", active: p.active })} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
                   <button onClick={() => delProd(p)} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-red-50 hover:text-red-500"><Trash /></button>
                 </div>
               </li>
             ))}
           </ul>
-          <button onClick={() => setProdModal({ category_id: c.id, name: "", priceReais: "", size_label: "", active: true })} className="mt-3 text-sm font-bold text-brand-600">+ Adicionar produto</button>
+          <button onClick={() => setProdModal({ category_id: c.id, name: "", priceReais: "", size_label: "", img: "", active: true })} className="mt-3 text-sm font-bold text-brand-600">+ Adicionar produto</button>
         </Card>
       ))}
 
@@ -164,6 +234,7 @@ export default function CardapioBarEditor() {
             <Field label="Preço (R$)"><input value={prodModal.priceReais} onChange={(e) => setProdModal({ ...prodModal, priceReais: e.target.value })} inputMode="decimal" placeholder="0,00" className={inputCls} /></Field>
             <Field label="Tamanho (opcional)"><input value={prodModal.size_label} onChange={(e) => setProdModal({ ...prodModal, size_label: e.target.value })} placeholder="500g / 600ml" className={inputCls} /></Field>
           </div>
+          <Field label="Foto (opcional)"><ImagePicker value={prodModal.img} onChange={(url) => setProdModal({ ...prodModal, img: url })} /></Field>
           <label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={prodModal.active} onChange={(e) => setProdModal({ ...prodModal, active: e.target.checked })} /> Disponível</label>
         </Modal>
       )}
