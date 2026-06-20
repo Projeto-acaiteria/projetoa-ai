@@ -3,6 +3,7 @@
 // estoque mínimo (alerta de baixa), validade (alerta de vencimento / FIFO) e
 // movimentação (entrada/saída). Baixa automática por ficha técnica = evolução.
 import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 // Universo de uma açaiteria, em 3 famílias (a cor da UI vem da família):
 export type StockCategory =
@@ -57,8 +58,9 @@ function seedClone(): StockItem[] {
   return JSON.parse(JSON.stringify(SEED)) as StockItem[];
 }
 
-async function readAll(): Promise<StockItem[]> {
-  const { data, error } = await db().from("stock_items").select("data");
+async function readAll(storeId?: string): Promise<StockItem[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("stock_items").select("data").eq("store_id", sid);
   if (error) throw new Error("Erro ao ler estoque: " + error.message); // nunca tratar erro como vazio
   const list = (data ?? []).map((r) => (r as { data: StockItem }).data);
   if (list.length) return list;
@@ -79,7 +81,8 @@ export async function addItem(input: NewStockItem, at: string): Promise<StockIte
     updatedAt: at,
     history: [],
   };
-  const { error } = await db().from("stock_items").upsert({ id: item.id, data: item });
+  const sid = await resolveStoreId();
+  const { error } = await db().from("stock_items").upsert({ store_id: sid, id: item.id, data: item });
   if (error) throw new Error("Falha ao criar item: " + error.message);
   return item;
 }
@@ -90,7 +93,8 @@ export async function updateItem(id: string, patch: Partial<StockItem>, at: stri
   const cur = all.find((x) => x.id === id);
   if (!cur) return null;
   const item: StockItem = { ...cur, ...patch, id, updatedAt: at };
-  const { error } = await db().from("stock_items").upsert({ id, data: item });
+  const sid = await resolveStoreId();
+  const { error } = await db().from("stock_items").upsert({ store_id: sid, id, data: item });
   if (error) throw new Error("Falha ao atualizar item: " + error.message);
   return item;
 }
@@ -107,12 +111,14 @@ export async function moveStock(id: string, type: "entrada" | "saida", qty: numb
     updatedAt: at,
     history: [{ type, qty: Math.abs(qty), reason, at }, ...cur.history],
   };
-  const { error } = await db().from("stock_items").upsert({ id, data: item });
+  const sid = await resolveStoreId();
+  const { error } = await db().from("stock_items").upsert({ store_id: sid, id, data: item });
   if (error) throw new Error("Falha ao movimentar estoque: " + error.message);
   return item;
 }
 
 export async function removeItem(id: string): Promise<void> {
-  const { error } = await db().from("stock_items").delete().eq("id", id); // delete por-id pontual é OK
+  const sid = await resolveStoreId();
+  const { error } = await db().from("stock_items").delete().eq("store_id", sid).eq("id", id);
   if (error) throw new Error("Falha ao remover item: " + error.message);
 }
