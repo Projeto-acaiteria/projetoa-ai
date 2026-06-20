@@ -1,6 +1,7 @@
 // Store de pedidos · protótipo sem Supabase ainda (arquivo JSON local).
 // No sistema final isto vira tabela `orders` no Supabase. A interface é a mesma.
 import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export type OrderStatus = "recebido" | "preparo" | "saiu" | "entregue";
 
@@ -35,14 +36,15 @@ export type Order = {
 
 export type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito";
 
-async function readAll(): Promise<Order[]> {
-  const { data, error } = await db().from("orders").select("data");
+async function readAll(storeId?: string): Promise<Order[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("orders").select("data").eq("store_id", sid);
   if (error) throw new Error("Erro ao ler pedidos: " + error.message); // nunca tratar erro como vazio
   return (data ?? []).map((r) => (r as { data: Order }).data);
 }
 
-export async function listOrders(): Promise<Order[]> {
-  return (await readAll()).sort((a, b) => b.id - a.id);
+export async function listOrders(storeId?: string): Promise<Order[]> {
+  return (await readAll(storeId)).sort((a, b) => b.id - a.id);
 }
 
 export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
@@ -50,8 +52,9 @@ export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 // INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.
 export async function addOrder(input: NewOrder, nowIso: string, status: OrderStatus = "recebido"): Promise<Order> {
   const d = db();
+  const sid = await resolveStoreId();
   const base = { ...input, createdAt: nowIso, status };
-  const { data: row, error } = await d.from("orders").insert({ data: base }).select("id").single();
+  const { data: row, error } = await d.from("orders").insert({ data: base, store_id: sid }).select("id").single();
   if (error || !row) throw new Error("Falha ao criar o pedido: " + (error?.message ?? "sem retorno"));
   const id = Number((row as { id: number }).id);
   const order: Order = { ...base, id, display: `#${id}` };
