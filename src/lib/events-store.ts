@@ -29,10 +29,12 @@ export async function listEvents(storeId?: string): Promise<EventRow[]> {
   return ((data ?? []) as Record<string, unknown>[]).map(toEvent);
 }
 
-/** Show ativo mais recente — usado pra aplicar o cover na abertura da comanda. */
+/** Show ativo HOJE — usado pra aplicar o cover na abertura. TRAVA LEGAL: só cobra couvert se há
+ *  atração ao vivo no dia (event_date = hoje + active). Sem show hoje, getActiveEvent=null, cover=0. */
 export async function getActiveEvent(storeId?: string): Promise<EventRow | null> {
   const sid = storeId ?? (await resolveStoreId());
-  const { data } = await db().from("events").select("*").eq("store_id", sid).eq("active", true).order("event_date", { ascending: false }).limit(1).maybeSingle();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await db().from("events").select("*").eq("store_id", sid).eq("active", true).eq("event_date", today).limit(1).maybeSingle();
   return data ? toEvent(data as Record<string, unknown>) : null;
 }
 

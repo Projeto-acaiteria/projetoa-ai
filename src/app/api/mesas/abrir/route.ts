@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/mesas/abrir — abre (ou recupera) a comanda da mesa
 export async function POST(req: Request) {
-  let b: { tableNumber?: number; label?: string };
+  let b: { tableNumber?: number; label?: string; pax?: number };
   try {
     b = await req.json();
   } catch {
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     if (error || !table) {
       return NextResponse.json({ error: "Mesa não encontrada" }, { status: 400 });
     }
-    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined);
+    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined, undefined, b.pax);
     return NextResponse.json({ tab });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
