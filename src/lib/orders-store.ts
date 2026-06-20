@@ -50,9 +50,9 @@ export async function listOrders(storeId?: string): Promise<Order[]> {
 export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 
 // INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.
-export async function addOrder(input: NewOrder, nowIso: string, status: OrderStatus = "recebido"): Promise<Order> {
+export async function addOrder(input: NewOrder, nowIso: string, status: OrderStatus = "recebido", storeId?: string): Promise<Order> {
   const d = db();
-  const sid = await resolveStoreId();
+  const sid = storeId ?? (await resolveStoreId());
   const base = { ...input, createdAt: nowIso, status };
   const { data: row, error } = await d.from("orders").insert({ data: base, store_id: sid }).select("id").single();
   if (error || !row) throw new Error("Falha ao criar o pedido: " + (error?.message ?? "sem retorno"));

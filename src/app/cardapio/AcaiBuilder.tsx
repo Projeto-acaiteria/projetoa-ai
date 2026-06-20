@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { type ModifierGroup, type Size } from "@/lib/menu";
 import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
 
-type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[] };
+type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string };
 import { brl } from "@/lib/format";
 import {
   IconBowl,
@@ -159,6 +159,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          slug: brand.slug,
           customerName: name.trim(),
           phone: phone.trim(),
           address: address.trim() || undefined,

@@ -2,9 +2,20 @@ import { NextResponse } from "next/server";
 import { addOrder, listOrders, type OrderItem } from "@/lib/orders-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStore } from "@/lib/settings-store";
+import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Resolve a loja do pedido público: pelo slug (cardápio /[slug]); sem slug = transição (Cantinho).
+async function resolveOrderStore(slug?: string): Promise<string> {
+  if (slug) {
+    const { data } = await db().from("stores").select("id").eq("slug", slug).eq("active", true).maybeSingle();
+    if (data) return (data as { id: string }).id;
+  }
+  return resolveStoreId();
+}
 
 export async function GET() {
   const orders = await listOrders();
@@ -13,6 +24,7 @@ export async function GET() {
 
 type RecvItem = { group?: string; name?: string; qty?: number };
 type RecvBody = {
+  slug?: string; // loja (cardápio público por /[slug])
   customerName?: string;
   phone?: string;
   address?: string;
@@ -28,9 +40,9 @@ type Calc =
 
 // Recalcula o pedido SÓ pelo menu/loja — descarta qualquer preço/consumo enviado
 // pelo cliente (o link é público; não dá pra confiar no que vem do navegador).
-async function recompute(body: RecvBody): Promise<Calc> {
-  const menu = await readMenu();
-  const store = await getStore();
+async function recompute(body: RecvBody, storeId: string): Promise<Calc> {
+  const menu = await readMenu(storeId);
+  const store = await getStore(storeId);
 
   const size = menu.sizes.find((s) => s.label === body.sizeLabel);
   if (!size) return { error: "Tamanho inválido" };
@@ -96,8 +108,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Endereço é obrigatório na entrega" }, { status: 400 });
   }
 
+  const storeId = await resolveOrderStore(body.slug);
+
   // tudo recalculado no servidor — o preço do client é ignorado
-  const calc = await recompute(body);
+  const calc = await recompute(body, storeId);
   if ("error" in calc) return NextResponse.json({ error: calc.error }, { status: 400 });
 
   const order = await addOrder(
@@ -115,6 +129,8 @@ export async function POST(req: Request) {
       bairro: body.bairro,
     },
     new Date().toISOString(),
+    "recebido",
+    storeId,
   );
 
   return NextResponse.json({ ok: true, order }, { status: 201 });
