@@ -4,6 +4,7 @@
 // Salão simples: SEM cover artístico, SEM dose/garrafa, SEM roteamento de estação,
 // SEM garçom/comissão. Todos os valores em CENTAVOS (int).
 import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 import { moveStock } from "@/lib/stock-store";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
@@ -92,13 +93,15 @@ export type NewTabItem = {
 /** Mesas com o estado da comanda aberta (se houver). Total = soma qty*unit_price. */
 export async function getTables(): Promise<TableCard[]> {
   const d = db();
-  const { data: tables } = await d.from("tables").select("id, number, area").order("number");
+  const sid = await resolveStoreId();
+  const { data: tables } = await d.from("tables").select("id, number, area").eq("store_id", sid).order("number");
   if (!tables?.length) return [];
 
   // comandas abertas → indexa por mesa
   const { data: openTabs } = await d
     .from("tabs")
     .select("id, table_id, opened_at")
+    .eq("store_id", sid)
     .eq("status", "aberta");
   const tabByTable = new Map<number, { id: number; opened_at: string }>();
   for (const t of openTabs ?? []) {
@@ -140,10 +143,11 @@ export async function getTables(): Promise<TableCard[]> {
 /** Cria as mesas 1..n (area 'salao') que ainda não existem. Idempotente. */
 export async function ensureTables(n: number): Promise<void> {
   const d = db();
-  const { data: existing } = await d.from("tables").select("number");
+  const sid = await resolveStoreId();
+  const { data: existing } = await d.from("tables").select("number").eq("store_id", sid);
   const have = new Set((existing ?? []).map((t) => num(t.number)));
-  const missing: { number: number; area: string }[] = [];
-  for (let i = 1; i <= n; i++) if (!have.has(i)) missing.push({ number: i, area: "salao" });
+  const missing: { number: number; area: string; store_id: string }[] = [];
+  for (let i = 1; i <= n; i++) if (!have.has(i)) missing.push({ number: i, area: "salao", store_id: sid });
   if (missing.length) await d.from("tables").insert(missing);
 }
 
@@ -152,9 +156,11 @@ export async function ensureTables(n: number): Promise<void> {
 /** Comanda aberta da mesa (status='aberta') ou cria uma nova. */
 export async function getOrCreateOpenTab(tableId: number, label?: string): Promise<Tab> {
   const d = db();
+  const sid = await resolveStoreId();
   const { data: existing } = await d
     .from("tabs")
     .select("*")
+    .eq("store_id", sid)
     .eq("table_id", tableId)
     .eq("status", "aberta")
     .maybeSingle();
@@ -162,7 +168,7 @@ export async function getOrCreateOpenTab(tableId: number, label?: string): Promi
 
   const { data, error } = await d
     .from("tabs")
-    .insert({ table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0 })
+    .insert({ store_id: sid, table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0 })
     .select()
     .single();
   if (error) throw error;
@@ -172,6 +178,7 @@ export async function getOrCreateOpenTab(tableId: number, label?: string): Promi
 /** Lança itens numa comanda: 1 tab_order + os tab_order_items. Baixa estoque por ficha técnica. */
 export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<TabOrder> {
   const d = db();
+  const sid = await resolveStoreId();
   const menu = await readMenu();
   // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
   const resolved = items.map((it) => {
@@ -187,12 +194,13 @@ export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<T
 
   const { data: order, error } = await d
     .from("tab_orders")
-    .insert({ tab_id: tabId, status: "pendente" })
+    .insert({ store_id: sid, tab_id: tabId, status: "pendente" })
     .select()
     .single();
   if (error) throw error;
 
   const rows = resolved.map((it) => ({
+    store_id: sid,
     tab_order_id: (order as TabOrder).id,
     name: it.name,
     size_label: it.sizeLabel ?? null,
@@ -270,9 +278,10 @@ export async function addPayment(
   amountCents: number,
   feePercent = 0,
 ): Promise<TabPayment> {
+  const sid = await resolveStoreId();
   const { data, error } = await db()
     .from("tab_payments")
-    .insert({ tab_id: tabId, method, amount_cents: amountCents, fee_percent: feePercent })
+    .insert({ store_id: sid, tab_id: tabId, method, amount_cents: amountCents, fee_percent: feePercent })
     .select()
     .single();
   if (error) throw error;
@@ -329,9 +338,10 @@ export async function createServiceCall(
   type: ServiceCallType,
   tabId?: number | null,
 ): Promise<ServiceCall> {
+  const sid = await resolveStoreId();
   const { data, error } = await db()
     .from("service_calls")
-    .insert({ table_number: tableNumber, type, tab_id: tabId ?? null, status: "pendente" })
+    .insert({ store_id: sid, table_number: tableNumber, type, tab_id: tabId ?? null, status: "pendente" })
     .select()
     .single();
   if (error) throw error;
@@ -340,9 +350,11 @@ export async function createServiceCall(
 
 /** Chamados ainda pendentes (fila de atendimento). */
 export async function getPendingCalls(): Promise<ServiceCall[]> {
+  const sid = await resolveStoreId();
   const { data } = await db()
     .from("service_calls")
     .select("*")
+    .eq("store_id", sid)
     .eq("status", "pendente")
     .order("created_at");
   return (data ?? []) as ServiceCall[];
@@ -365,9 +377,11 @@ export type MesaVenda = {
 
 /** Pagamentos de comanda no MESMO formato das vendas, pro financeiro e o caixa. */
 export async function listMesaPayments(): Promise<MesaVenda[]> {
+  const sid = await resolveStoreId();
   const { data, error } = await db()
     .from("tab_payments")
-    .select("amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))");
+    .select("amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))")
+    .eq("store_id", sid);
   if (error) throw new Error("Erro ao ler pagamentos de mesa: " + error.message);
   return (data ?? []).map((p) => {
     const row = p as {
