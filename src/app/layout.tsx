@@ -3,6 +3,7 @@ import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://comandapro.net.br"),
   title: "ComandaPRO — Sistema de food service",
   description: "Cardápio digital, comanda, mesa, delivery, balcão e gestão — num sistema só.",
   manifest: "/manifest.webmanifest",
