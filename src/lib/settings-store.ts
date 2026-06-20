@@ -3,7 +3,7 @@
 // Multi-tenant: lê/escreve a config DA LOJA (store_id). Default = Cantinho durante a transição
 // da ativação (enquanto os callers não passam storeId). Ver src/lib/tenant.ts.
 import { db } from "@/lib/supabase";
-import { CANTINHO_STORE_ID } from "@/lib/tenant";
+import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export type PaymentFees = Record<PaymentMethod, number>; // % por método
@@ -51,15 +51,16 @@ async function writeSettings(storeId: string, data: SettingsBlob) {
   await db().from("app_settings").upsert({ store_id: storeId, data }, { onConflict: "store_id" });
 }
 
-export async function getStore(storeId: string = CANTINHO_STORE_ID): Promise<StoreSettings> {
-  const raw = await readSettings(storeId);
+export async function getStore(storeId?: string): Promise<StoreSettings> {
+  const raw = await readSettings(storeId ?? (await resolveStoreId()));
   return { ...DEFAULT_STORE, ...(raw.store || {}) };
 }
 
 export async function setStore(
   store: Partial<StoreSettings>,
-  storeId: string = CANTINHO_STORE_ID,
+  storeId?: string,
 ): Promise<StoreSettings> {
+  storeId = storeId ?? (await resolveStoreId());
   const raw = await readSettings(storeId);
   const clean: StoreSettings = { ...DEFAULT_STORE, ...(raw.store || {}) };
   if (typeof store.name === "string") clean.name = store.name.trim().slice(0, 60) || DEFAULT_STORE.name;
@@ -92,15 +93,16 @@ export function isOpenNow(hours: OpenHours[], now = new Date()): boolean {
   return cur >= h.open && cur <= h.close;
 }
 
-export async function getFees(storeId: string = CANTINHO_STORE_ID): Promise<PaymentFees> {
-  const raw = await readSettings(storeId);
+export async function getFees(storeId?: string): Promise<PaymentFees> {
+  const raw = await readSettings(storeId ?? (await resolveStoreId()));
   return { ...DEFAULT_FEES, ...(raw.fees || {}) };
 }
 
 export async function setFees(
   fees: Partial<PaymentFees>,
-  storeId: string = CANTINHO_STORE_ID,
+  storeId?: string,
 ): Promise<PaymentFees> {
+  storeId = storeId ?? (await resolveStoreId());
   const raw = await readSettings(storeId);
   const clean: PaymentFees = { ...DEFAULT_FEES };
   for (const k of Object.keys(clean) as PaymentMethod[]) {

@@ -1,11 +1,12 @@
 // Config de fidelidade editável pelo dono. Multi-tenant: por store_id (default Cantinho na
 // transição — ver src/lib/tenant.ts).
 import { db } from "@/lib/supabase";
-import { CANTINHO_STORE_ID } from "@/lib/tenant";
+import { resolveStoreId } from "@/lib/auth/current";
 import { DEFAULT_LOYALTY, type LoyaltyConfig, type Reward } from "@/lib/loyalty";
 
-export async function getLoyalty(storeId: string = CANTINHO_STORE_ID): Promise<LoyaltyConfig> {
-  const { data } = await db().from("app_loyalty").select("data").eq("store_id", storeId).maybeSingle();
+export async function getLoyalty(storeId?: string): Promise<LoyaltyConfig> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data } = await db().from("app_loyalty").select("data").eq("store_id", sid).maybeSingle();
   const raw = (data?.data as Partial<LoyaltyConfig>) ?? {};
   return {
     ...DEFAULT_LOYALTY,
@@ -16,8 +17,9 @@ export async function getLoyalty(storeId: string = CANTINHO_STORE_ID): Promise<L
 
 export async function setLoyalty(
   input: Partial<LoyaltyConfig>,
-  storeId: string = CANTINHO_STORE_ID,
+  storeId?: string,
 ): Promise<LoyaltyConfig> {
+  storeId = storeId ?? (await resolveStoreId());
   const cur = await getLoyalty(storeId);
   const clean: LoyaltyConfig = { ...cur };
 
