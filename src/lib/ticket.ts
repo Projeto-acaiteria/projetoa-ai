@@ -24,6 +24,8 @@ export type TicketData = {
   changeCents?: number;
   pointsInfo?: string;
   origem?: "balcao" | "link"; // pedido do link ganha destaque "NOVO PEDIDO ONLINE"
+  code?: string; // código de rastreio (delivery) — sai destacado pro cliente acompanhar
+  collectCents?: number; // valor a RECEBER do cliente na entrega/retirada (não processamos pagamento)
 };
 
 const esc = (s: unknown) =>
@@ -119,13 +121,17 @@ export function ticketHtml(d: TicketData): string {
     .it .v{font-weight:600}
     .it .note{padding-left:32px;font-size:11px}
     .total{font-size:16px}
+    .track{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin:4px 0;letter-spacing:3px;font-size:15px}
+    .collect{border:3px solid #000;text-align:center;font-weight:700;padding:5px;margin:5px 0;font-size:15px;line-height:1.3}
+    .collect .v{font-size:22px}
   </style></head><body>
     ${isLink ? `<div class="tag">NOVO PEDIDO ONLINE</div>` : ""}
     <div class="brand">${esc(d.loja).toUpperCase()}</div>
     ${d.tagline ? `<div class="sub">${esc(d.tagline)}</div>` : ""}
     <div class="dash"></div>
     ${lead(esc(d.display), esc(d.dateLabel))}
-    <div>${esc(d.modeLabel)}${d.paymentLabel ? ` &middot; ${esc(d.paymentLabel)}` : ""}</div>
+    <div class="b" style="text-align:center;font-size:15px;margin:2px 0">${esc(d.modeLabel).toUpperCase()}</div>
+    ${d.code ? `<div class="track">RASTREIO: ${esc(d.code)}</div>` : ""}
     ${d.customerName ? `<div class="dest">${esc(d.customerName).toUpperCase()}</div>` : ""}
     ${entrega}
     <div class="dash"></div>
@@ -133,6 +139,7 @@ export function ticketHtml(d: TicketData): string {
     <div class="dash"></div>
     ${d.feeCents ? lead("Taxa entrega", brl(d.feeCents)) : ""}
     ${lead("TOTAL", brl(d.totalCents), "b total")}
+    ${d.collectCents != null ? `<div class="collect">RECEBER ${d.paymentLabel ? `EM ${esc(d.paymentLabel).toUpperCase()}` : "DO CLIENTE"}<br><span class="v">${brl(d.collectCents)}</span></div>` : (d.paymentLabel ? `<div class="c">Pagamento: ${esc(d.paymentLabel)}</div>` : "")}
     ${d.receivedCents != null ? lead("Recebido", brl(d.receivedCents)) : ""}
     ${d.changeCents != null && d.changeCents > 0 ? lead("Troco", brl(d.changeCents)) : ""}
     ${d.pointsInfo ? `<div class="c" style="margin-top:4px">${esc(d.pointsInfo)}</div>` : ""}

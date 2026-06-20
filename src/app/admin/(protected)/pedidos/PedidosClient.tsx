@@ -45,8 +45,15 @@ function ticketFromOrder(o: Order, storeName: string): TicketData {
     address: o.address,
     bairro: o.bairro,
     feeCents: o.feeCents || undefined,
-    items: [{ qty: 1, name: o.sizeLabel }, ...o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined }))],
+    // sizeLabel "Delivery"/"Retirada" é só marcador de tipo (já vai no modeLabel) — não vira item
+    items: [
+      ...(o.sizeLabel && o.sizeLabel !== "Delivery" && o.sizeLabel !== "Retirada" ? [{ qty: 1, name: o.sizeLabel }] : []),
+      ...o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
+    ],
     totalCents: o.totalCents,
+    code: o.code,
+    // não processamos pagamento: em pedido do link (entrega/retirada) o entregador/balcão RECEBE o total
+    collectCents: o.mode !== "balcao" ? o.totalCents : undefined,
     pointsInfo: o.pointsAwarded ? `Pontos ganhos: +${o.pointsAwarded}` : undefined,
     origem: o.mode === "balcao" ? "balcao" : "link",
   };
