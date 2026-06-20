@@ -14,7 +14,9 @@ export const dynamic = "force-dynamic";
 export default async function CardapioAdminPage() {
   const storeId = await resolveStoreId();
   const [store, cfg] = await Promise.all([getStore(storeId), getStoreConfig(storeId)]);
-  const isBar = cfg?.menu_template === "bar";
+  // bar E grid usam o schema relacional (menu_categories/menu_products) → CardapioBarEditor.
+  // Só o açaí usa o editor de montagem-no-copo (blob).
+  const isBar = cfg?.menu_template === "bar" || cfg?.menu_template === "grid";
 
   const { data: s } = await db().from("stores").select("slug").eq("id", storeId).maybeSingle();
   const slug = (s as { slug?: string } | null)?.slug;

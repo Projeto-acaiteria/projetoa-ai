@@ -8,6 +8,12 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  createModifier,
+  updateModifier,
+  deleteModifier,
 } from "@/lib/menu-bar-store";
 
 export const runtime = "nodejs";
@@ -51,6 +57,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "prod.delete":
         await deleteProduct(String(p.id), storeId);
+        return NextResponse.json({ ok: true });
+      case "group.create": {
+        const g = await createGroup(p as never, storeId);
+        return NextResponse.json({ ok: true, id: g.id });
+      }
+      case "group.update":
+        await updateGroup(String(p.id), p.patch as never, storeId);
+        return NextResponse.json({ ok: true });
+      case "group.delete":
+        await deleteGroup(String(p.id), storeId);
+        return NextResponse.json({ ok: true });
+      case "mod.create": {
+        const mo = await createModifier(p as never, storeId);
+        return NextResponse.json({ ok: true, id: mo.id });
+      }
+      case "mod.update":
+        await updateModifier(String(p.id), p.patch as never, storeId);
+        return NextResponse.json({ ok: true });
+      case "mod.delete":
+        await deleteModifier(String(p.id), storeId);
         return NextResponse.json({ ok: true });
       default:
         return NextResponse.json({ error: "ação inválida" }, { status: 400 });

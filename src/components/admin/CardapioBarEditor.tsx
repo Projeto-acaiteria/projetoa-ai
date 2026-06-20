@@ -5,6 +5,7 @@ import { Card } from "@/components/admin/ui";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import { IMAGE_BANK } from "@/config/image-bank";
 import { compressImage } from "@/lib/compress-image";
+import ModifierManager from "@/components/admin/ModifierManager";
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
@@ -90,6 +91,9 @@ const Pencil = () => (
 const Trash = () => (
   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
 );
+const Sliders = () => (
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>
+);
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -123,6 +127,7 @@ export default function CardapioBarEditor() {
   const [saving, setSaving] = useState(false);
   const [catModal, setCatModal] = useState<CatForm | null>(null);
   const [prodModal, setProdModal] = useState<ProdForm | null>(null);
+  const [modProduct, setModProduct] = useState<BarProduct | null>(null);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/cardapio-bar", { cache: "no-store" });
@@ -208,6 +213,10 @@ export default function CardapioBarEditor() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-brand-600">{brl(p.price_cents)}</span>
+                  <button onClick={() => setModProduct(p)} title="Personalização (adicionais, ponto, remover…)" className="relative rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink">
+                    <Sliders />
+                    {p.groups.length > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[9px] font-bold text-white">{p.groups.length}</span>}
+                  </button>
                   <button onClick={() => setProdModal({ id: p.id, category_id: p.category_id, name: p.name, priceReais: (p.price_cents / 100).toFixed(2).replace(".", ","), size_label: p.size_label ?? "", img: p.img ?? "", active: p.active })} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
                   <button onClick={() => delProd(p)} className="rounded-lg p-1.5 text-[var(--text-faded)] hover:bg-red-50 hover:text-red-500"><Trash /></button>
                 </div>
@@ -242,6 +251,8 @@ export default function CardapioBarEditor() {
           <label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={prodModal.active} onChange={(e) => setProdModal({ ...prodModal, active: e.target.checked })} /> Disponível</label>
         </Modal>
       )}
+
+      {modProduct && <ModifierManager product={modProduct} onClose={() => setModProduct(null)} onChanged={reload} />}
     </div>
   );
 }
