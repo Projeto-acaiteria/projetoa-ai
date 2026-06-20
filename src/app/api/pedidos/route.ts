@@ -74,7 +74,7 @@ async function recompute(body: RecvBody, storeId: string): Promise<Calc> {
   const subtotalCents = size.priceCents + modifiersCents;
   let feeCents = 0;
   if (body.mode === "entrega") {
-    if (store.deliveryZones.length > 0) {
+    if (store.deliveryMode === "zones") {
       const zona = store.deliveryZones.find((z) => z.bairro === body.bairro);
       if (!zona) return { error: "Escolha um bairro de entrega válido" };
       feeCents = zona.feeCents;

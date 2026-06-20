@@ -73,13 +73,15 @@ export async function addOrder(input: NewOrder, nowIso: string, status: OrderSta
 }
 
 // patch por-linha: lê 1 row, muta o data, atualiza só dela (não toca o resto da tabela).
-async function patchOrder(id: number, mut: (o: Order) => Order): Promise<Order | null> {
+// storeId OBRIGATÓRIO: filtra por loja nas DUAS queries — senão um dono mexe em pedido de
+// outra loja chutando o id sequencial (IDOR). db() é service-role e bypassa RLS.
+async function patchOrder(id: number, storeId: string, mut: (o: Order) => Order): Promise<Order | null> {
   const d = db();
-  const { data: row, error } = await d.from("orders").select("data").eq("id", id).maybeSingle();
+  const { data: row, error } = await d.from("orders").select("data").eq("id", id).eq("store_id", storeId).maybeSingle();
   if (error) throw new Error("Erro ao ler pedido: " + error.message);
   if (!row) return null;
   const order = mut((row as { data: Order }).data);
-  const { error: e2 } = await d.from("orders").update({ data: order }).eq("id", id);
+  const { error: e2 } = await d.from("orders").update({ data: order }).eq("id", id).eq("store_id", storeId);
   if (e2) throw new Error("Erro ao atualizar pedido: " + e2.message);
   return order;
 }
@@ -92,12 +94,15 @@ export async function getOrderByCode(storeId: string, code: string): Promise<Ord
   return all.find((o) => (o.code || "").toUpperCase() === c) ?? null;
 }
 
-export async function setStatus(id: number, status: OrderStatus): Promise<Order | null> {
-  return patchOrder(id, (o) => ({ ...o, status }));
+export async function setStatus(id: number, status: OrderStatus, storeId?: string): Promise<Order | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  return patchOrder(id, sid, (o) => ({ ...o, status }));
 }
-export async function markPointsAwarded(id: number, points: number): Promise<void> {
-  await patchOrder(id, (o) => ({ ...o, pointsAwarded: points }));
+export async function markPointsAwarded(id: number, points: number, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await patchOrder(id, sid, (o) => ({ ...o, pointsAwarded: points }));
 }
-export async function markConsumed(id: number): Promise<void> {
-  await patchOrder(id, (o) => ({ ...o, consumed: true }));
+export async function markConsumed(id: number, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await patchOrder(id, sid, (o) => ({ ...o, consumed: true }));
 }

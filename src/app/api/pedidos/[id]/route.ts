@@ -4,6 +4,7 @@ import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { moveStock } from "@/lib/stock-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!body.status || !VALID.includes(body.status as OrderStatus)) {
     return NextResponse.json({ error: "Status inválido" }, { status: 400 });
   }
-  const order = await setStatus(Number(id), body.status as OrderStatus);
+  const sid = await resolveStoreId();
+  const order = await setStatus(Number(id), body.status as OrderStatus, sid);
   if (!order) return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
 
   // Pedido entregue = pago. Credita pontos uma única vez, sobre o valor dos
@@ -34,16 +36,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     awarded = pointsForSale(order.subtotalCents, cfg, { isFirstPurchase });
     if (awarded > 0) {
       await awardPoints(order.phone, order.customerName, awarded, order.display, order.createdAt);
-      await markPointsAwarded(order.id, awarded);
+      await markPointsAwarded(order.id, awarded, sid);
     }
   }
 
   // Baixa de estoque do delivery: abate a ficha técnica ao entregar (uma vez).
   if (order.status === "entregue" && !order.consumed && order.consumes?.length) {
     for (const c of order.consumes) {
-      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Pedido ${order.display}`, order.createdAt.slice(0, 10));
+      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Pedido ${order.display}`, order.createdAt.slice(0, 10), sid);
     }
-    await markConsumed(order.id);
+    await markConsumed(order.id, sid);
   }
 
   return NextResponse.json({ ok: true, order, pointsAwarded: awarded });

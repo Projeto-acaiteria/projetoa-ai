@@ -214,6 +214,9 @@ export async function getOrCreateTableByNumber(tableNumber: number, storeId?: st
 export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: string, note?: string): Promise<TabOrder[]> {
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
+  // a comanda tem que ser DESTA loja (anti-IDOR: não injetar item em comanda alheia)
+  const { data: ownTab } = await d.from("tabs").select("id").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!ownTab) throw new Error("Comanda não encontrada.");
   const menu = await readMenu(storeId);
 
   // ficha técnica do BAR resolvida no SERVIDOR pelo productId (recipe do menu_products, nunca do client)
@@ -360,10 +363,13 @@ export type TabFull = {
   paidCents: number;
 };
 
-/** Comanda completa: tab + pedidos com itens + pagamentos + totais. */
-export async function getTabFull(tabId: number): Promise<TabFull> {
+/** Comanda completa: tab + pedidos com itens + pagamentos + totais. storeId trava a loja
+ *  (sem ele um dono leria comanda de outra loja chutando o tabId — db() bypassa RLS). */
+export async function getTabFull(tabId: number, storeId?: string): Promise<TabFull> {
   const d = db();
-  const { data: tab } = await d.from("tabs").select("*").eq("id", tabId).single();
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: tab } = await d.from("tabs").select("*").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!tab) throw new Error("Comanda não encontrada.");
   const { data: orders } = await d
     .from("tab_orders")
     .select("*")
@@ -412,6 +418,9 @@ export async function addPayment(
   feePercent = 0,
 ): Promise<TabPayment> {
   const sid = await resolveStoreId();
+  // valida que a comanda é DESTA loja antes de registrar pagamento (anti-IDOR)
+  const { data: tab } = await db().from("tabs").select("id").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!tab) throw new Error("Comanda não encontrada.");
   const { data, error } = await db()
     .from("tab_payments")
     .insert({ store_id: sid, tab_id: tabId, method, amount_cents: amountCents, fee_percent: feePercent })
@@ -430,9 +439,12 @@ export type CloseTabOpts = {
 /** Fecha a comanda. Se vier telefone, pontua fidelidade sobre o total dos PRODUTOS (sem taxa). */
 export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<{ pointsAwarded: number }> {
   const d = db();
+  const sid = await resolveStoreId();
 
   // fidelidade pontua só sobre o CONSUMO (produtos) — nunca sobre couvert nem taxa
-  const full = await getTabFull(tabId);
+  const full = await getTabFull(tabId, sid);
+  // idempotente: comanda já fechada não pontua de novo (anti duplo-clique/retry)
+  if (full.tab.status === "fechada") return { pointsAwarded: 0 };
   const productCents = full.consumoCents;
 
   const phone = opts.customerPhone ? normPhone(opts.customerPhone) : "";
@@ -445,7 +457,7 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
   };
   if (phone) patch.customer_phone = phone;
   if (name) patch.customer_name = name;
-  const { error } = await d.from("tabs").update(patch).eq("id", tabId);
+  const { error } = await d.from("tabs").update(patch).eq("id", tabId).eq("store_id", sid);
   if (error) throw error;
 
   // fidelidade — pontua só sobre os produtos; detecta 1ª compra pelo cadastro
@@ -493,9 +505,10 @@ export async function getPendingCalls(): Promise<ServiceCall[]> {
   return (data ?? []) as ServiceCall[];
 }
 
-/** Marca o chamado como atendido. */
+/** Marca o chamado como atendido (escopo da loga logada — anti-IDOR). */
 export async function markCallAttended(id: number): Promise<void> {
-  await db().from("service_calls").update({ status: "atendido" }).eq("id", id);
+  const sid = await resolveStoreId();
+  await db().from("service_calls").update({ status: "atendido" }).eq("id", id).eq("store_id", sid);
 }
 
 // ── Receita das mesas para o financeiro/caixa ────────────────────────────────

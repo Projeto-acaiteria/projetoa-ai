@@ -102,11 +102,18 @@ export async function setStore(
   return clean;
 }
 
-// loja aberta agora? (com base no horário do dia)
+// loja aberta agora? Usa o fuso do BRASIL (a Vercel roda em UTC — senão abre/fecha 3h errado).
+const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 export function isOpenNow(hours: OpenHours[], now = new Date()): boolean {
-  const h = hours[now.getDay()];
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const day = DOW[get("weekday")] ?? now.getDay();
+  const hh = get("hour") === "24" ? "00" : get("hour").padStart(2, "0");
+  const h = hours[day];
   if (!h || h.closed) return false;
-  const cur = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const cur = `${hh}:${get("minute").padStart(2, "0")}`;
   return cur >= h.open && cur <= h.close;
 }
 

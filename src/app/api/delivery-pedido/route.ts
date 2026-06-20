@@ -55,6 +55,13 @@ export async function POST(req: Request) {
   }
 
   try {
+    // produto vendido por peso não dá pra pedir por delivery (cliente não pesa) — recusa explícito
+    const ids = sel.map((s) => s.productId).filter(Boolean);
+    const { data: pesados } = await db().from("menu_products").select("id").eq("store_id", storeId).eq("by_weight", true).in("id", ids);
+    if (pesados && pesados.length) {
+      return NextResponse.json({ error: "Itens vendidos por peso só no balcão — remova do pedido." }, { status: 400 });
+    }
+
     const resolved = await resolveOrderItems(storeId, sel);
     if (!resolved.length) return NextResponse.json({ error: "itens indisponíveis" }, { status: 400 });
 

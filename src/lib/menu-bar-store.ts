@@ -232,8 +232,10 @@ export async function resolveOrderItems(
     if (p.by_weight) {
       const bruto = Math.max(0, Math.round(Number(s.grams) || 0));
       const liquido = Math.max(0, bruto - num(p.tare_grams));
+      // sem peso válido (ausente/menor que a tara) NÃO entra — senão o item sai de graça (P0)
+      if (liquido <= 0) continue;
       baseCents = Math.round((liquido / 1000) * num(p.price_cents));
-      sizeLabel = liquido > 0 ? `${liquido}g` : "0g";
+      sizeLabel = `${liquido}g`;
     }
 
     out.push({

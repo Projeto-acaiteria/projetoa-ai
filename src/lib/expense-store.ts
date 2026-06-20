@@ -38,7 +38,8 @@ export async function addExpense(input: Omit<Expense, "id" | "createdAt">, nowIs
 }
 
 export async function removeExpense(id: string): Promise<void> {
-  const { error } = await db().from("expenses").delete().eq("id", id); // delete por-id pontual é OK
+  const sid = await resolveStoreId();
+  const { error } = await db().from("expenses").delete().eq("id", id).eq("store_id", sid); // escopo da loja (anti-IDOR)
   if (error) throw new Error("Falha ao remover despesa: " + error.message);
 }
 
@@ -63,7 +64,8 @@ export async function addFixed(input: Omit<FixedExpense, "id">): Promise<FixedEx
   return f;
 }
 export async function removeFixed(id: string): Promise<void> {
-  const { error } = await db().from("fixed_expenses").delete().eq("id", id); // delete por-id pontual é OK
+  const sid = await resolveStoreId();
+  const { error } = await db().from("fixed_expenses").delete().eq("id", id).eq("store_id", sid); // escopo da loja (anti-IDOR)
   if (error) throw new Error("Falha ao remover despesa fixa: " + error.message);
 }
 
