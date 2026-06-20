@@ -15,7 +15,8 @@ async function call(action: string, payload: unknown) {
 function groupHint(g: ModifierGroup) {
   const obr = g.min_select >= 1 ? "Obrigatório" : "Opcional";
   const qt = g.max_select === 1 ? "escolha 1" : g.max_select ? `até ${g.max_select}` : "várias";
-  return `${obr} · ${qt}${g.free_up_to ? ` · ${g.free_up_to} grátis` : ""}`;
+  const mode = g.price_mode === "highest" ? " · paga a maior" : g.price_mode === "average" ? " · média" : "";
+  return `${obr} · ${qt}${g.free_up_to ? ` · ${g.free_up_to} grátis` : ""}${mode}`;
 }
 
 export default function ModifierManager({ product, onClose, onChanged }: { product: BarProduct; onClose: () => void; onChanged: () => void }) {
@@ -25,6 +26,7 @@ export default function ModifierManager({ product, onClose, onChanged }: { produ
   const [gTitle, setGTitle] = useState("");
   const [gReq, setGReq] = useState(false);
   const [gSingle, setGSingle] = useState(true);
+  const [gMode, setGMode] = useState<"sum" | "highest" | "average">("sum");
   // form nova opção por grupo
   const [optFor, setOptFor] = useState<string | null>(null);
   const [optName, setOptName] = useState("");
@@ -42,8 +44,8 @@ export default function ModifierManager({ product, onClose, onChanged }: { produ
   async function addGroup() {
     if (!gTitle.trim()) return;
     await run(async () => {
-      await call("group.create", { product_id: product.id, title: gTitle.trim(), min_select: gReq ? 1 : 0, max_select: gSingle ? 1 : 0, free_up_to: 0, sort: groups.length });
-      setGTitle(""); setGReq(false); setGSingle(true);
+      await call("group.create", { product_id: product.id, title: gTitle.trim(), min_select: gReq ? 1 : 0, max_select: gSingle ? 1 : 0, free_up_to: 0, price_mode: gMode, sort: groups.length });
+      setGTitle(""); setGReq(false); setGSingle(true); setGMode("sum");
     });
   }
   async function addOpt(groupId: string) {
@@ -106,6 +108,11 @@ export default function ModifierManager({ product, onClose, onChanged }: { produ
             <label className="flex items-center gap-1.5"><input type="radio" checked={gSingle} onChange={() => setGSingle(true)} /> Escolha 1</label>
             <label className="flex items-center gap-1.5"><input type="radio" checked={!gSingle} onChange={() => setGSingle(false)} /> Várias</label>
           </div>
+          <select value={gMode} onChange={(e) => setGMode(e.target.value as "sum" | "highest" | "average")} className={`${inputCls} mt-2`}>
+            <option value="sum">Cálculo: cada opção soma (adicionais)</option>
+            <option value="highest">Cálculo: paga a mais cara (pizza meio-a-meio)</option>
+            <option value="average">Cálculo: média dos preços</option>
+          </select>
           <button onClick={addGroup} disabled={busy || !gTitle.trim()} className="mt-3 w-full rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-50">Adicionar grupo</button>
         </div>
       </div>

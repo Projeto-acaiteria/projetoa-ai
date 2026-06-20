@@ -19,6 +19,7 @@ export type Modifier = {
   active: boolean;
 };
 
+export type PriceMode = "sum" | "highest" | "average"; // sum=adicionais · highest=pizza meio-a-meio · average
 export type ModifierGroup = {
   id: string;
   product_id: string;
@@ -26,6 +27,7 @@ export type ModifierGroup = {
   min_select: number; // 0 = opcional · >=1 = obrigatório
   max_select: number; // 0 = ilimitado
   free_up_to: number; // N primeiros grátis
+  price_mode: PriceMode;
   sort: number;
   modifiers: Modifier[];
 };
@@ -92,6 +94,7 @@ const toGroup = (r: Record<string, unknown>, modifiers: Modifier[]): ModifierGro
   min_select: num(r.min_select),
   max_select: num(r.max_select),
   free_up_to: num(r.free_up_to),
+  price_mode: (["sum", "highest", "average"].includes(String(r.price_mode)) ? String(r.price_mode) : "sum") as PriceMode,
   sort: num(r.sort),
   modifiers,
 });
@@ -159,12 +162,12 @@ export async function resolveOrderItems(
     d.from("menu_products").select("id, name, size_label, price_cents, category_id").eq("store_id", storeId).eq("active", true).in("id", ids),
     d.from("menu_categories").select("id, station").eq("store_id", storeId),
     d.from("menu_modifiers").select("id, group_id, name, price_cents").eq("store_id", storeId).eq("active", true),
-    d.from("menu_modifier_groups").select("id, free_up_to").eq("store_id", storeId),
+    d.from("menu_modifier_groups").select("id, free_up_to, price_mode").eq("store_id", storeId),
   ]);
   const stationByCat = new Map(((cats ?? []) as { id: string; station: string }[]).map((c) => [String(c.id), String(c.station)]));
   const pById = new Map(((prods ?? []) as Record<string, unknown>[]).map((p) => [String(p.id), p]));
   const modById = new Map(((mods ?? []) as Record<string, unknown>[]).map((m) => [String(m.id), m]));
-  const freeByGroup = new Map(((groups ?? []) as { id: string; free_up_to: number }[]).map((g) => [String(g.id), num(g.free_up_to)]));
+  const cfgByGroup = new Map(((groups ?? []) as { id: string; free_up_to: number; price_mode: string }[]).map((g) => [String(g.id), { free: num(g.free_up_to), mode: String(g.price_mode || "sum") }]));
 
   const out: ResolvedItem[] = [];
   for (const s of sel) {
@@ -182,12 +185,29 @@ export async function resolveOrderItems(
     let modsTotal = 0;
     const modsOut: ResolvedMod[] = [];
     for (const [gid, list] of byGroup) {
-      const free = freeByGroup.get(gid) ?? 0;
-      list.forEach((m, idx) => {
-        const charged = idx < free ? 0 : num(m.price_cents); // os 'free' primeiros do grupo não somam
-        modsTotal += charged;
-        modsOut.push({ name: String(m.name), price_cents: charged });
-      });
+      const cfg = cfgByGroup.get(gid) ?? { free: 0, mode: "sum" };
+      if (cfg.mode === "highest") {
+        // pizza meio-a-meio: paga só o sabor mais caro; os outros aparecem com 0 (espelham no KDS)
+        const maxP = Math.max(0, ...list.map((m) => num(m.price_cents)));
+        let cobrou = false;
+        for (const m of list) {
+          const charged = !cobrou && num(m.price_cents) === maxP ? maxP : 0;
+          if (charged) cobrou = true;
+          modsTotal += charged;
+          modsOut.push({ name: String(m.name), price_cents: charged });
+        }
+      } else if (cfg.mode === "average") {
+        const sum = list.reduce((s, m) => s + num(m.price_cents), 0);
+        const avg = list.length ? Math.round(sum / list.length) : 0;
+        modsTotal += avg;
+        list.forEach((m, i) => modsOut.push({ name: String(m.name), price_cents: i === 0 ? avg : 0 }));
+      } else {
+        list.forEach((m, idx) => {
+          const charged = idx < cfg.free ? 0 : num(m.price_cents); // os 'free' primeiros não somam
+          modsTotal += charged;
+          modsOut.push({ name: String(m.name), price_cents: charged });
+        });
+      }
     }
 
     out.push({
@@ -292,12 +312,12 @@ export async function deleteProduct(id: string, storeId?: string): Promise<void>
 }
 
 // ── Modificadores: grupos + opções (CRUD admin) ──────────────────────────────
-export type GroupInput = { product_id: string; title: string; min_select?: number; max_select?: number; free_up_to?: number; sort?: number };
+export type GroupInput = { product_id: string; title: string; min_select?: number; max_select?: number; free_up_to?: number; price_mode?: PriceMode; sort?: number };
 export async function createGroup(input: GroupInput, storeId?: string): Promise<ModifierGroup> {
   const sid = storeId ?? (await resolveStoreId());
   const { data, error } = await db().from("menu_modifier_groups").insert({
     store_id: sid, product_id: input.product_id, title: input.title.trim(),
-    min_select: input.min_select ?? 0, max_select: input.max_select ?? 0, free_up_to: input.free_up_to ?? 0, sort: input.sort ?? 0,
+    min_select: input.min_select ?? 0, max_select: input.max_select ?? 0, free_up_to: input.free_up_to ?? 0, price_mode: input.price_mode ?? "sum", sort: input.sort ?? 0,
   }).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Falha ao criar grupo.");
   return toGroup(data, []);

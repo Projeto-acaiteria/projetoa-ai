@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BarProduct, ModifierGroup } from "@/lib/menu-bar-store";
+import type { BarProduct, ModifierGroup, Modifier } from "@/lib/menu-bar-store";
 
 // Montagem guiada de produto (monta-seu-lanche / adicionais / ponto / remover) com PREÇO AO VIVO.
 // Recomendação de UI #1 da pesquisa. Compartilhado por TemplateBar (dark) e TemplateGrid (light).
@@ -59,14 +59,31 @@ export default function ProductCustomizer({
     for (const g of product.groups) {
       const chosen = sel[g.id] ?? [];
       if (g.min_select > 0 && chosen.length < g.min_select) faltando.push(g.title);
-      chosen.forEach((mId, idx) => {
-        const m = g.modifiers.find((x) => x.id === mId);
-        if (!m) return;
-        const charged = idx < g.free_up_to ? 0 : m.price_cents;
-        total += charged;
-        mods.push({ name: m.name, price_cents: charged });
-        modifierIds.push(mId);
-      });
+      const items = chosen.map((id) => g.modifiers.find((x) => x.id === id)).filter(Boolean) as Modifier[];
+      if (g.price_mode === "highest") {
+        // pizza meio-a-meio: cobra só o sabor mais caro
+        const maxP = Math.max(0, ...items.map((m) => m.price_cents));
+        let cobrou = false;
+        for (const m of items) {
+          const charged = !cobrou && m.price_cents === maxP ? maxP : 0;
+          if (charged) cobrou = true;
+          total += charged;
+          mods.push({ name: m.name, price_cents: charged });
+          modifierIds.push(m.id);
+        }
+      } else if (g.price_mode === "average") {
+        const sum = items.reduce((s, m) => s + m.price_cents, 0);
+        const avg = items.length ? Math.round(sum / items.length) : 0;
+        total += avg;
+        items.forEach((m, i) => { mods.push({ name: m.name, price_cents: i === 0 ? avg : 0 }); modifierIds.push(m.id); });
+      } else {
+        items.forEach((m, idx) => {
+          const charged = idx < g.free_up_to ? 0 : m.price_cents;
+          total += charged;
+          mods.push({ name: m.name, price_cents: charged });
+          modifierIds.push(m.id);
+        });
+      }
     }
     return { unitPriceCents: total, mods, modifierIds, faltando };
   }, [sel, product]);
