@@ -388,8 +388,8 @@ export default function TemplateGrid({
                   </div>
                 </div>
                 {errorMsg && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{errorMsg}</p>}
-                <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 14px 36px -12px rgba(0,0,0,0.4)" }}>
-                  {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : isDeliveryFlow ? "Fazer pedido" : "Confirmar pedido"}
+                <button onClick={send} disabled={count === 0 || sending || (isDeliveryFlow && !aberto)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 14px 36px -12px rgba(0,0,0,0.4)" }}>
+                  {isDeliveryFlow && !aberto ? "Loja fechada" : sending ? "Enviando…" : tableNumber ? "Enviar pedido" : isDeliveryFlow ? "Fazer pedido" : "Confirmar pedido"}
                 </button>
               </>
             )}

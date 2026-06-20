@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
-import { getStore } from "@/lib/settings-store";
+import { getStore, isOpenNow } from "@/lib/settings-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 
 export const runtime = "nodejs";
@@ -59,6 +59,12 @@ export async function POST(req: Request) {
     if (!resolved.length) return NextResponse.json({ error: "itens indisponíveis" }, { status: 400 });
 
     const store = await getStore(storeId);
+
+    // loja fechada não aceita pedido (mesma trava do açaí) — server-authoritative
+    if (!isOpenNow(store.hours)) {
+      return NextResponse.json({ error: "A loja está fechada no momento. Tente dentro do horário de funcionamento." }, { status: 400 });
+    }
+
     const subtotalCents = resolved.reduce((s, it) => s + it.qty * it.unitPriceCents, 0);
 
     // taxa de entrega: por bairro (zonas) ou taxa única; retirada = 0

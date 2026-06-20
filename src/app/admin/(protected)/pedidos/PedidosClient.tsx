@@ -106,11 +106,33 @@ export default function PedidosClient({ storeName }: { storeName: string }) {
   const [loaded, setLoaded] = useState(false);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
+  const [soundOn, setSoundOn] = useState(true);
   const seen = useRef<Set<number>>(new Set());
   const first = useRef(true);
+  const audioCtx = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     setAutoPrint(localStorage.getItem("autoprint:caixa") !== "0");
+    setSoundOn(localStorage.getItem("sound:caixa") !== "0");
+  }, []);
+
+  // bipe de novo pedido (Web Audio, sem arquivo) — 2 toques curtos
+  const beep = useCallback(() => {
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioCtx.current = audioCtx.current ?? new Ctx();
+      const ac = audioCtx.current;
+      if (ac.state === "suspended") void ac.resume();
+      [0, 0.18].forEach((t) => {
+        const o = ac.createOscillator(); const g = ac.createGain();
+        o.type = "sine"; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.001, ac.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.25, ac.currentTime + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + t + 0.15);
+        o.connect(g); g.connect(ac.destination);
+        o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.16);
+      });
+    } catch { /* navegador sem áudio / sem gesto ainda — silencioso */ }
   }, []);
 
   const load = useCallback(async () => {
@@ -126,10 +148,10 @@ export default function PedidosClient({ storeName }: { storeName: string }) {
       } else {
         const novos = list.filter((o) => !seen.current.has(o.id));
         novos.forEach((o) => seen.current.add(o.id));
+        const novosLink = novos.filter((o) => o.mode !== "balcao");
+        if (soundOn && novosLink.length) beep();
         if (autoPrint) {
-          for (const o of novos) {
-            if (o.mode !== "balcao") void printTicket(ticketHtml(ticketFromOrder(o, storeName)));
-          }
+          for (const o of novosLink) void printTicket(ticketHtml(ticketFromOrder(o, storeName)));
         }
       }
     } catch {
@@ -137,7 +159,7 @@ export default function PedidosClient({ storeName }: { storeName: string }) {
     } finally {
       setLoaded(true);
     }
-  }, [autoPrint, storeName]);
+  }, [autoPrint, soundOn, beep, storeName]);
 
   useEffect(() => {
     load();
@@ -149,6 +171,14 @@ export default function PedidosClient({ storeName }: { storeName: string }) {
     setAutoPrint((v) => {
       const nv = !v;
       localStorage.setItem("autoprint:caixa", nv ? "1" : "0");
+      return nv;
+    });
+  }
+  function toggleSound() {
+    setSoundOn((v) => {
+      const nv = !v;
+      localStorage.setItem("sound:caixa", nv ? "1" : "0");
+      if (nv) beep(); // toca pra confirmar + libera o áudio (gesto do usuário)
       return nv;
     });
   }
@@ -177,9 +207,18 @@ export default function PedidosClient({ storeName }: { storeName: string }) {
           <div className="text-xs text-[var(--text-muted)]">pedidos do link saem na impressora do caixa</div>
         </div>
       </div>
-      <button onClick={toggleAuto} aria-label="Ligar/desligar impressão automática" className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoPrint ? "bg-brand-600" : "bg-bg-surface-2"}`}>
-        <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${autoPrint ? "left-6" : "left-1"}`} />
-      </button>
+      <div className="flex items-center gap-3">
+        <button onClick={toggleSound} title={soundOn ? "Som de novo pedido ligado" : "Som desligado"} aria-label="Ligar/desligar som de novo pedido" className={`grid h-9 w-9 place-items-center rounded-lg border border-line ${soundOn ? "text-brand-600" : "text-[var(--text-faded)]"}`}>
+          {soundOn ? (
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+          ) : (
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>
+          )}
+        </button>
+        <button onClick={toggleAuto} aria-label="Ligar/desligar impressão automática" className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoPrint ? "bg-brand-600" : "bg-bg-surface-2"}`}>
+          <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${autoPrint ? "left-6" : "left-1"}`} />
+        </button>
+      </div>
     </div>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {COLS.map((col) => {
