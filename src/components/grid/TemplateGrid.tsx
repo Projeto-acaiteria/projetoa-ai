@@ -2,16 +2,17 @@
 
 import { useMemo, useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
+import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 
-// TemplateGrid — cardápio público modelo GRID (foto grande, estilo iFood/delivery premium).
-// Reusa o MESMO schema/lógica do bar (categoria→produto, station, mesa) — muda só o LAYOUT:
-// tema claro, produtos em grade de cards com foto grande. Restaurante/marmita.
+// TemplateGrid — cardápio público modelo GRID (foto grande, estilo iFood). Tema claro.
+// Suporta montagem guiada (modifiers): produto com grupos abre o ProductCustomizer.
 
-const ACCENT = "#EA580C"; // laranja-food (futuro: cor da marca no store_config)
+const ACCENT = "#EA580C";
 const ACCENT_HI = "#F97316";
 
-type Line = { product: BarProduct; station: string; qty: number };
+type Line = { key: string; product: BarProduct; station: string; qty: number; modifierIds: string[]; mods: { name: string; price_cents: number }[]; unitPriceCents: number };
 const brl = (cents: number) => "R$ " + (cents / 100).toFixed(2).replace(".", ",");
+const lineKey = (productId: string, modifierIds: string[]) => productId + (modifierIds.length ? ":" + [...modifierIds].sort().join(",") : "");
 
 function Thumb({ p }: { p: BarProduct }) {
   if (p.img) {
@@ -46,18 +47,26 @@ export default function TemplateGrid({
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [customizing, setCustomizing] = useState<{ product: BarProduct; station: string } | null>(null);
 
   const lines = Object.values(cart).filter((l) => l.qty > 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
-  const total = lines.reduce((s, l) => s + l.qty * l.product.price_cents, 0);
+  const total = lines.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
 
-  const add = (product: BarProduct, station: string) =>
-    setCart((c) => ({ ...c, [product.id]: { product, station, qty: (c[product.id]?.qty ?? 0) + 1 } }));
-  const dec = (id: string) =>
+  function addLine(product: BarProduct, station: string, modifierIds: string[], mods: { name: string; price_cents: number }[], unitPriceCents: number, qty = 1) {
+    const key = lineKey(product.id, modifierIds);
+    setCart((c) => ({ ...c, [key]: { key, product, station, modifierIds, mods, unitPriceCents, qty: (c[key]?.qty ?? 0) + qty } }));
+  }
+  function onPlus(product: BarProduct, station: string) {
+    if (product.groups && product.groups.length) setCustomizing({ product, station });
+    else addLine(product, station, [], [], product.price_cents);
+  }
+  const incKey = (key: string) => setCart((c) => (c[key] ? { ...c, [key]: { ...c[key], qty: c[key].qty + 1 } } : c));
+  const decKey = (key: string) =>
     setCart((c) => {
-      const q = (c[id]?.qty ?? 0) - 1;
-      if (q <= 0) { const { [id]: _omit, ...rest } = c; return rest; }
-      return { ...c, [id]: { ...c[id], qty: q } };
+      const q = (c[key]?.qty ?? 0) - 1;
+      if (q <= 0) { const { [key]: _omit, ...rest } = c; return rest; }
+      return { ...c, [key]: { ...c[key], qty: q } };
     });
 
   const byStation = useMemo(() => {
@@ -75,7 +84,7 @@ export default function TemplateGrid({
       const r = await fetch("/api/mesa-pedido", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, tableNumber, items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })), note }),
+        body: JSON.stringify({ slug, tableNumber, items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds })), note }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui enviar o pedido.");
@@ -91,12 +100,8 @@ export default function TemplateGrid({
 
   return (
     <main className="min-h-screen bg-[#FAFAF9] text-zinc-900">
-      {/* HERO claro */}
       <header className="relative px-6 pb-7 pt-12 text-center">
-        <span
-          className="absolute right-5 top-5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white"
-          style={{ background: aberto ? "#16A34A" : "#9CA3AF" }}
-        >
+        <span className="absolute right-5 top-5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white" style={{ background: aberto ? "#16A34A" : "#9CA3AF" }}>
           <span className="h-1.5 w-1.5 rounded-full bg-white" /> {aberto ? "Aberto agora" : "Fechado"}
         </span>
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{storeName}</h1>
@@ -109,7 +114,6 @@ export default function TemplateGrid({
         )}
       </header>
 
-      {/* CARDÁPIO em grade */}
       <div className="mx-auto max-w-3xl space-y-8 px-4 pb-40">
         {categories.map((cat) => (
           <section key={cat.id}>
@@ -117,28 +121,31 @@ export default function TemplateGrid({
               <h2 className="text-xl font-extrabold">{cat.name}</h2>
               {cat.description && <p className="text-sm text-zinc-400">{cat.description}</p>}
             </div>
-
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {cat.products.map((p) => {
-                const q = cart[p.id]?.qty ?? 0;
+                const hasGroups = p.groups && p.groups.length > 0;
+                const q = hasGroups ? 0 : cart[p.id]?.qty ?? 0;
                 return (
                   <div key={p.id} className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
                     <div className="relative">
                       <Thumb p={p} />
                       {q > 0 ? (
                         <div className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 p-1 shadow-md backdrop-blur">
-                          <button onClick={() => dec(p.id)} aria-label="menos" className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-zinc-600 active:scale-95">−</button>
+                          <button onClick={() => decKey(p.id)} aria-label="menos" className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-zinc-600 active:scale-95">−</button>
                           <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>
-                          <button onClick={() => add(p, cat.station)} aria-label="mais" className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: ACCENT }}>+</button>
+                          <button onClick={() => incKey(p.id)} aria-label="mais" className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: ACCENT }}>+</button>
                         </div>
                       ) : (
-                        <button onClick={() => add(p, cat.station)} aria-label={`adicionar ${p.name}`} className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none text-white shadow-md active:scale-95" style={{ background: ACCENT }}>+</button>
+                        <button onClick={() => onPlus(p, cat.station)} aria-label={`adicionar ${p.name}`} className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none text-white shadow-md active:scale-95" style={{ background: ACCENT }}>+</button>
                       )}
                     </div>
                     <div className="p-2.5">
                       <p className="text-sm font-bold leading-tight">{p.name}</p>
                       {p.size_label && <p className="text-xs text-zinc-400">{p.size_label}</p>}
-                      <p className="mt-1 font-extrabold" style={{ color: ACCENT }}>{brl(p.price_cents)}</p>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <p className="font-extrabold" style={{ color: ACCENT }}>{brl(p.price_cents)}</p>
+                        {hasGroups && <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-bold text-orange-600">monta</span>}
+                      </div>
                     </div>
                   </div>
                 );
@@ -148,19 +155,22 @@ export default function TemplateGrid({
         ))}
       </div>
 
-      {/* BARRA FLUTUANTE */}
       {count > 0 && !open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]"
-          style={{ background: ACCENT, boxShadow: "0 16px 40px -12px rgba(234,88,12,0.55)" }}
-        >
+        <button onClick={() => setOpen(true)} className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]" style={{ background: ACCENT, boxShadow: "0 16px 40px -12px rgba(234,88,12,0.55)" }}>
           <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/20 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
           <span className="tabular-nums">{brl(total)}</span>
         </button>
       )}
 
-      {/* DRAWER */}
+      {customizing && (
+        <ProductCustomizer
+          product={customizing.product}
+          accent={ACCENT_HI}
+          onClose={() => setCustomizing(null)}
+          onConfirm={(r: CustomizeResult) => { addLine(customizing.product, customizing.station, r.modifierIds, r.mods, r.unitPriceCents, r.qty); setCustomizing(null); }}
+        />
+      )}
+
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
@@ -169,7 +179,6 @@ export default function TemplateGrid({
               <h3 className="text-2xl font-extrabold">Seu pedido</h3>
               <button onClick={() => setOpen(false)} aria-label="fechar" className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-lg">✕</button>
             </div>
-
             {sent ? (
               <div className="py-10 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
@@ -182,37 +191,31 @@ export default function TemplateGrid({
               <>
                 <ul className="divide-y divide-zinc-100">
                   {lines.map((l) => (
-                    <li key={l.product.id} className="flex items-center gap-3 py-3">
+                    <li key={l.key} className="flex items-start gap-3 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold leading-tight">{l.product.name}{l.product.size_label && <span className="text-sm font-normal text-zinc-400"> · {l.product.size_label}</span>}</p>
-                        <p className="text-sm text-zinc-400">{brl(l.product.price_cents)}</p>
+                        {l.mods.length > 0 && <p className="text-xs text-zinc-400">{l.mods.map((m) => m.name).join(" · ")}</p>}
+                        <p className="text-sm text-zinc-400">{brl(l.unitPriceCents)}</p>
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <button onClick={() => dec(l.product.id)} className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-lg leading-none active:scale-95">−</button>
+                        <button onClick={() => decKey(l.key)} className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-lg leading-none active:scale-95">−</button>
                         <span className="w-4 text-center font-bold tabular-nums">{l.qty}</span>
-                        <button onClick={() => add(l.product, l.station)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: ACCENT }}>+</button>
+                        <button onClick={() => incKey(l.key)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: ACCENT }}>+</button>
                       </div>
                     </li>
                   ))}
                 </ul>
-
-                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (ex: sem cebola, ponto da carne)" className="mt-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400" />
-
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (ex: caprichar no molho)" className="mt-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400" />
                 {Object.keys(byStation).length > 1 && (
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-400">
-                    {Object.entries(byStation).map(([st, n]) => (
-                      <span key={st} className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 capitalize">{n} → {st}</span>
-                    ))}
+                    {Object.entries(byStation).map(([st, n]) => (<span key={st} className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 capitalize">{n} → {st}</span>))}
                   </div>
                 )}
-
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-zinc-500">Total</span>
                   <span className="text-2xl font-extrabold" style={{ color: ACCENT }}>{brl(total)}</span>
                 </div>
-
                 {errorMsg && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{errorMsg}</p>}
-
                 <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: ACCENT, boxShadow: "0 14px 36px -12px rgba(234,88,12,0.55)" }}>
                   {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : "Confirmar pedido"}
                 </button>
