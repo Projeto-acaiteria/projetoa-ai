@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     // taxa de entrega: por bairro (zonas) ou taxa única; retirada = 0
     let feeCents = 0;
     if (mode === "entrega") {
-      if (store.deliveryZones.length > 0) {
+      if (store.deliveryMode === "zones") {
         const zona = store.deliveryZones.find((z) => z.bairro === b.bairro);
         if (!zona) return NextResponse.json({ error: "Escolha um bairro de entrega válido" }, { status: 400 });
         feeCents = zona.feeCents;

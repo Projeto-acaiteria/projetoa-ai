@@ -49,6 +49,7 @@ export default function TemplateBar({
   deliveryFeeCents = 0,
   minOrderCents = 0,
   deliveryZones = [],
+  deliveryMode = "fixed",
 }: {
   storeName: string;
   tagline?: string | null;
@@ -63,6 +64,7 @@ export default function TemplateBar({
   deliveryFeeCents?: number;
   minOrderCents?: number;
   deliveryZones?: { bairro: string; feeCents: number }[];
+  deliveryMode?: "fixed" | "zones";
 }) {
   const [cart, setCart] = useState<Record<string, Line>>({});
   const [open, setOpen] = useState(false);
@@ -81,7 +83,7 @@ export default function TemplateBar({
   const [dPay, setDPay] = useState<"dinheiro" | "pix" | "credito">("pix");
   const [placed, setPlaced] = useState<string | null>(null);
   const isDeliveryFlow = !tableNumber && hasDelivery;
-  const usaZonas = deliveryZones.length > 0;
+  const usaZonas = deliveryMode === "zones";
   const deliFee = dMode === "entrega" ? (usaZonas ? (deliveryZones.find((z) => z.bairro === dBairro)?.feeCents ?? 0) : deliveryFeeCents) : 0;
 
   const lines = Object.values(cart).filter((l) => l.qty > 0);

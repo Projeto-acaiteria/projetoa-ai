@@ -15,9 +15,10 @@ export type StoreSettings = {
   name: string;
   tagline: string;
   whatsapp: string; // só dígitos, com DDI (ex: 5599...)
-  deliveryFeeCents: number;
+  deliveryMode: "fixed" | "zones"; // como cobra a entrega: taxa única OU por bairro/região
+  deliveryFeeCents: number; // taxa única (modo fixed)
   minOrderCents: number;
-  deliveryZones: DeliveryZone[]; // taxa por bairro (vazio = taxa única)
+  deliveryZones: DeliveryZone[]; // taxa por bairro (modo zones)
   hours: OpenHours[]; // 7 posições, domingo→sábado
   pricePerKgCents: number; // preço do açaí por kg (modo balança no balcão/mesa)
   // identidade visual da loja (cardápio público) — opt-in, cada loja com a própria cara
@@ -38,6 +39,7 @@ const DEFAULT_STORE: StoreSettings = {
   name: "Açaí do Vidal",
   tagline: "Cremoso de verdade. Monte do seu jeito.",
   whatsapp: "5599810420160",
+  deliveryMode: "fixed",
   deliveryFeeCents: 500,
   minOrderCents: 1500,
   deliveryZones: [],
@@ -76,6 +78,7 @@ export async function setStore(
   if (store.deliveryFeeCents != null) clean.deliveryFeeCents = Math.max(0, Math.round(Number(store.deliveryFeeCents)));
   if (store.minOrderCents != null) clean.minOrderCents = Math.max(0, Math.round(Number(store.minOrderCents)));
   if (store.pricePerKgCents != null) clean.pricePerKgCents = Math.max(0, Math.round(Number(store.pricePerKgCents)));
+  if (store.deliveryMode === "fixed" || store.deliveryMode === "zones") clean.deliveryMode = store.deliveryMode;
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
   if (typeof store.logoUrl === "string") clean.logoUrl = store.logoUrl.trim().slice(0, 500);
   if (typeof store.bannerUrl === "string") clean.bannerUrl = store.bannerUrl.trim().slice(0, 500);

@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
+type Store = { name: string; tagline: string; whatsapp: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -82,22 +82,6 @@ export default function ConfigClient() {
             <input className={`${inp} mt-1`} inputMode="tel" value={store.whatsapp} onChange={(e) => setS("whatsapp", e.target.value)} placeholder="5599991234567" />
             <p className="mt-1 text-[11px] text-[var(--text-faded)]">Formato: 55 + DDD + número (só números).</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Taxa de entrega</label>
-              <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
-                <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.deliveryFeeCents / 100} onChange={(e) => setS("deliveryFeeCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Pedido mínimo</label>
-              <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
-                <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.minOrderCents / 100} onChange={(e) => setS("minOrderCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
-              </div>
-            </div>
-          </div>
         </div>
       </Card>
 
@@ -124,9 +108,61 @@ export default function ConfigClient() {
             </button>
           </div>
           {config.has_delivery && (
-            <p className="mt-3 rounded-xl bg-bg-surface-2 p-3 text-[13px] text-[var(--text-muted)]">
-              A opção de entrega aparece no cardápio público. Configure a <b>taxa de entrega</b>, o <b>pedido mínimo</b> (acima) e as <b>zonas por bairro</b> (abaixo).
-            </p>
+            <div className="mt-4 space-y-4 border-t border-line pt-4">
+              {/* modo de cobrança: taxa fixa OU por bairro/região */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Como cobra a entrega?</label>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {([["fixed", "Taxa fixa", "Um valor único pra qualquer endereço"], ["zones", "Por bairro/região", "Cada bairro tem sua taxa"]] as const).map(([id, label, sub]) => (
+                    <button key={id} onClick={() => setS("deliveryMode", id)} className={`rounded-xl border-2 p-3 text-left transition ${store.deliveryMode === id ? "border-brand-600 bg-bg-surface-2" : "border-line"}`}>
+                      <div className="text-sm font-bold text-ink">{label}</div>
+                      <div className="text-[11px] text-[var(--text-faded)]">{sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {store.deliveryMode === "fixed" ? (
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)]">Taxa de entrega (única)</label>
+                  <div className="mt-1 flex w-40 items-center rounded-lg border border-line bg-bg-base px-3">
+                    <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+                    <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.deliveryFeeCents / 100} onChange={(e) => setS("deliveryFeeCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Bairros e taxas</label>
+                    <button onClick={() => setStore((s) => s ? { ...s, deliveryZones: [...s.deliveryZones, { bairro: "", feeCents: 500 }] } : s)} className="inline-flex items-center gap-1 rounded-lg bg-bg-surface-2 px-3 py-1.5 text-sm font-bold text-brand-600">
+                      <IconPlus width={14} height={14} /> Bairro
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {store.deliveryZones.length === 0 && <p className="text-sm text-[var(--text-faded)]">Adicione os bairros que você atende e a taxa de cada um.</p>}
+                    {store.deliveryZones.map((z, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input value={z.bairro} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, bairro: e.target.value } : x) } : s)} placeholder="Bairro" className={`${inp} min-w-0 flex-1`} />
+                        <div className="flex items-center rounded-lg border border-line bg-bg-base px-3">
+                          <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+                          <input type="number" min={0} step="0.5" value={z.feeCents / 100} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, feeCents: Math.round((parseFloat(e.target.value) || 0) * 100) } : x) } : s)} className="w-16 bg-transparent px-2 py-2 text-right text-sm font-bold text-ink outline-none" />
+                        </div>
+                        <button onClick={() => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.filter((_, k) => k !== i) } : s)} className="rounded-lg border border-line px-2 py-2 text-xs font-bold text-[var(--red-no)]">x</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Pedido mínimo</label>
+                <div className="mt-1 flex w-40 items-center rounded-lg border border-line bg-bg-base px-3">
+                  <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+                  <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.minOrderCents / 100} onChange={(e) => setS("minOrderCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-faded)]">Retirada no balcão é sempre grátis. A taxa só vale pra entrega.</p>
+              </div>
+            </div>
           )}
         </Card>
       )}
@@ -180,30 +216,6 @@ export default function ConfigClient() {
                   <input type="time" value={h.close} onChange={(e) => setStore((s) => s ? { ...s, hours: s.hours.map((x, k) => k === i ? { ...x, close: e.target.value } : x) } : s)} className="rounded-lg border border-line bg-bg-base px-2 py-1.5" />
                 </div>
               )}
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Zonas de entrega */}
-      <Card className="p-5 sm:p-6">
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="text-base font-extrabold text-ink">Bairros e taxas de entrega</h2>
-          <button onClick={() => setStore((s) => s ? { ...s, deliveryZones: [...s.deliveryZones, { bairro: "", feeCents: 500 }] } : s)} className="inline-flex items-center gap-1 rounded-lg bg-bg-surface-2 px-3 py-1.5 text-sm font-bold text-brand-600">
-            <IconPlus width={14} height={14} /> Bairro
-          </button>
-        </div>
-        <p className="mb-3 text-sm text-[var(--text-muted)]">Se vazio, usa a taxa de entrega única acima. Com bairros, o cliente escolhe e paga a taxa do bairro dele.</p>
-        <div className="space-y-2">
-          {store.deliveryZones.length === 0 && <p className="text-sm text-[var(--text-faded)]">Nenhum bairro — taxa única.</p>}
-          {store.deliveryZones.map((z, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input value={z.bairro} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, bairro: e.target.value } : x) } : s)} placeholder="Bairro" className={`${inp} min-w-0 flex-1`} />
-              <div className="flex items-center rounded-lg border border-line bg-bg-base px-3">
-                <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                <input type="number" min={0} step="0.5" value={z.feeCents / 100} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, feeCents: Math.round((parseFloat(e.target.value) || 0) * 100) } : x) } : s)} className="w-16 bg-transparent px-2 py-2 text-right text-sm font-bold text-ink outline-none" />
-              </div>
-              <button onClick={() => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.filter((_, k) => k !== i) } : s)} className="rounded-lg border border-line px-2 py-2 text-xs font-bold text-[var(--red-no)]">x</button>
             </div>
           ))}
         </div>

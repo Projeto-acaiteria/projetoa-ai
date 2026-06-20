@@ -50,6 +50,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       deliveryFeeCents: lojaStore.deliveryFeeCents,
       minOrderCents: lojaStore.minOrderCents,
       deliveryZones: lojaStore.deliveryZones,
+      deliveryMode: lojaStore.deliveryMode,
     };
     return cfg.menu_template === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
   }
