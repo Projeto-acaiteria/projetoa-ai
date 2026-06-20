@@ -48,6 +48,7 @@ export type TabOrder = {
   note: string | null;
   status: string; // 'pendente'
   created_at: string;
+  station: string; // 'cozinha' | 'bar' | 'copa' ... (roteamento; default 'cozinha')
 };
 
 export type TabPayment = {
@@ -86,6 +87,7 @@ export type NewTabItem = {
   consumes?: StockConsume[] | null;
   sizeId?: string; // copo: ficha técnica resolvida pelo tamanho no servidor
   grams?: number; // peso: polpa proporcional resolvida no servidor
+  station?: string; // estação de preparo (bar). Ausente = 'cozinha' (açaí).
 };
 
 // ── Mesas ────────────────────────────────────────────────────────────────────
@@ -153,10 +155,11 @@ export async function ensureTables(n: number): Promise<void> {
 
 // ── Comandas ─────────────────────────────────────────────────────────────────
 
-/** Comanda aberta da mesa (status='aberta') ou cria uma nova. */
-export async function getOrCreateOpenTab(tableId: number, label?: string): Promise<Tab> {
+/** Comanda aberta da mesa (status='aberta') ou cria uma nova. storeId explícito no fluxo público
+ *  (pedido pela mesa via slug, sem auth — senão resolveStoreId cairia na loja errada). */
+export async function getOrCreateOpenTab(tableId: number, label?: string, storeId?: string): Promise<Tab> {
   const d = db();
-  const sid = await resolveStoreId();
+  const sid = storeId ?? (await resolveStoreId());
   const { data: existing } = await d
     .from("tabs")
     .select("*")
@@ -175,11 +178,25 @@ export async function getOrCreateOpenTab(tableId: number, label?: string): Promi
   return data as Tab;
 }
 
-/** Lança itens numa comanda: 1 tab_order + os tab_order_items. Baixa estoque por ficha técnica. */
-export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<TabOrder> {
+/** Resolve a mesa pelo NÚMERO (cria se não existir). Pro QR público /[slug]/mesa/N. */
+export async function getOrCreateTableByNumber(tableNumber: number, storeId?: string): Promise<number> {
   const d = db();
-  const sid = await resolveStoreId();
-  const menu = await readMenu();
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: ex } = await d.from("tables").select("id").eq("store_id", sid).eq("number", tableNumber).maybeSingle();
+  if (ex) return num(ex.id);
+  const { data, error } = await d.from("tables").insert({ store_id: sid, number: tableNumber, area: "salao" }).select("id").single();
+  if (error) throw error;
+  return num((data as { id: number }).id);
+}
+
+/** Lança itens numa comanda, ROTEANDO por estação: 1 tab_order por estação (cozinha/bar/...),
+ *  cada um com seus tab_order_items. Itens de cozinha+bar viram 2 tab_orders → cada um vai pra
+ *  sua impressora/KDS, mas a comanda (tab) soma tudo. Açaí (sem station) = 1 tab_order 'cozinha'.
+ *  Baixa estoque por ficha técnica. Retorna os tab_orders criados (um por estação). */
+export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: string, note?: string): Promise<TabOrder[]> {
+  const d = db();
+  const sid = storeId ?? (await resolveStoreId());
+  const menu = await readMenu(storeId);
   // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
   const resolved = items.map((it) => {
     let consumes: StockConsume[] = [];
@@ -189,38 +206,113 @@ export async function addTabItems(tabId: number, items: NewTabItem[]): Promise<T
     } else if (it.grams && it.grams > 0) {
       consumes = [{ stockId: POLPA_STOCK_ID, qty: +(it.grams / 1000).toFixed(3) }];
     }
-    return { ...it, consumes };
+    return { ...it, consumes, station: it.station || "cozinha" };
   });
 
-  const { data: order, error } = await d
-    .from("tab_orders")
-    .insert({ store_id: sid, tab_id: tabId, status: "pendente" })
-    .select()
-    .single();
-  if (error) throw error;
-
-  const rows = resolved.map((it) => ({
-    store_id: sid,
-    tab_order_id: (order as TabOrder).id,
-    name: it.name,
-    size_label: it.sizeLabel ?? null,
-    qty: it.qty,
-    unit_price_cents: it.unitPriceCents,
-    consumes: it.consumes,
-  }));
-  if (rows.length) {
-    const { error: e2 } = await d.from("tab_order_items").insert(rows);
-    if (e2) throw e2;
+  // agrupa por estação → 1 tab_order por estação (o roteamento)
+  const byStation = new Map<string, typeof resolved>();
+  for (const it of resolved) {
+    const arr = byStation.get(it.station) ?? [];
+    arr.push(it);
+    byStation.set(it.station, arr);
   }
 
-  // baixa de estoque pela ficha técnica resolvida
+  const created: TabOrder[] = [];
+  for (const [station, group] of byStation) {
+    const { data: order, error } = await d
+      .from("tab_orders")
+      .insert({ store_id: sid, tab_id: tabId, status: "pendente", station, note: note ?? null })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const rows = group.map((it) => ({
+      store_id: sid,
+      tab_order_id: (order as TabOrder).id,
+      name: it.name,
+      size_label: it.sizeLabel ?? null,
+      qty: it.qty,
+      unit_price_cents: it.unitPriceCents,
+      consumes: it.consumes,
+    }));
+    const { error: e2 } = await d.from("tab_order_items").insert(rows);
+    if (e2) throw e2;
+    created.push(order as TabOrder);
+  }
+
+  // baixa de estoque pela ficha técnica resolvida (sobre todos os itens, independente da estação)
   const today = new Date().toISOString().slice(0, 10);
   for (const it of resolved) {
     for (const c of it.consumes) {
       await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today);
     }
   }
-  return order as TabOrder;
+  return created;
+}
+
+// ── KDS (telas de preparo por estação) ───────────────────────────────────────
+export type KdsItem = { name: string; size_label: string | null; qty: number };
+export type KdsOrder = {
+  id: number;
+  station: string;
+  status: string; // 'pendente' | 'preparando' | 'pronto'
+  created_at: string;
+  table_label: string;
+  note: string | null;
+  items: KdsItem[];
+};
+
+export const KDS_STATUSES = ["pendente", "preparando", "pronto"] as const;
+// avança pendente → preparando → pronto → entregue (sai do KDS)
+export function nextKdsStatus(s: string): string {
+  const i = KDS_STATUSES.indexOf(s as (typeof KDS_STATUSES)[number]);
+  return i < 0 ? "preparando" : i >= KDS_STATUSES.length - 1 ? "entregue" : KDS_STATUSES[i + 1];
+}
+
+/** Pedidos ABERTOS (pendente/preparando/pronto) das estações dadas, com itens e a mesa.
+ *  É o feed do KDS — cada tab_order já vem roteado pra UMA estação pelo addTabItems. */
+export async function getStationOrders(stations: string[]): Promise<KdsOrder[]> {
+  const d = db();
+  const sid = await resolveStoreId();
+  const { data: orders } = await d
+    .from("tab_orders")
+    .select("id, tab_id, station, status, note, created_at")
+    .eq("store_id", sid)
+    .in("station", stations)
+    .in("status", KDS_STATUSES as unknown as string[])
+    .order("created_at");
+  const list = (orders ?? []) as Array<{ id: number; tab_id: number; station: string; status: string; note: string | null; created_at: string }>;
+  if (!list.length) return [];
+
+  const orderIds = list.map((o) => o.id);
+  const tabIds = [...new Set(list.map((o) => o.tab_id))];
+  const [{ data: items }, { data: tabs }] = await Promise.all([
+    d.from("tab_order_items").select("tab_order_id, name, size_label, qty").in("tab_order_id", orderIds),
+    d.from("tabs").select("id, label").in("id", tabIds),
+  ]);
+  const labelByTab = new Map<number, string>();
+  for (const t of (tabs ?? []) as Array<{ id: number; label: string | null }>) labelByTab.set(t.id, t.label ?? "Balcão");
+  const byOrder = new Map<number, KdsItem[]>();
+  for (const it of (items ?? []) as Array<{ tab_order_id: number; name: string; size_label: string | null; qty: number }>) {
+    const arr = byOrder.get(it.tab_order_id) ?? [];
+    arr.push({ name: it.name, size_label: it.size_label, qty: num(it.qty) });
+    byOrder.set(it.tab_order_id, arr);
+  }
+  return list.map((o) => ({
+    id: o.id,
+    station: o.station,
+    status: o.status,
+    created_at: o.created_at,
+    table_label: labelByTab.get(o.tab_id) ?? "Balcão",
+    note: o.note,
+    items: byOrder.get(o.id) ?? [],
+  }));
+}
+
+/** Avança/define o status de um pedido (KDS). Não deixa mexer em loja de outro dono. */
+export async function advanceTabOrder(orderId: number, status: string): Promise<void> {
+  const sid = await resolveStoreId();
+  await db().from("tab_orders").update({ status }).eq("id", orderId).eq("store_id", sid);
 }
 
 export type TabFull = {

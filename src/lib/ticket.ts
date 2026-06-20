@@ -33,6 +33,49 @@ const esc = (s: unknown) =>
 const lead = (l: string, r: string, cls = "") =>
   `<div class="lead ${cls}"><span>${l}</span><span class="dots"></span><span>${r}</span></div>`;
 
+// ── Via de PREPARO por estação (KDS → impressora da cozinha/bar) ──────────────
+// Cupom sem preço (é comanda de preparo): faixa da ESTAÇÃO + destino (mesa) gigante + qty grande +
+// observação em caixa. A faixa é dinâmica (station.toUpperCase()) — serve cozinha, bar, copa...
+export type StationTicketData = {
+  station: string;
+  tableLabel: string;
+  dateLabel: string;
+  orderId: number;
+  items: { qty: number; name: string; sizeLabel?: string | null }[];
+  note?: string | null;
+};
+
+export function stationTicketHtml(d: StationTicketData): string {
+  const items = d.items
+    .map(
+      (it) =>
+        `<div class="it"><span class="q">${it.qty}x</span><span class="n">${esc(it.name)}${
+          it.sizeLabel ? `<div class="sz">${esc(it.sizeLabel)}</div>` : ""
+        }</span></div>`,
+    )
+    .join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    body{width:72mm;padding:2mm;line-height:1.3}
+    .stn{font-weight:700;font-size:16px;text-align:center;border:2px solid #000;padding:3px 0;margin-bottom:4px;letter-spacing:2px}
+    .dest{font-weight:700;font-size:30px;text-align:center;line-height:1.1}
+    .meta{font-size:11px;text-align:center;margin-bottom:5px}
+    .sep{border-top:2px solid #000;margin:5px 0}
+    .it{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px}
+    .it .q{font-weight:700;font-size:20px;min-width:36px}
+    .it .n{font-size:18px;font-weight:600;flex:1}
+    .it .sz{font-size:12px;font-weight:400}
+    .obs{border:2px solid #000;padding:4px 6px;font-weight:700;font-size:15px}
+  </style></head><body>
+    <div class="stn">${esc(d.station).toUpperCase()}</div>
+    <div class="dest">${esc(d.tableLabel).toUpperCase()}</div>
+    <div class="meta">${esc(d.dateLabel)} &middot; #${d.orderId}</div>
+    <div class="sep"></div>
+    ${items}
+    ${d.note ? `<div class="sep"></div><div class="obs">OBS: ${esc(d.note)}</div>` : ""}
+  </body></html>`;
+}
+
 export function ticketHtml(d: TicketData): string {
   const isLink = d.origem === "link";
 

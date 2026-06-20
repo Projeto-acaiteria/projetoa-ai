@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   IconBowl,
+  IconFlame,
   IconHome,
   IconReceipt,
   IconMenu as IconHamburger,
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt },
+  { href: "/admin/preparo", label: "Preparo", Icon: IconFlame },
   { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl },
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },

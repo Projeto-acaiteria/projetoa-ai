@@ -4,8 +4,8 @@
 // só o cupom, não a página inteira). Nunca lança — impressão não pode travar a venda.
 import { qzPrintHtml, getStationPrinter } from "./qz";
 
-export async function printTicket(html: string): Promise<"qz" | "iframe" | "erro"> {
-  const printer = getStationPrinter();
+export async function printTicket(html: string, station = "caixa"): Promise<"qz" | "iframe" | "erro"> {
+  const printer = getStationPrinter(station);
   if (printer) {
     try {
       await qzPrintHtml(printer, html);
