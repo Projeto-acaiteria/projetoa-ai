@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       storeId,
     );
 
-    return NextResponse.json({ ok: true, order: { display: order.display, totalCents } }, { status: 201 });
+    return NextResponse.json({ ok: true, order: { display: order.display, totalCents, code: order.code } }, { status: 201 });
   } catch (e) {
     console.error("delivery-pedido:", e);
     return NextResponse.json({ error: "Não consegui enviar o pedido. Tente de novo." }, { status: 500 });

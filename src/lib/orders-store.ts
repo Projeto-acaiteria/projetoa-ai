@@ -32,7 +32,16 @@ export type Order = {
   consumes?: { stockId: string; qty: number }[]; // ficha técnica (baixa de estoque)
   consumed?: boolean; // estoque já abatido (evita duplicar na entrega)
   bairro?: string; // zona de entrega (delivery)
+  code?: string; // código de rastreio (curto, aleatório) — cliente consulta o status por ele
 };
+
+// código curto sem caracteres ambíguos (sem O/0/I/1/L) — fácil de ditar e digitar
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function genCode(): string {
+  let s = "";
+  for (let i = 0; i < 5; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return s;
+}
 
 export type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito";
 
@@ -53,7 +62,7 @@ export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 export async function addOrder(input: NewOrder, nowIso: string, status: OrderStatus = "recebido", storeId?: string): Promise<Order> {
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
-  const base = { ...input, createdAt: nowIso, status };
+  const base = { ...input, code: input.code || genCode(), createdAt: nowIso, status };
   const { data: row, error } = await d.from("orders").insert({ data: base, store_id: sid }).select("id").single();
   if (error || !row) throw new Error("Falha ao criar o pedido: " + (error?.message ?? "sem retorno"));
   const id = Number((row as { id: number }).id);
@@ -73,6 +82,14 @@ async function patchOrder(id: number, mut: (o: Order) => Order): Promise<Order |
   const { error: e2 } = await d.from("orders").update({ data: order }).eq("id", id);
   if (e2) throw new Error("Erro ao atualizar pedido: " + e2.message);
   return order;
+}
+
+/** Busca pública pelo código de rastreio (case-insensitive), restrita à loja. Não expõe lista. */
+export async function getOrderByCode(storeId: string, code: string): Promise<Order | null> {
+  const c = (code || "").trim().toUpperCase();
+  if (c.length < 4) return null;
+  const all = await readAll(storeId);
+  return all.find((o) => (o.code || "").toUpperCase() === c) ?? null;
 }
 
 export async function setStatus(id: number, status: OrderStatus): Promise<Order | null> {

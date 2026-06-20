@@ -82,6 +82,7 @@ export default function TemplateBar({
   const [dBairro, setDBairro] = useState("");
   const [dPay, setDPay] = useState<"dinheiro" | "pix" | "credito">("pix");
   const [placed, setPlaced] = useState<string | null>(null);
+  const [placedCode, setPlacedCode] = useState<string | null>(null);
   const isDeliveryFlow = !tableNumber && hasDelivery;
   const usaZonas = deliveryMode === "zones";
   const deliFee = dMode === "entrega" ? (usaZonas ? (deliveryZones.find((z) => z.bairro === dBairro)?.feeCents ?? 0) : deliveryFeeCents) : 0;
@@ -169,7 +170,7 @@ export default function TemplateBar({
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || "Não consegui enviar o pedido.");
-        setPlaced(d.order?.display ?? null); setSent(true); setCart({}); setNote("");
+        setPlaced(d.order?.display ?? null); setPlacedCode(d.order?.code ?? null); setSent(true); setCart({}); setNote("");
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : "Não consegui enviar o pedido.");
       } finally { setSending(false); }
@@ -308,6 +309,13 @@ export default function TemplateBar({
                 </div>
                 <p className="text-lg font-bold">Pedido enviado! {placed}</p>
                 <p className="mt-1 text-sm text-white/50">{isDeliveryFlow ? "A loja vai confirmar pelo WhatsApp." : "Já está sendo preparado."}</p>
+                {isDeliveryFlow && placedCode && (
+                  <a href={`/${slug}/pedido/${placedCode}`} className="mt-4 block rounded-xl border border-white/10 bg-white/5 p-3 transition hover:border-white/20">
+                    <span className="text-xs text-white/50">Acompanhe pelo código</span>
+                    <span className="mt-0.5 block text-2xl font-extrabold tracking-[0.2em]" style={{ color: branding?.primaryColor || ACCENT_HI }}>{placedCode}</span>
+                    <span className="text-xs font-semibold text-white/40">toque para ver o status →</span>
+                  </a>
+                )}
                 {isDeliveryFlow && whatsapp && (
                   <a href={`https://wa.me/${whatsapp}?text=${waText()}`} target="_blank" rel="noopener noreferrer"
                     className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-6 py-3 font-bold text-white active:scale-[0.99]">
