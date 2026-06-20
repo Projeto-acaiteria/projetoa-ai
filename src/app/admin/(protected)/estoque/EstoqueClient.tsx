@@ -186,6 +186,7 @@ function ItemRow({ it, onMove, onRemove }: { it: StockItem; onMove: (dir: "entra
       <div className="shrink-0 text-right">
         <span className={`text-lg font-extrabold ${isLow ? "text-[var(--red-no)]" : "text-ink"}`}>{it.qty}</span>
         <span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">{it.unit}</span>
+        {it.dosesPerBottle ? <div className="text-[11px] text-[var(--text-faded)]">≈ {(it.qty / it.dosesPerBottle).toFixed(1)} garrafa(s)</div> : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -211,13 +212,16 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [minQty, setMinQty] = useState("0");
   const [expiry, setExpiry] = useState("");
   const [sell, setSell] = useState("");
+  const [dpb, setDpb] = useState(""); // doses por garrafa (destilado)
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
+  const isBebida = category === "bebida";
 
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
+    const doses = isBebida && dpb ? Math.round(parseFloat(dpb.replace(",", ".")) || 0) : 0;
     await fetch("/api/estoque", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -225,10 +229,11 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         name,
         category,
         qty: +qty,
-        unit,
+        unit: doses > 0 ? "dose" : unit,
         minQty: +minQty,
         expiry: expiry || undefined,
         sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : undefined,
+        dosesPerBottle: doses > 0 ? doses : undefined,
       }),
     });
     onSaved();
@@ -247,10 +252,17 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         ))}
       </select>
       <div className="grid grid-cols-3 gap-2">
-        <input className={inp} type="number" min={0} placeholder="Qtd" value={qty} onChange={(e) => setQty(e.target.value)} />
-        <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} />
+        <input className={inp} type="number" min={0} placeholder={isBebida && dpb ? "Doses" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
+        <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={isBebida && !!dpb} />
         <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
       </div>
+      {isBebida && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Doses por garrafa (destilado — opcional)</label>
+          <input className={`${inp} mt-1`} type="number" min={0} placeholder="ex: 20 (garrafa 1L ÷ dose 50ml)" value={dpb} onChange={(e) => setDpb(e.target.value)} />
+          <p className="mt-1 text-[11px] text-[var(--text-faded)]">Preenchendo, o estoque conta em DOSES; a entrada é por garrafa (= esse nº de doses).</p>
+        </div>
+      )}
       {isVenda && (
         <div>
           <label className="text-xs font-semibold text-[var(--text-muted)]">Preço de venda</label>

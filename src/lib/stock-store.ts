@@ -26,10 +26,14 @@ export type StockItem = {
   name: string;
   category: StockCategory;
   qty: number;
-  unit: string; // kg, g, L, un...
+  unit: string; // kg, g, L, un... (com dose/garrafa, qty = nº de DOSES)
   minQty: number; // alerta de estoque baixo
   expiry?: string; // YYYY-MM-DD (validade do lote atual)
   sellPriceCents?: number; // preço de venda (só p/ produtos de revenda)
+  // bar (opt-in): destilado controlado em DOSE/GARRAFA. qty fica em doses; entrada por garrafa
+  // soma dosesPerBottle. garrafas = qty / dosesPerBottle. custoPorGarrafa pro CMV (futuro).
+  dosesPerBottle?: number;
+  costPerBottleCents?: number;
   updatedAt: string;
   history: StockMove[];
 };
@@ -115,6 +119,15 @@ export async function moveStock(id: string, type: "entrada" | "saida", qty: numb
   const { error } = await db().from("stock_items").upsert({ store_id: sid, id, data: item });
   if (error) throw new Error("Falha ao movimentar estoque: " + error.message);
   return item;
+}
+
+/** Entrada por GARRAFA (item dose/garrafa): soma bottles × dosesPerBottle ao estoque em doses. */
+export async function addBottles(id: string, bottles: number, at: string): Promise<StockItem | null> {
+  const all = await readAll();
+  const cur = all.find((x) => x.id === id);
+  if (!cur || !cur.dosesPerBottle) return null;
+  const doses = Math.round(Math.abs(bottles) * cur.dosesPerBottle);
+  return moveStock(id, "entrada", doses, `Entrada ${bottles} garrafa(s)`, at);
 }
 
 export async function removeItem(id: string): Promise<void> {
