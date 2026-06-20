@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import { IMAGE_BANK } from "@/config/image-bank";
+import { compressImage } from "@/lib/compress-image";
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
@@ -25,8 +26,11 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (url: strin
     setUploading(true);
     setErr("");
     try {
+      // comprime no client (webp ~200-350KB) ANTES de subir — porte do AgendaPRO
+      const c = await compressImage(file);
+      if (!c.ok) { setErr(c.reason); return; }
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", c.file);
       const r = await fetch("/api/upload-foto", { method: "POST", body: fd });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "falha no upload");
@@ -57,7 +61,7 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (url: strin
           </div>
           {err && <span className="text-xs text-red-500">{err}</span>}
         </div>
-        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
       </div>
       {bankOpen && (
         <div className="mt-3 max-h-52 overflow-y-auto rounded-xl border border-line p-2">
