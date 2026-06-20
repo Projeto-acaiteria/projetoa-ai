@@ -59,16 +59,19 @@ export default function MesasClient({
   pricePerKgCents,
   sizes,
   coverShow = null,
+  staff = [],
 }: {
   pricePerKgCents: number;
   sizes: SizeOption[];
   coverShow?: { artist: string; coverCents: number } | null;
+  staff?: { id: string; name: string }[];
 }) {
   const [tables, setTables] = useState<TableCell[]>([]);
   const [loaded, setLoaded] = useState(false);
-  // couvert: ao abrir mesa nova com show hoje, pergunta o nº de pessoas
+  // abertura: ao abrir mesa nova com show hoje ou garçons, pergunta garçom + nº de pessoas
   const [paxCell, setPaxCell] = useState<TableCell | null>(null);
   const [paxValue, setPaxValue] = useState(2);
+  const [waiterSel, setWaiterSel] = useState<string>("");
 
   // modal / comanda aberta
   const [tabId, setTabId] = useState<number | null>(null);
@@ -114,13 +117,13 @@ export default function MesasClient({
     setComanda(data);
   }, []);
 
-  // clique na mesa: ocupada abre direto; mesa NOVA com show hoje pergunta nº de pessoas (pro couvert)
+  // clique na mesa: ocupada abre direto; mesa NOVA com show hoje OU garçons → modal (garçom + pessoas)
   function onTableClick(cell: TableCell) {
-    if (!cell.tabId && coverShow) { setPaxValue(2); setPaxCell(cell); return; }
-    openTable(cell, 1);
+    if (!cell.tabId && (coverShow || staff.length > 0)) { setPaxValue(2); setWaiterSel(""); setPaxCell(cell); return; }
+    openTable(cell, 1, null);
   }
 
-  async function openTable(cell: TableCell, pax: number) {
+  async function openTable(cell: TableCell, pax: number, waiterId: string | null) {
     setBusy(true);
     try {
       let id = cell.tabId;
@@ -128,7 +131,7 @@ export default function MesasClient({
         const res = await fetch("/api/mesas/abrir", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tableNumber: cell.number, pax }),
+          body: JSON.stringify({ tableNumber: cell.number, pax, waiterId: waiterId || undefined }),
         });
         const data = await res.json();
         id = data.tab?.id ?? null;
@@ -675,22 +678,35 @@ export default function MesasClient({
         </div>
       )}
 
-      {paxCell && coverShow && (
+      {paxCell && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPaxCell(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative w-full max-w-xs rounded-2xl bg-bg-elevated p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-extrabold text-ink">Mesa {paxCell.number}</h3>
-            <p className="mt-0.5 text-sm text-[var(--text-muted)]">Couvert · atração ao vivo: {coverShow.artist}</p>
-            <p className="mb-3 mt-4 text-sm font-semibold text-ink">Quantas pessoas na mesa?</p>
-            <div className="flex items-center justify-center gap-5">
-              <button onClick={() => setPaxValue((v) => Math.max(1, v - 1))} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">−</button>
-              <span className="w-10 text-center text-3xl font-extrabold tabular-nums text-ink">{paxValue}</span>
-              <button onClick={() => setPaxValue((v) => v + 1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">+</button>
-            </div>
-            <p className="mt-4 text-center text-sm text-[var(--text-muted)]">Couvert: <b className="text-ink">{brl(coverShow.coverCents * paxValue)}</b> <span className="text-xs">({brl(coverShow.coverCents)}/pessoa)</span></p>
+            {staff.length > 0 && (
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Garçom</label>
+                <select value={waiterSel} onChange={(e) => setWaiterSel(e.target.value)} className="w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-600">
+                  <option value="">Sem garçom</option>
+                  {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+            {coverShow && (
+              <>
+                <p className="mt-3 text-sm text-[var(--text-muted)]">Couvert · ao vivo: {coverShow.artist}</p>
+                <p className="mb-3 mt-3 text-sm font-semibold text-ink">Quantas pessoas na mesa?</p>
+                <div className="flex items-center justify-center gap-5">
+                  <button onClick={() => setPaxValue((v) => Math.max(1, v - 1))} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">−</button>
+                  <span className="w-10 text-center text-3xl font-extrabold tabular-nums text-ink">{paxValue}</span>
+                  <button onClick={() => setPaxValue((v) => v + 1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-2xl active:scale-95">+</button>
+                </div>
+                <p className="mt-3 text-center text-sm text-[var(--text-muted)]">Couvert: <b className="text-ink">{brl(coverShow.coverCents * paxValue)}</b> <span className="text-xs">({brl(coverShow.coverCents)}/pessoa)</span></p>
+              </>
+            )}
             <div className="mt-5 flex gap-2">
               <button onClick={() => setPaxCell(null)} className="flex-1 rounded-xl border border-line py-2.5 text-sm font-bold text-[var(--text-secondary)]">Cancelar</button>
-              <button onClick={() => openTable(paxCell, paxValue)} disabled={busy} className="flex-1 rounded-xl brand-gradient py-2.5 text-sm font-bold text-white disabled:opacity-50">Abrir mesa</button>
+              <button onClick={() => openTable(paxCell, paxValue, waiterSel || null)} disabled={busy} className="flex-1 rounded-xl brand-gradient py-2.5 text-sm font-bold text-white disabled:opacity-50">Abrir mesa</button>
             </div>
           </div>
         </div>

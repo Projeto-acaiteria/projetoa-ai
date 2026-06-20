@@ -24,6 +24,7 @@ const NAV = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable },
+  { href: "/admin/garcons", label: "Garçons", Icon: IconUsers },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt },
   { href: "/admin/preparo", label: "Preparo", Icon: IconFlame },
   { href: "/admin/eventos", label: "Shows", Icon: IconMusic },

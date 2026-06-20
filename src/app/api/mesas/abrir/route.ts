@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrCreateOpenTab } from "@/lib/tables-store";
+import { setTabWaiter } from "@/lib/staff-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import { db } from "@/lib/supabase";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/mesas/abrir — abre (ou recupera) a comanda da mesa
 export async function POST(req: Request) {
-  let b: { tableNumber?: number; label?: string; pax?: number };
+  let b: { tableNumber?: number; label?: string; pax?: number; waiterId?: string };
   try {
     b = await req.json();
   } catch {
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Mesa não encontrada" }, { status: 400 });
     }
     const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined, storeId, b.pax);
+    if (b.waiterId) await setTabWaiter(Number(tab.id), b.waiterId, storeId);
     return NextResponse.json({ tab });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
