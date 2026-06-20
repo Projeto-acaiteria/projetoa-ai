@@ -1,6 +1,6 @@
 // ComandaPRO — segmentos de food service (Fase 4, multi-segmento).
 // O onboarding pergunta "que tipo de negócio?" e usa estes DEFAULTS pra ligar as features certas
-// (gravadas em store_config). O dono pode ajustar cada flag depois. Lançamento = os com espelho.
+// (gravadas em store_config) e escolher o MODELO de cardápio. O dono pode ajustar tudo depois.
 
 export type BusinessType =
   | "acaiteria"
@@ -9,6 +9,9 @@ export type BusinessType =
   | "restaurante"
   | "petiscaria"
   | "bar";
+
+// 3 modelos de cardápio público: acai (monta no copo) | bar (comanda estilo Medellín) | grid (foto grande).
+export type MenuTemplate = "acai" | "bar" | "grid";
 
 export type Features = {
   sellsByWeight: boolean; // balança R$/kg (açaí, sorveteria, marmita a quilo)
@@ -21,29 +24,35 @@ export type Features = {
   loyaltyEnabled: boolean; // fidelidade (pontos do cliente)
 };
 
-export const SEGMENTOS: Record<BusinessType, { label: string; features: Features }> = {
+export const SEGMENTOS: Record<BusinessType, { label: string; menuTemplate: MenuTemplate; features: Features }> = {
   acaiteria: {
     label: "Açaiteria",
+    menuTemplate: "acai",
     features: { sellsByWeight: true, hasBalcao: true, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: false, loyaltyEnabled: true },
   },
   sorveteria: {
     label: "Sorveteria",
+    menuTemplate: "acai",
     features: { sellsByWeight: true, hasBalcao: true, hasTables: false, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: false, loyaltyEnabled: true },
   },
   marmitaria: {
     label: "Marmitaria / Comida a quilo",
+    menuTemplate: "grid",
     features: { sellsByWeight: true, hasBalcao: true, hasTables: false, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: false, loyaltyEnabled: false },
   },
   restaurante: {
     label: "Restaurante",
+    menuTemplate: "grid",
     features: { sellsByWeight: false, hasBalcao: false, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: false },
   },
   petiscaria: {
     label: "Petiscaria / Espetinho",
+    menuTemplate: "bar",
     features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: false },
   },
   bar: {
     label: "Bar / Choperia",
+    menuTemplate: "bar",
     features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: false, coverEnabled: true, stockDose: true, hasStations: true, loyaltyEnabled: false },
   },
 };

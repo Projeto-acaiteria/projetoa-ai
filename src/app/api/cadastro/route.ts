@@ -81,6 +81,7 @@ export async function POST(req: Request) {
   const { error: cErr } = await db().from("store_config").insert({
     store_id: storeId,
     business_type: seg,
+    menu_template: SEGMENTOS[seg].menuTemplate,
     sells_by_weight: f.sellsByWeight,
     has_balcao: f.hasBalcao,
     has_tables: f.hasTables,
