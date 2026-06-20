@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getByPhone, listCustomers, redeem, normPhone } from "@/lib/customers-store";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { getCurrentStore } from "@/lib/auth/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/pontos            -> lista todos (admin)
-// GET /api/pontos?phone=...  -> saldo de um cliente
+// GET /api/pontos            -> lista todos (ADMIN — exige login; vaza base de clientes/PII)
+// GET /api/pontos?phone=...  -> saldo de um cliente (PÚBLICO — página meus-pontos)
 export async function GET(req: Request) {
   const phone = new URL(req.url).searchParams.get("phone");
   const { rewards } = await getLoyalty();
@@ -14,6 +15,8 @@ export async function GET(req: Request) {
     const customer = await getByPhone(phone);
     return NextResponse.json({ customer, rewards });
   }
+  // listar TODOS = admin
+  if (!(await getCurrentStore())) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const customers = await listCustomers();
   return NextResponse.json({ customers, rewards });
 }

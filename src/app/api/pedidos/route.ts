@@ -4,6 +4,7 @@ import { readMenu } from "@/lib/menu-store";
 import { getStore } from "@/lib/settings-store";
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getCurrentStore } from "@/lib/auth/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ async function resolveOrderStore(slug?: string): Promise<string> {
 }
 
 export async function GET() {
-  const orders = await listOrders();
+  // listar pedidos = ADMIN (sem login não pode varrer os pedidos do tenant default)
+  const loja = await getCurrentStore();
+  if (!loja) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const orders = await listOrders(loja.id);
   return NextResponse.json({ orders });
 }
 

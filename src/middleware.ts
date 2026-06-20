@@ -1,10 +1,22 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth/middleware";
 
-// Roda em todas as rotas (menos assets estáticos) só pra renovar a sessão do usuário.
-// NÃO bloqueia nada ainda — o gate de billing/login entra depois, no layout protegido.
+// Rotas /api PÚBLICAS (cliente final / signup / webhooks / cron / impressão). Tudo o mais sob
+// /api exige login. As rotas MISTAS (público + admin) ficam aqui e gateiam o lado admin DENTRO
+// da própria rota (pedidos: POST público/GET admin; pontos: GET?phone público/listar+POST admin).
+const API_PUBLICAS = [
+  "/api/mesa-pedido", "/api/delivery-pedido", "/api/cadastro", "/api/cadastro/check",
+  "/api/webhooks/asaas", "/api/cron/billing-check", "/api/qz-sign",
+  "/api/pedidos", "/api/pontos",
+];
+
 export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+  const { response, userId } = await updateSession(request);
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/api/") && !API_PUBLICAS.some((p) => path === p || path.startsWith(p + "/"))) {
+    if (!userId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  return response;
 }
 
 export const config = {

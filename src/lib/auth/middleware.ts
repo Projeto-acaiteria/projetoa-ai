@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Renova a sessão a cada request. CRÍTICO (lição AgendaPRO/Olímpio): o getUser() abaixo
 // refresca o token — sem ele o usuário desloga sozinho em ~1h. — ComandaPRO Fase 2.
-export async function updateSession(request: NextRequest) {
+export async function updateSession(request: NextRequest): Promise<{ response: NextResponse; userId: string | null }> {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -26,7 +26,7 @@ export async function updateSession(request: NextRequest) {
   );
 
   // NÃO remover: refresca o token de sessão. Sem isso = deslogar-sozinho-em-1h.
-  await supabase.auth.getUser();
+  const { data } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, userId: data.user?.id ?? null };
 }
