@@ -16,6 +16,7 @@ import {
   IconBox,
   IconChart,
   IconCart,
+  IconBag,
   IconGear,
   IconPrinter,
   IconTable,
@@ -24,6 +25,7 @@ import {
 const NAV = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
+  { href: "/admin/balcao", label: "Balcão", Icon: IconBag },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable },
   { href: "/admin/garcons", label: "Garçons", Icon: IconUsers },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt },
