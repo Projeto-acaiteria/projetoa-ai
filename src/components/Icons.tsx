@@ -26,6 +26,13 @@ export const IconFlame = (p: I) => (
     <path d="M12 2c1.5 3 4.5 4.5 4.5 8.5a4.5 4.5 0 0 1-9 0c0-1.2.4-2.2 1-3 .3 1 1 1.7 2 2 0-2.3-1-4.3 1.5-7.5Z" />
   </svg>
 );
+export const IconMusic = (p: I) => (
+  <svg {...base(p)}>
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="18" cy="16" r="3" />
+  </svg>
+);
 export const IconHome = (p: I) => (
   <svg {...base(p)}>
     <path d="M3 10.5 12 3l9 7.5" />

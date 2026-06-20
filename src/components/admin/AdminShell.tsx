@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   IconBowl,
   IconFlame,
+  IconMusic,
   IconHome,
   IconReceipt,
   IconMenu as IconHamburger,
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt },
   { href: "/admin/preparo", label: "Preparo", Icon: IconFlame },
+  { href: "/admin/eventos", label: "Shows", Icon: IconMusic },
   { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl },
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
