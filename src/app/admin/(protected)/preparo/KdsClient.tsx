@@ -8,7 +8,7 @@ import { stationTicketHtml } from "@/lib/ticket";
 // e avança status pendente → preparando → pronto → entregue (sai do quadro). Polling 8s + tick
 // de 1s pro tempo/urgência. O aparelho da cozinha fixa a estação; persiste em localStorage.
 
-type KdsItem = { name: string; size_label: string | null; qty: number };
+type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null };
 type KdsOrder = { id: number; station: string; status: string; created_at: string; table_label: string; note: string | null; items: KdsItem[] };
 
 const COLS = [
@@ -51,7 +51,7 @@ export default function KdsClient({ stations }: { stations: string[] }) {
       tableLabel: o.table_label,
       dateLabel: new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       orderId: o.id,
-      items: o.items.map((i) => ({ qty: i.qty, name: i.name, sizeLabel: i.size_label })),
+      items: o.items.map((i) => ({ qty: i.qty, name: i.name, sizeLabel: i.size_label, mods: i.mods })),
       note: o.note,
     });
   }
@@ -169,9 +169,16 @@ export default function KdsClient({ stations }: { stations: string[] }) {
                       )}
                       <ul className="space-y-1">
                         {o.items.map((it, i) => (
-                          <li key={i} className="flex gap-2 text-sm">
-                            <span className="font-bold text-zinc-900 tabular-nums">{it.qty}×</span>
-                            <span className="text-zinc-700">{it.name}{it.size_label && <span className="text-zinc-400"> · {it.size_label}</span>}</span>
+                          <li key={i} className="text-sm">
+                            <div className="flex gap-2">
+                              <span className="font-bold text-zinc-900 tabular-nums">{it.qty}×</span>
+                              <span className="text-zinc-700">{it.name}{it.size_label && <span className="text-zinc-400"> · {it.size_label}</span>}</span>
+                            </div>
+                            {it.mods && it.mods.length > 0 && (
+                              <div className="pl-6 text-xs font-bold text-amber-700">
+                                {it.mods.map((m, j) => <div key={j}>+ {m.name}</div>)}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // a comanda da mesa e grava ROTEANDO por estação (cozinha/bar) — cai no KDS de cada estação.
 // Preço/estação vêm do banco (server-authoritative), nunca do client.
 export async function POST(req: Request) {
-  let b: { slug?: string; tableNumber?: number; items?: { productId: string; qty: number }[]; note?: string };
+  let b: { slug?: string; tableNumber?: number; items?: { productId: string; qty: number; modifierIds?: string[] }[]; note?: string };
   try {
     b = await req.json();
   } catch {
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const tab = await getOrCreateOpenTab(tableId, `Mesa ${tableNumber}`, storeId);
     const orders = await addTabItems(
       tab.id,
-      items.map((it) => ({ name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station })),
+      items.map((it) => ({ name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods })),
       storeId,
       note,
     );
