@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { IconCard, IconCheck, IconBowl, IconPlus } from "@/components/Icons";
+import ImageUpload from "@/components/admin/ImageUpload";
 
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[] };
+type Store = { name: string; tagline: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -93,6 +94,36 @@ export default function ConfigClient() {
                 <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.minOrderCents / 100} onChange={(e) => setS("minOrderCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
               </div>
             </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Identidade visual (cardápio público) */}
+      <Card className="p-5 sm:p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-brand-600">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C21.998 6.012 17.5 2 12 2Z"/></svg>
+          </span>
+          <h2 className="text-base font-extrabold text-ink">Identidade visual</h2>
+        </div>
+        <p className="mb-4 text-sm text-[var(--text-muted)]">A cara da sua loja no cardápio público (logo, banner e cor).</p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Logo</label>
+            <div className="mt-1.5"><ImageUpload value={store.logoUrl} onChange={(url) => setS("logoUrl", url)} aspect="square" hint="Aparece no topo do cardápio. PNG quadrado fica melhor." /></div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Banner (foto de fundo)</label>
+            <div className="mt-1.5"><ImageUpload value={store.bannerUrl} onChange={(url) => setS("bannerUrl", url)} aspect="wide" hint="Foto de fundo do topo. Horizontal, boa qualidade." /></div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Cor de destaque</label>
+            <div className="mt-1.5 flex items-center gap-3">
+              <input type="color" value={store.primaryColor || "#7c3aed"} onChange={(e) => setS("primaryColor", e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-line bg-bg-base" />
+              <input className={`${inp} flex-1`} value={store.primaryColor} onChange={(e) => setS("primaryColor", e.target.value)} placeholder="#7c3aed (vazio = padrão)" />
+              {store.primaryColor && <button onClick={() => setS("primaryColor", "")} className="rounded-lg px-2 py-1.5 text-xs font-bold text-red-500">limpar</button>}
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--text-faded)]">Aplicada no botão principal do cardápio. Vazio = cor padrão do modelo.</p>
           </div>
         </div>
       </Card>

@@ -20,6 +20,10 @@ export type StoreSettings = {
   deliveryZones: DeliveryZone[]; // taxa por bairro (vazio = taxa única)
   hours: OpenHours[]; // 7 posições, domingo→sábado
   pricePerKgCents: number; // preço do açaí por kg (modo balança no balcão/mesa)
+  // identidade visual da loja (cardápio público) — opt-in, cada loja com a própria cara
+  logoUrl: string; // logo no header (vazio = só o nome)
+  bannerUrl: string; // foto de fundo do header/hero (vazio = gradiente padrão do template)
+  primaryColor: string; // cor de destaque (#RRGGBB) aplicada no CTA principal (vazio = padrão do template)
 };
 
 // taxas padrão de mercado (editáveis pelo adm)
@@ -39,6 +43,9 @@ const DEFAULT_STORE: StoreSettings = {
   deliveryZones: [],
   hours: Array.from({ length: 7 }, () => ({ open: "10:00", close: "22:00", closed: false })),
   pricePerKgCents: 4990, // R$ 49,90/kg (placeholder — confirmar com o Vidal)
+  logoUrl: "",
+  bannerUrl: "",
+  primaryColor: "",
 };
 
 type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings> };
@@ -69,6 +76,13 @@ export async function setStore(
   if (store.deliveryFeeCents != null) clean.deliveryFeeCents = Math.max(0, Math.round(Number(store.deliveryFeeCents)));
   if (store.minOrderCents != null) clean.minOrderCents = Math.max(0, Math.round(Number(store.minOrderCents)));
   if (store.pricePerKgCents != null) clean.pricePerKgCents = Math.max(0, Math.round(Number(store.pricePerKgCents)));
+  // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
+  if (typeof store.logoUrl === "string") clean.logoUrl = store.logoUrl.trim().slice(0, 500);
+  if (typeof store.bannerUrl === "string") clean.bannerUrl = store.bannerUrl.trim().slice(0, 500);
+  if (typeof store.primaryColor === "string") {
+    const c = store.primaryColor.trim();
+    clean.primaryColor = /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : "";
+  }
   if (Array.isArray(store.deliveryZones)) {
     clean.deliveryZones = store.deliveryZones
       .map((z) => ({ bairro: String(z.bairro || "").trim().slice(0, 40), feeCents: Math.max(0, Math.round(Number(z.feeCents) || 0)) }))

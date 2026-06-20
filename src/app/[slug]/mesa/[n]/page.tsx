@@ -38,6 +38,7 @@ export default async function MesaCardapio({ params }: { params: Promise<{ slug:
     slug,
     tableNumber,
     coverNotice,
+    branding: { logoUrl: store.logoUrl, bannerUrl: store.bannerUrl, primaryColor: store.primaryColor },
   };
   return tpl === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
 }

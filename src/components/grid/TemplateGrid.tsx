@@ -35,6 +35,7 @@ export default function TemplateGrid({
   slug,
   tableNumber = null,
   coverNotice = null,
+  branding = null,
 }: {
   storeName: string;
   tagline?: string | null;
@@ -43,6 +44,7 @@ export default function TemplateGrid({
   slug: string;
   tableNumber?: number | null;
   coverNotice?: { artist: string; coverCents: number } | null;
+  branding?: { logoUrl?: string; bannerUrl?: string; primaryColor?: string } | null;
 }) {
   const [cart, setCart] = useState<Record<string, Line>>({});
   const [open, setOpen] = useState(false);
@@ -103,20 +105,31 @@ export default function TemplateGrid({
 
   return (
     <main className="min-h-screen bg-[#FAFAF9] text-zinc-900">
-      <header className="relative px-6 pb-7 pt-12 text-center">
-        <span className="absolute right-5 top-5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white" style={{ background: aberto ? "#16A34A" : "#9CA3AF" }}>
+      <header className={`relative overflow-hidden px-6 pb-7 pt-12 text-center ${branding?.bannerUrl ? "text-white" : ""}`}>
+        {branding?.bannerUrl && (
+          <div className="absolute inset-0 z-0" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={branding.bannerUrl} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/45 to-black/70" />
+          </div>
+        )}
+        <span className="absolute right-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white" style={{ background: aberto ? "#16A34A" : "#9CA3AF" }}>
           <span className="h-1.5 w-1.5 rounded-full bg-white" /> {aberto ? "Aberto agora" : "Fechado"}
         </span>
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{storeName}</h1>
-        {tagline && <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500">{tagline}</p>}
+        {branding?.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logoUrl} alt={storeName} className="relative z-10 mx-auto mb-3 h-20 w-20 rounded-2xl object-cover shadow-lg" />
+        )}
+        <h1 className="relative z-10 text-3xl font-extrabold tracking-tight sm:text-4xl">{storeName}</h1>
+        {tagline && <p className={`relative z-10 mx-auto mt-2 max-w-sm text-sm ${branding?.bannerUrl ? "text-white/80" : "text-zinc-500"}`}>{tagline}</p>}
         {tableNumber != null && (
-          <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-bold shadow-sm">
+          <span className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-bold text-zinc-900 shadow-sm">
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9h18M5 9l1 11M19 9l-1 11M4 5h16v4H4z" /></svg>
             Mesa {tableNumber}
           </span>
         )}
         {coverNotice && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: "#FED7AA", background: "#FFF7ED", color: "#C2410C" }}>
+          <div className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: "#FED7AA", background: "#FFF7ED", color: "#C2410C" }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
             Couvert {brl(coverNotice.coverCents)}/pessoa · ao vivo: {coverNotice.artist}
           </div>
@@ -167,7 +180,7 @@ export default function TemplateGrid({
       </div>
 
       {count > 0 && !open && (
-        <button onClick={() => setOpen(true)} className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]" style={{ background: ACCENT, boxShadow: "0 16px 40px -12px rgba(234,88,12,0.55)" }}>
+        <button onClick={() => setOpen(true)} className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 16px 40px -12px rgba(0,0,0,0.4)" }}>
           <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/20 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
           <span className="tabular-nums">{brl(total)}</span>
         </button>
@@ -227,7 +240,7 @@ export default function TemplateGrid({
                   <span className="text-2xl font-extrabold" style={{ color: ACCENT }}>{brl(total)}</span>
                 </div>
                 {errorMsg && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{errorMsg}</p>}
-                <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: ACCENT, boxShadow: "0 14px 36px -12px rgba(234,88,12,0.55)" }}>
+                <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 14px 36px -12px rgba(0,0,0,0.4)" }}>
                   {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : "Confirmar pedido"}
                 </button>
               </>

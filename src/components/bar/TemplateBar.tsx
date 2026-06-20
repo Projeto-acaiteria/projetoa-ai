@@ -43,6 +43,7 @@ export default function TemplateBar({
   slug,
   tableNumber = null,
   coverNotice = null,
+  branding = null,
 }: {
   storeName: string;
   tagline?: string | null;
@@ -51,6 +52,7 @@ export default function TemplateBar({
   slug: string;
   tableNumber?: number | null;
   coverNotice?: { artist: string; coverCents: number } | null;
+  branding?: { logoUrl?: string; bannerUrl?: string; primaryColor?: string } | null;
 }) {
   const [cart, setCart] = useState<Record<string, Line>>({});
   const [open, setOpen] = useState(false);
@@ -111,21 +113,32 @@ export default function TemplateBar({
 
   return (
     <main className="min-h-screen text-white" style={{ background: "radial-gradient(1100px 520px at 50% -8%, rgba(255,59,78,0.16), transparent 60%), #0B0A09" }}>
-      <header className="relative flex min-h-[42vh] flex-col items-center justify-center px-6 py-16 text-center">
-        <span className="absolute right-5 top-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold backdrop-blur" style={{ background: aberto ? "rgba(255,255,255,0.12)" : "rgba(239,68,68,0.9)" }}>
+      <header className="relative flex min-h-[42vh] flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
+        {branding?.bannerUrl && (
+          <div className="absolute inset-0 z-0" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={branding.bannerUrl} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(11,10,9,0.55), rgba(11,10,9,0.82))" }} />
+          </div>
+        )}
+        <span className="absolute right-5 top-6 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold backdrop-blur" style={{ background: aberto ? "rgba(255,255,255,0.12)" : "rgba(239,68,68,0.9)" }}>
           <span className="h-2 w-2 rounded-full" style={{ background: aberto ? "#34D399" : "#fff" }} />
           {aberto ? "Aberto agora" : "Fechado"}
         </span>
-        <h1 className="font-display text-5xl font-extrabold tracking-tight drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" style={{ fontFamily: "Georgia, serif" }}>{storeName}</h1>
-        {tagline && <p className="mt-4 max-w-sm text-base font-medium text-white/70">{tagline}</p>}
+        {branding?.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logoUrl} alt={storeName} className="relative z-10 mb-4 h-20 w-20 rounded-2xl object-cover shadow-[0_8px_30px_rgba(0,0,0,0.5)]" />
+        )}
+        <h1 className="relative z-10 font-display text-5xl font-extrabold tracking-tight drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" style={{ fontFamily: "Georgia, serif" }}>{storeName}</h1>
+        {tagline && <p className="relative z-10 mt-4 max-w-sm text-base font-medium text-white/70">{tagline}</p>}
         {tableNumber != null && (
-          <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm font-bold backdrop-blur">
+          <span className="relative z-10 mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm font-bold backdrop-blur">
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={ACCENT_HI} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9h18M5 9l1 11M19 9l-1 11M4 5h16v4H4z" /></svg>
             Mesa {tableNumber}
           </span>
         )}
         {coverNotice && (
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur" style={{ borderColor: "rgba(255,59,78,0.35)", background: "rgba(255,59,78,0.1)", color: ACCENT_HI }}>
+          <div className="relative z-10 mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur" style={{ borderColor: "rgba(255,59,78,0.35)", background: "rgba(255,59,78,0.1)", color: ACCENT_HI }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
             Couvert {brl(coverNotice.coverCents)}/pessoa · ao vivo: {coverNotice.artist}
           </div>
@@ -254,7 +267,7 @@ export default function TemplateBar({
 
                 {errorMsg && <p className="mt-3 rounded-xl bg-red-500/15 px-3 py-2 text-center text-sm font-semibold text-red-300">{errorMsg}</p>}
 
-                <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})`, boxShadow: "0 14px 36px -12px rgba(255,59,78,0.6)" }}>
+                <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={branding?.primaryColor ? { background: branding.primaryColor, boxShadow: "0 14px 36px -12px rgba(0,0,0,0.5)" } : { background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})`, boxShadow: "0 14px 36px -12px rgba(255,59,78,0.6)" }}>
                   <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /><path d="M21 19H3l1.8-3a8 8 0 0 0 .9-3.6V9a6.3 6.3 0 0 1 12.6 0v3.4a8 8 0 0 0 .9 3.6Z" /></svg>
                   {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : "Confirmar pedido"}
                 </button>

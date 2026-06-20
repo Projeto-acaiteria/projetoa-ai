@@ -44,6 +44,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       categories,
       slug,
       coverNotice,
+      branding: { logoUrl: lojaStore.logoUrl, bannerUrl: lojaStore.bannerUrl, primaryColor: lojaStore.primaryColor },
     };
     return cfg.menu_template === "grid" ? <TemplateGrid {...props} /> : <TemplateBar {...props} />;
   }
@@ -63,6 +64,13 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
 
       <div className="relative z-10">
         <section className="relative flex min-h-[64vh] flex-col justify-center overflow-hidden px-6 py-20 text-center">
+          {store.bannerUrl && (
+            <div className="absolute inset-0 z-0" aria-hidden>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={store.bannerUrl} alt="" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/35 to-[#140820]" />
+            </div>
+          )}
           <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-6">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white backdrop-blur ${aberto ? "bg-white/15" : "bg-[#EF4444]/90"}`}>
               <IconClock width={13} height={13} /> {aberto ? "Aberto agora" : "Fechado"}
@@ -73,6 +81,10 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-2xl">
+            {store.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={store.logoUrl} alt={store.name} className="mx-auto mb-5 h-24 w-24 rounded-2xl object-cover shadow-[0_8px_30px_rgba(0,0,0,0.4)]" />
+            )}
             <h1 className="text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.5)] sm:text-5xl">
               {store.name}
             </h1>
@@ -81,8 +93,8 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
             )}
             <a
               href="#montar"
-              className="mt-8 inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-full px-7 py-4 text-base font-extrabold text-[#2E1065] shadow-[0_14px_40px_rgba(240,188,74,0.4)] transition active:scale-[0.98]"
-              style={{ background: "linear-gradient(135deg, #F4C95C 0%, #E0A82E 100%)" }}
+              className="mt-8 inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-full px-7 py-4 text-base font-extrabold shadow-[0_14px_40px_rgba(0,0,0,0.3)] transition active:scale-[0.98]"
+              style={store.primaryColor ? { background: store.primaryColor, color: "#fff" } : { background: "linear-gradient(135deg, #F4C95C 0%, #E0A82E 100%)", color: "#2E1065" }}
             >
               Fazer meu pedido <IconArrowRight width={18} height={18} />
             </a>
