@@ -7,8 +7,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const store = await getStore();
   return {
     name: store.name,
-    short_name: store.name.length > 12 ? "Açaí" : store.name,
-    description: "Monte seu açaí, junte pontos e peça pelo celular.",
+    short_name: store.name.length > 12 ? store.name.split(" ")[0] : store.name,
+    description: store.tagline || "Peça pelo cardápio digital.",
     start_url: "/cardapio",
     scope: "/",
     display: "standalone",

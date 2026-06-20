@@ -1,8 +1,8 @@
 {
-  "name": "acai-system",
+  "name": "comandapro",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistema próprio Açaiteria do Vidal · fork dedicado do palace-system",
+  "description": "ComandaPRO — SaaS de food service (cardápio digital, comanda, mesa, delivery, balcão, gestão)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
