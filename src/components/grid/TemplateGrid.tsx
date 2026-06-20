@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
+import { fromPrice } from "@/lib/menu-price";
 
 // TemplateGrid — cardápio público modelo GRID (foto grande, estilo iFood). Tema claro.
 // Suporta montagem guiada (modifiers): produto com grupos abre o ProductCustomizer.
@@ -143,7 +144,9 @@ export default function TemplateGrid({
                       <p className="text-sm font-bold leading-tight">{p.name}</p>
                       {p.size_label && <p className="text-xs text-zinc-400">{p.size_label}</p>}
                       <div className="mt-1 flex items-center gap-1.5">
-                        <p className="font-extrabold" style={{ color: ACCENT }}>{brl(p.price_cents)}</p>
+                        <p className="font-extrabold" style={{ color: ACCENT }}>
+                          {(() => { const fp = fromPrice(p); return <>{fp.from && <span className="text-[10px] font-medium text-zinc-400">a partir de </span>}{brl(fp.cents)}</>; })()}
+                        </p>
                         {hasGroups && <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-bold text-orange-600">monta</span>}
                       </div>
                     </div>
