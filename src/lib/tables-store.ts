@@ -10,6 +10,8 @@ import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { readMenu } from "@/lib/menu-store";
+import { getStoreConfig } from "@/lib/auth/store-config";
+import { getActiveEvent } from "@/lib/events-store";
 
 const POLPA_STOCK_ID = "polpa"; // insumo base do açaí pesado (kg)
 
@@ -30,6 +32,8 @@ export type Tab = {
   service_fee_cents: number;
   customer_phone: string | null;
   customer_name: string | null;
+  cover_cents: number; // couvert artístico (snapshot na abertura = cover do show × pessoas)
+  people_count: number;
 };
 
 export type TabItem = {
@@ -158,7 +162,7 @@ export async function ensureTables(n: number): Promise<void> {
 
 /** Comanda aberta da mesa (status='aberta') ou cria uma nova. storeId explícito no fluxo público
  *  (pedido pela mesa via slug, sem auth — senão resolveStoreId cairia na loja errada). */
-export async function getOrCreateOpenTab(tableId: number, label?: string, storeId?: string): Promise<Tab> {
+export async function getOrCreateOpenTab(tableId: number, label?: string, storeId?: string, pax?: number): Promise<Tab> {
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
   const { data: existing } = await d
@@ -170,9 +174,21 @@ export async function getOrCreateOpenTab(tableId: number, label?: string, storeI
     .maybeSingle();
   if (existing) return existing as Tab;
 
+  // COUVERT artístico: se vier nº de pessoas e a loja tem cover ligado + show ativo, snapshot na abertura
+  // (cover do show × pessoas). Sem pax (ex: pedido do cliente pelo QR) não aplica couvert.
+  let cover_cents = 0;
+  const people_count = Math.max(1, Math.round(pax ?? 1));
+  if (pax && pax > 0) {
+    const cfg = await getStoreConfig(sid);
+    if (cfg?.cover_enabled) {
+      const ev = await getActiveEvent(sid);
+      if (ev) cover_cents = ev.cover_cents * people_count;
+    }
+  }
+
   const { data, error } = await d
     .from("tabs")
-    .insert({ store_id: sid, table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0 })
+    .insert({ store_id: sid, table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0, cover_cents, people_count })
     .select()
     .single();
   if (error) throw error;
@@ -321,7 +337,9 @@ export type TabFull = {
   tab: Tab;
   orders: (TabOrder & { items: TabItem[] })[];
   payments: TabPayment[];
-  totalCents: number;
+  consumoCents: number; // soma dos itens — É A BASE DA TAXA DE SERVIÇO (couvert NÃO entra)
+  coverCents: number; // couvert artístico (snapshot) — fora da base da taxa (CDC)
+  totalCents: number; // consumo + couvert (sem a taxa, que é opcional no fechamento)
   paidCents: number;
 };
 
@@ -350,16 +368,20 @@ export async function getTabFull(tabId: number): Promise<TabFull> {
       .filter((i) => num(i.tab_order_id) === num(o.id))
       .map((i) => ({ ...i, qty: num(i.qty), unit_price_cents: num(i.unit_price_cents) })),
   }));
-  const totalCents = ((items ?? []) as TabItem[]).reduce(
+  const consumoCents = ((items ?? []) as TabItem[]).reduce(
     (s, i) => s + num(i.qty) * num(i.unit_price_cents),
     0,
   );
+  const coverCents = num((tab as Tab).cover_cents); // couvert NÃO entra na base da taxa de serviço
+  const totalCents = consumoCents + coverCents;
   const paidCents = ((payments ?? []) as TabPayment[]).reduce((s, p) => s + num(p.amount_cents), 0);
 
   return {
     tab: tab as Tab,
     orders: withItems,
     payments: (payments ?? []) as TabPayment[],
+    consumoCents,
+    coverCents,
     totalCents,
     paidCents,
   };
@@ -392,9 +414,9 @@ export type CloseTabOpts = {
 export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<{ pointsAwarded: number }> {
   const d = db();
 
-  // total dos produtos (sem taxa) antes de fechar
+  // fidelidade pontua só sobre o CONSUMO (produtos) — nunca sobre couvert nem taxa
   const full = await getTabFull(tabId);
-  const productCents = full.totalCents;
+  const productCents = full.consumoCents;
 
   const phone = opts.customerPhone ? normPhone(opts.customerPhone) : "";
   const name = opts.customerName?.trim() || full.tab.customer_name || "";

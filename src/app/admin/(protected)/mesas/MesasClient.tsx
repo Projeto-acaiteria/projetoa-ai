@@ -31,6 +31,8 @@ type Comanda = {
   tab: { id: number };
   orders: ComandaOrder[];
   payments: ComandaPayment[];
+  consumoCents: number;
+  coverCents: number;
   totalCents: number;
   paidCents: number;
 };
@@ -240,8 +242,11 @@ export default function MesasClient({
   }, [comanda]);
 
   // ---- pagamento ----
-  const subtotal = comanda?.totalCents ?? 0;
-  const serviceFeeCents = fee ? Math.round(subtotal * 0.1) : 0;
+  const consumo = comanda?.consumoCents ?? 0;
+  const cover = comanda?.coverCents ?? 0;
+  // taxa de serviço (10%) incide SÓ sobre o consumo — NUNCA sobre o couvert (CDC; queixa mais multada)
+  const serviceFeeCents = fee ? Math.round(consumo * 0.1) : 0;
+  const subtotal = consumo + cover;
   const grand = subtotal + serviceFeeCents;
   const paid = comanda?.paidCents ?? 0;
   const falta = Math.max(0, grand - paid);
@@ -533,6 +538,12 @@ export default function MesasClient({
                   <span className="tabular-nums text-[var(--text-muted)]">{brl(serviceFeeCents)}</span>
                 </button>
 
+                {cover > 0 && (
+                  <div className="flex justify-between text-sm text-[var(--text-muted)]">
+                    <span>Couvert artístico</span>
+                    <span className="tabular-nums">{brl(cover)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-[var(--text-muted)]">
                   <span>Subtotal</span>
                   <span className="tabular-nums">{brl(subtotal)}</span>
