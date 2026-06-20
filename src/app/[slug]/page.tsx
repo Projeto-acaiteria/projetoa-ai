@@ -108,7 +108,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
           sizes={menu.sizes}
           groups={menu.groups}
           isOpen={aberto}
-          brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, slug }}
+          brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, slug, hasDelivery: cfg?.has_delivery !== false }}
         />
       </div>
     </main>

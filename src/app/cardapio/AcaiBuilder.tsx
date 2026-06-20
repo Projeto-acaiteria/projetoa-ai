@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { type ModifierGroup, type Size } from "@/lib/menu";
 import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
 
-type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string };
+type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean };
 import { brl } from "@/lib/format";
 import {
   IconBowl,
@@ -354,13 +354,13 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
         <div className="grid grid-cols-2 gap-2.5">
           {([
             { id: "retirada", label: "Retirar no balcão", sub: "Sem taxa", Icon: IconBag },
-            { id: "entrega", label: "Delivery", sub: `+ ${brl(brand.deliveryFeeCents)}`, Icon: IconMoto },
+            ...(brand.hasDelivery === false ? [] : [{ id: "entrega", label: "Delivery", sub: `+ ${brl(brand.deliveryFeeCents)}`, Icon: IconMoto }]),
           ] as const).map(({ id, label, sub, Icon }) => {
             const on = mode === id;
             return (
               <button
                 key={id}
-                onClick={() => setMode(id)}
+                onClick={() => setMode(id as "retirada" | "entrega")}
                 className={`flex items-center gap-3 rounded-2xl border-2 p-3.5 text-left transition ${
                   on ? "border-brand-600 bg-bg-surface-2" : "border-line bg-bg-elevated"
                 }`}

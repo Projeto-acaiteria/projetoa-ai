@@ -22,3 +22,14 @@ export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig
   const { data } = await db().from("store_config").select("*").eq("store_id", storeId).maybeSingle();
   return (data as StoreConfig) ?? null;
 });
+
+// Flags que o DONO pode ligar/desligar no painel (as outras vêm do segmento e não mudam pela UI).
+const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose"];
+
+export async function setStoreConfig(patch: Partial<StoreConfig>, storeId: string): Promise<void> {
+  const clean: Record<string, boolean> = {};
+  for (const k of TOGGLEABLE) if (k in patch) clean[k] = Boolean(patch[k]);
+  if (!Object.keys(clean).length) return;
+  const { error } = await db().from("store_config").update(clean).eq("store_id", storeId);
+  if (error) throw new Error("Falha ao salvar configuração da loja: " + error.message);
+}

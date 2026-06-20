@@ -21,16 +21,19 @@ const FEE_ROWS: { k: keyof Fees; label: string; hint: string }[] = [
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
+type Config = { has_delivery: boolean } | null;
+
 export default function ConfigClient() {
   const [fees, setFees] = useState<Fees | null>(null);
   const [store, setStore] = useState<Store | null>(null);
+  const [config, setConfig] = useState<Config>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ?? { has_delivery: false }); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -48,7 +51,7 @@ export default function ConfigClient() {
     const r = await fetch("/api/configuracoes", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fees, store }),
+      body: JSON.stringify({ fees, store, config: config ?? undefined }),
     });
     if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
     setSaving(false);
@@ -97,6 +100,36 @@ export default function ConfigClient() {
           </div>
         </div>
       </Card>
+
+      {/* Entrega (delivery) — módulo ligável por loja */}
+      {config && (
+        <Card className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="mb-1 flex items-center gap-2">
+                <span className="text-brand-600">
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 18a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z"/><path d="M3 6h11v9M14 9h4l3 3v3h-2"/></svg>
+                </span>
+                <h2 className="text-base font-extrabold text-ink">Entrega (delivery)</h2>
+              </div>
+              <p className="text-sm text-[var(--text-muted)]">Recebe pedido pelo seu link, sem comissão. Liga e desliga quando quiser.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setConfig((c) => (c ? { ...c, has_delivery: !c.has_delivery } : c)); setSaved(false); }}
+              role="switch" aria-checked={config.has_delivery}
+              className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition ${config.has_delivery ? "brand-gradient" : "bg-bg-surface-2 border border-line"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${config.has_delivery ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+          {config.has_delivery && (
+            <p className="mt-3 rounded-xl bg-bg-surface-2 p-3 text-[13px] text-[var(--text-muted)]">
+              A opção de entrega aparece no cardápio público. Configure a <b>taxa de entrega</b>, o <b>pedido mínimo</b> (acima) e as <b>zonas por bairro</b> (abaixo).
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Identidade visual (cardápio público) */}
       <Card className="p-5 sm:p-6">
