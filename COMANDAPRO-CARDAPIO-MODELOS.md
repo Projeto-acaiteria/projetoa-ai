@@ -118,7 +118,11 @@ switch (cfg.menu_template) {
    Açaí já roda no `TemplateAcai`. Cliente imediato (Vidal, açaiteria) não depende disso.
 2. **2ª onda:** profundidade do bar — cover, dose/garrafa + ficha técnica + baixa por trigger,
    comissão/gorjeta por garçom.
-3. **3ª onda:** modelo GRID (restaurante/marmita) — depois de decidir layout-vs-modelo acima.
+3. ✅ **modelo GRID FEITO** (restaurante/marmita): `TemplateGrid` (`src/components/grid/`, tema CLARO,
+   foto grande estilo iFood) REUSA o schema (menu_categories/menu_products) e o motor (mesa→KDS→
+   impressão) do bar — confirmada a decisão (a) "grid = só layout". `/[slug]` e `/mesa/N` switch
+   incluem grid. Loja `restaurante-demo` (login restaurante@comandapro.app/restaurante2026).
+   FALTA no grid: marmita por PESO (`sells_by_weight` — refinamento; hoje grid = produto+preço fixo).
 
 ## Camadas que NÃO se duplicam (servem os 3 modelos)
 

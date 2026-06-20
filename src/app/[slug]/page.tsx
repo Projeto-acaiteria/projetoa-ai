@@ -8,6 +8,7 @@ import { getStore, isOpenNow } from "@/lib/settings-store";
 import { IconClock, IconStar, IconArrowRight } from "@/components/Icons";
 import AcaiBuilder from "../cardapio/AcaiBuilder";
 import TemplateBar from "@/components/bar/TemplateBar";
+import TemplateGrid from "@/components/grid/TemplateGrid";
 import InstallApp from "@/components/InstallApp";
 
 export const dynamic = "force-dynamic"; // reflete edições do adm na hora
@@ -40,7 +41,19 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       />
     );
   }
-  // grid: cai no açaí por ora (3ª onda); default = açaí (montagem no copo).
+  if (cfg?.menu_template === "grid") {
+    const [categories, lojaStore] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
+    return (
+      <TemplateGrid
+        storeName={lojaStore.name}
+        tagline={lojaStore.tagline}
+        aberto={isOpenNow(lojaStore.hours)}
+        categories={categories}
+        slug={slug}
+      />
+    );
+  }
+  // default = açaí (montagem no copo).
 
   const menu = await readMenu(storeId);
   const store = await getStore(storeId);
