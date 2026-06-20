@@ -67,6 +67,10 @@ export default function LoginPage() {
         >
           {carregando ? "Entrando…" : "Entrar"}
         </button>
+
+        <p className="mt-5 text-center text-sm text-white/60">
+          Ainda não tem loja? <a href="/cadastro" className="font-semibold text-purple-300 hover:text-purple-200">Criar grátis</a>
+        </p>
       </form>
     </div>
   );
