@@ -36,6 +36,11 @@ export default function TemplateGrid({
   tableNumber = null,
   coverNotice = null,
   branding = null,
+  hasDelivery = false,
+  whatsapp = "",
+  deliveryFeeCents = 0,
+  minOrderCents = 0,
+  deliveryZones = [],
 }: {
   storeName: string;
   tagline?: string | null;
@@ -45,6 +50,11 @@ export default function TemplateGrid({
   tableNumber?: number | null;
   coverNotice?: { artist: string; coverCents: number } | null;
   branding?: { logoUrl?: string; bannerUrl?: string; primaryColor?: string } | null;
+  hasDelivery?: boolean;
+  whatsapp?: string;
+  deliveryFeeCents?: number;
+  minOrderCents?: number;
+  deliveryZones?: { bairro: string; feeCents: number }[];
 }) {
   const [cart, setCart] = useState<Record<string, Line>>({});
   const [open, setOpen] = useState(false);
@@ -53,6 +63,20 @@ export default function TemplateGrid({
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [customizing, setCustomizing] = useState<{ product: BarProduct; station: string } | null>(null);
+  // delivery (cardápio público sem mesa): dados do cliente + entrega/retirada
+  const [dMode, setDMode] = useState<"retirada" | "entrega">("retirada");
+  const [dName, setDName] = useState("");
+  const [dPhone, setDPhone] = useState("");
+  const [dAddress, setDAddress] = useState("");
+  const [dCep, setDCep] = useState("");
+  const [dBairro, setDBairro] = useState("");
+  const [dPay, setDPay] = useState<"dinheiro" | "pix" | "credito">("pix");
+  const [placed, setPlaced] = useState<string | null>(null);
+
+  // checkout de delivery aparece no cardápio público (sem mesa) quando a loja tem entrega ligada
+  const isDeliveryFlow = !tableNumber && hasDelivery;
+  const usaZonas = deliveryZones.length > 0;
+  const deliFee = dMode === "entrega" ? (usaZonas ? (deliveryZones.find((z) => z.bairro === dBairro)?.feeCents ?? 0) : deliveryFeeCents) : 0;
 
   const lines = Object.values(cart).filter((l) => l.qty > 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
@@ -80,27 +104,83 @@ export default function TemplateGrid({
     return m;
   }, [lines]);
 
+  // ViaCEP: preenche endereço a partir do CEP (grátis, sem chave)
+  async function lookupCep(raw: string) {
+    const cep = raw.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const d = await r.json();
+      if (d.erro) return;
+      const linha = [d.logradouro, d.bairro, d.localidade && `${d.localidade}-${d.uf}`].filter(Boolean).join(", ");
+      if (linha) setDAddress((a) => (a ? a : linha + ", "));
+      if (!usaZonas && d.bairro) setDBairro(d.bairro);
+    } catch { /* CEP é conveniência; falha não bloqueia */ }
+  }
+
   async function send() {
     if (sending || count === 0) return;
     setErrorMsg("");
-    if (!tableNumber) { setSent(true); return; }
-    setSending(true);
-    try {
-      const r = await fetch("/api/mesa-pedido", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, tableNumber, items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds })), note }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Não consegui enviar o pedido.");
-      setSent(true);
-      setCart({});
-      setNote("");
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Não consegui enviar o pedido.");
-    } finally {
-      setSending(false);
+
+    // cardápio com mesa → comanda (fluxo existente)
+    if (tableNumber) {
+      setSending(true);
+      try {
+        const r = await fetch("/api/mesa-pedido", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, tableNumber, items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds })), note }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Não consegui enviar o pedido.");
+        setSent(true); setCart({}); setNote("");
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : "Não consegui enviar o pedido.");
+      } finally { setSending(false); }
+      return;
     }
+
+    // cardápio público com entrega ligada → pedido de delivery/retirada (orders-store)
+    if (isDeliveryFlow) {
+      if (!dName.trim() || !dPhone.trim()) { setErrorMsg("Informe nome e telefone."); return; }
+      if (dMode === "entrega" && !dAddress.trim()) { setErrorMsg("Informe o endereço para entrega."); return; }
+      if (dMode === "entrega" && usaZonas && !dBairro) { setErrorMsg("Escolha o bairro de entrega."); return; }
+      if (total + deliFee < minOrderCents) { setErrorMsg(`Pedido mínimo de ${brl(minOrderCents)}.`); return; }
+      setSending(true);
+      try {
+        const r = await fetch("/api/delivery-pedido", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug, customerName: dName, phone: dPhone, mode: dMode,
+            address: dMode === "entrega" ? dAddress : undefined,
+            bairro: dMode === "entrega" ? dBairro : undefined,
+            paymentMethod: dPay, note,
+            items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds })),
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Não consegui enviar o pedido.");
+        setPlaced(d.order?.display ?? null); setSent(true); setCart({}); setNote("");
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : "Não consegui enviar o pedido.");
+      } finally { setSending(false); }
+      return;
+    }
+
+    // cardápio só de vitrine (sem mesa, sem entrega) → confirma preview
+    setSent(true);
+  }
+
+  // mensagem pré-preenchida pro WhatsApp da loja (confirmação humana — diferencial da pesquisa)
+  function waText() {
+    const L = [`*Pedido ${placed ?? ""}— ${storeName}*`.replace("  ", " ")];
+    L.push(`*Cliente:* ${dName}${dPhone ? " · " + dPhone : ""}`);
+    L.push(`*Tipo:* ${dMode === "entrega" ? `Entrega (+${brl(deliFee)})` : "Retirada no balcão"}`);
+    if (dMode === "entrega" && dAddress) L.push(`*Endereço:* ${dAddress}${dBairro ? " — " + dBairro : ""}`);
+    L.push(`*Pagamento:* ${dPay === "pix" ? "PIX" : dPay === "dinheiro" ? "Dinheiro" : "Cartão"} (na entrega)`);
+    L.push(`*Total:* ${brl(total + deliFee)}`);
+    return encodeURIComponent(L.join("\n"));
   }
 
   return (
@@ -204,12 +284,19 @@ export default function TemplateGrid({
               <button onClick={() => setOpen(false)} aria-label="fechar" className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-lg">✕</button>
             </div>
             {sent ? (
-              <div className="py-10 text-center">
+              <div className="py-8 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
                   <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 </div>
-                <p className="text-lg font-bold">Pedido enviado!</p>
-                <p className="mt-1 text-sm text-zinc-500">Já está sendo preparado.</p>
+                <p className="text-lg font-bold">Pedido enviado! {placed}</p>
+                <p className="mt-1 text-sm text-zinc-500">{isDeliveryFlow ? "A loja vai confirmar pelo WhatsApp." : "Já está sendo preparado."}</p>
+                {isDeliveryFlow && whatsapp && (
+                  <a href={`https://wa.me/${whatsapp}?text=${waText()}`} target="_blank" rel="noopener noreferrer"
+                    className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-6 py-3 font-bold text-white active:scale-[0.99]">
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 0 0 1.51 5.26l-.999 3.648 3.978-1.607z"/></svg>
+                    Confirmar pelo WhatsApp
+                  </a>
+                )}
               </div>
             ) : (
               <>
@@ -230,18 +317,69 @@ export default function TemplateGrid({
                   ))}
                 </ul>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (ex: caprichar no molho)" className="mt-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400" />
+
+                {isDeliveryFlow && (
+                  <div className="mt-4 space-y-3 border-t border-zinc-100 pt-4">
+                    {/* retirada x entrega */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["retirada", "entrega"] as const).map((m) => (
+                        <button key={m} onClick={() => setDMode(m)} className={`rounded-xl border-2 p-2.5 text-sm font-bold transition ${dMode === m ? "border-current" : "border-zinc-200 text-zinc-500"}`} style={dMode === m ? { color: branding?.primaryColor || ACCENT } : undefined}>
+                          {m === "retirada" ? "Retirar no balcão" : "Entrega"}
+                          <span className="block text-[11px] font-medium text-zinc-400">{m === "retirada" ? "Sem taxa" : usaZonas ? "Taxa por bairro" : `+ ${brl(deliveryFeeCents)}`}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={dName} onChange={(e) => setDName(e.target.value)} placeholder="Seu nome" className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-zinc-400" />
+                      <input value={dPhone} onChange={(e) => setDPhone(e.target.value)} inputMode="tel" placeholder="WhatsApp" className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-zinc-400" />
+                    </div>
+                    {dMode === "entrega" && (
+                      <>
+                        <div className="flex gap-2">
+                          <input value={dCep} onChange={(e) => setDCep(e.target.value)} onBlur={(e) => lookupCep(e.target.value)} inputMode="numeric" placeholder="CEP" className="w-28 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-zinc-400" />
+                          <span className="flex items-center text-[11px] text-zinc-400">preenche o endereço</span>
+                        </div>
+                        <input value={dAddress} onChange={(e) => setDAddress(e.target.value)} placeholder="Endereço, número, complemento" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-zinc-400" />
+                        {usaZonas && (
+                          <select value={dBairro} onChange={(e) => setDBairro(e.target.value)} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-zinc-400">
+                            <option value="">Bairro de entrega…</option>
+                            {deliveryZones.map((z) => <option key={z.bairro} value={z.bairro}>{z.bairro} (+{brl(z.feeCents)})</option>)}
+                          </select>
+                        )}
+                      </>
+                    )}
+                    {/* como vai pagar (informativo — a loja recebe na entrega) */}
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-zinc-500">Como vai pagar {dMode === "entrega" ? "na entrega" : "na retirada"}?</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([["pix", "PIX"], ["dinheiro", "Dinheiro"], ["credito", "Cartão"]] as const).map(([id, label]) => (
+                          <button key={id} onClick={() => setDPay(id)} className={`rounded-xl border-2 py-2 text-sm font-bold transition ${dPay === id ? "border-current" : "border-zinc-200 text-zinc-500"}`} style={dPay === id ? { color: branding?.primaryColor || ACCENT } : undefined}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {Object.keys(byStation).length > 1 && (
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-400">
                     {Object.entries(byStation).map(([st, n]) => (<span key={st} className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 capitalize">{n} → {st}</span>))}
                   </div>
                 )}
-                <div className="mt-5 flex items-center justify-between">
-                  <span className="text-zinc-500">Total</span>
-                  <span className="text-2xl font-extrabold" style={{ color: ACCENT }}>{brl(total)}</span>
+                <div className="mt-5 space-y-1">
+                  {isDeliveryFlow && (
+                    <>
+                      <div className="flex items-center justify-between text-sm text-zinc-500"><span>Subtotal</span><span className="tabular-nums">{brl(total)}</span></div>
+                      <div className="flex items-center justify-between text-sm text-zinc-500"><span>{dMode === "entrega" ? "Taxa de entrega" : "Retirada"}</span><span className="tabular-nums">{deliFee ? brl(deliFee) : "grátis"}</span></div>
+                    </>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-500">Total</span>
+                    <span className="text-2xl font-extrabold tabular-nums" style={{ color: branding?.primaryColor || ACCENT }}>{brl(total + (isDeliveryFlow ? deliFee : 0))}</span>
+                  </div>
                 </div>
                 {errorMsg && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{errorMsg}</p>}
                 <button onClick={send} disabled={count === 0 || sending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-extrabold text-white shadow-xl active:scale-[0.99] disabled:opacity-50" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 14px 36px -12px rgba(0,0,0,0.4)" }}>
-                  {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : "Confirmar pedido"}
+                  {sending ? "Enviando…" : tableNumber ? "Enviar pedido" : isDeliveryFlow ? "Fazer pedido" : "Confirmar pedido"}
                 </button>
               </>
             )}
