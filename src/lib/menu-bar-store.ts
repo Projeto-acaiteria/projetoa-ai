@@ -165,11 +165,11 @@ export async function readBarMenu(storeId?: string, includeInactive = false): Pr
 /** Resolve itens de um pedido a partir de {productId, qty} — preço, nome, size_label e ESTAÇÃO
  *  vêm do BANCO (nunca do client). station = da categoria do produto. Ignora produto inativo. */
 export type ResolvedMod = { name: string; price_cents: number };
-export type ResolvedItem = { productId: string; name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; mods: ResolvedMod[] | null; recipe: RecipeLine[] };
+export type ResolvedItem = { productId: string; name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; mods: ResolvedMod[] | null; recipe: RecipeLine[]; note?: string | null };
 
 export async function resolveOrderItems(
   storeId: string,
-  sel: { productId: string; qty: number; modifierIds?: string[]; grams?: number }[],
+  sel: { productId: string; qty: number; modifierIds?: string[]; grams?: number; note?: string }[],
 ): Promise<ResolvedItem[]> {
   const ids = sel.map((s) => s.productId).filter(Boolean);
   if (!ids.length) return [];
@@ -247,6 +247,7 @@ export async function resolveOrderItems(
       station: stationByCat.get(String(p.category_id)) ?? "cozinha",
       mods: modsOut.length ? modsOut : null,
       recipe: toRecipe(p.recipe),
+      note: s.note?.trim() ? s.note.trim().slice(0, 200) : null, // obs viaja DENTRO da linha (não casa por índice)
     });
   }
   return out;

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       tab: { id: full.tab.id, label: full.tab.label, people_count: full.tab.people_count },
       orders: full.orders.map((o) => ({
-        items: o.items.map((i) => ({ name: i.name, sizeLabel: i.size_label, qty: i.qty, unitPriceCents: i.unit_price_cents, note: i.note ?? null })),
+        items: o.items.map((i) => ({ name: i.name, sizeLabel: i.size_label, qty: i.qty, unitPriceCents: i.unit_price_cents, note: i.note ?? null, mods: i.mods ?? null })),
       })),
       payments: full.payments.map((p) => ({ method: p.method, amountCents: p.amount_cents })),
       consumoCents: full.consumoCents,

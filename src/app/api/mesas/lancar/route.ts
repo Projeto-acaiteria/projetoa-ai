@@ -26,10 +26,9 @@ export async function POST(req: Request) {
     // 1) RESOLVE O PREÇO PRIMEIRO — se falhar/vazio, nada é criado (sem janela de comanda-fantasma)
     const resolved = await resolveOrderItems(storeId, sel);
     if (!resolved.length) return NextResponse.json({ error: "Itens indisponíveis." }, { status: 400 });
-    // obs por linha vem do client (não do menu) — casa por posição + confere productId (operador não pula itens)
-    const lines = resolved.map((it, i) => ({
-      productId: it.productId, name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods,
-      note: sel[i]?.productId === it.productId ? ((sel[i] as { note?: string }).note ?? null) : null,
+    // obs viaja DENTRO da linha (resolveOrderItems já a carrega de cada sel) — sem casar por índice
+    const lines = resolved.map((it) => ({
+      productId: it.productId, name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods, note: it.note ?? null,
     }));
     const note = (b.note ?? "").trim().slice(0, 200) || undefined;
 

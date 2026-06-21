@@ -12,7 +12,7 @@ import ProductCustomizer, { type CustomizeResult } from "@/components/menu/Produ
 import WeightModal from "@/components/admin/WeightModal";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null };
-type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null };
+type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null; mods?: { name: string; price_cents: number }[] | null };
 type Comanda = { tab: { id: number; label?: string | null }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
 // linha do carrinho temp: produto simples (qty), com modificadores (modifierIds) ou por peso (grams) + obs
 type TempLine = { uid: string; product: BarProduct; label: string; qty: number; unitPriceCents: number; modifierIds?: string[]; grams?: number; note?: string };
@@ -119,7 +119,10 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
     const map = new Map<string, ComItem & { station: string }>();
     for (const o of comanda?.orders ?? []) for (const it of o.items) {
       const st = it.station ?? "cozinha";
-      const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}|${it.note ?? ""}`; // obs diferente = linha separada
+      // chave inclui MODIFICADORES (assinatura ordenada) + obs → mods/obs diferentes NÃO fundem;
+      // idênticos (mesmos mods, mesma obs) fundem e somam qty (mantém o #3 sem regressão).
+      const modSig = (it.mods ?? []).map((m) => m.name).sort().join("+");
+      const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}|${modSig}|${it.note ?? ""}`;
       const cur = map.get(k) ?? { ...it, station: st, qty: 0 };
       cur.qty += it.qty; map.set(k, cur);
     }
@@ -315,7 +318,7 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
                     <ul className="divide-y divide-line">
                       {consolid.map((it, i) => (
                         <li key={i} className="flex items-start justify-between gap-2 px-3 py-2 text-sm">
-                          <span className="min-w-0 text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span>{it.note ? <span className="block text-[11px] italic text-[var(--text-muted)]">obs: {it.note}</span> : null}</span>
+                          <span className="min-w-0 text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span>{it.mods && it.mods.length > 0 ? <span className="block text-[11px] text-[var(--text-muted)]">{it.mods.map((m) => m.name).join(" · ")}</span> : null}{it.note ? <span className="block text-[11px] italic text-[var(--text-muted)]">obs: {it.note}</span> : null}</span>
                           <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
                         </li>
                       ))}

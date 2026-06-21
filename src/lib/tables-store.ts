@@ -45,6 +45,7 @@ export type TabItem = {
   unit_price_cents: number;
   consumes: StockConsume[] | null;
   note?: string | null;
+  mods?: { name: string; price_cents: number }[] | null;
 };
 
 export type TabOrder = {
