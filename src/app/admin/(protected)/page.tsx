@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { PageHeader, StatCard, Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { getOpenSession } from "@/lib/cash-store";
@@ -11,8 +11,8 @@ const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregu
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  // Caixa fechado = começo do dia → primeira tela é abrir o caixa
-  if (!(await getOpenSession())) redirect("/admin/caixa");
+  // caixa fechado NÃO bloqueia mais — vira um aviso suave (login cai no painel, não na tela de abrir caixa)
+  const semCaixa = !(await getOpenSession());
 
   const today = new Date().toISOString().slice(0, 10);
   const orders = await listOrders();
@@ -41,6 +41,19 @@ export default async function AdminHome() {
   return (
     <>
       <PageHeader title="Início" sub="Resumo de hoje" />
+
+      {semCaixa && (
+        <Link href="/admin/caixa" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-3.5 transition hover:border-brand-400">
+          <span className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-bg-surface-2 text-brand-600"><IconWallet width={18} height={18} /></span>
+            <span className="text-sm">
+              <span className="block font-bold text-ink">Caixa fechado</span>
+              <span className="text-[var(--text-muted)]">Abra o caixa pra controlar o dinheiro do dia (opcional — as vendas funcionam mesmo sem).</span>
+            </span>
+          </span>
+          <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">Abrir caixa</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Faturado hoje" value={brl(brutoHoje)} hint={`${vendasHoje.length} vendas`} Icon={IconWallet} tone="lime" />

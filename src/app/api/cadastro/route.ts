@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { SEGMENTOS, type BusinessType } from "@/config/segments";
+import { setStore } from "@/lib/settings-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
   if (!b.senha || b.senha.length < 8 || !/[A-Z]/.test(b.senha) || !/[0-9]/.test(b.senha))
     return NextResponse.json({ error: "Senha: mínimo 8 caracteres, 1 maiúscula e 1 número." }, { status: 400 });
   if (!b.nome?.trim()) return NextResponse.json({ error: "Informe seu nome." }, { status: 400 });
+  // WhatsApp é o canal do delivery/cliente — obrigatório (mínimo DDD + número = 10 dígitos)
+  if ((b.whatsapp ?? "").replace(/\D+/g, "").length < 10) return NextResponse.json({ error: "Informe um WhatsApp válido (com DDD)." }, { status: 400 });
 
   const { data: existe } = await db().from("stores").select("id").eq("slug", slug).maybeSingle();
   if (existe) return NextResponse.json({ error: "Esse link já está em uso. Escolha outro." }, { status: 409 });
@@ -103,6 +106,12 @@ export async function POST(req: Request) {
     await rollbackStore();
     return NextResponse.json({ error: "Falha ao iniciar o teste grátis." }, { status: 500 });
   }
+
+  // 5. config inicial da loja: NOME + WhatsApp já valem no cardápio/cupom desde o 1º acesso
+  //    (senão getStore cai no DEFAULT "Açaí do Vidal"/zap placeholder até o dono configurar).
+  try {
+    await setStore({ name: b.negocio.trim(), whatsapp: (b.whatsapp ?? "").replace(/\D+/g, "") }, storeId);
+  } catch { /* não bloqueia o cadastro — o dono ajusta em Configurações */ }
 
   return NextResponse.json({ ok: true, slug, storeId });
 }

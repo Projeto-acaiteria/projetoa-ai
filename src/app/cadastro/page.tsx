@@ -174,13 +174,18 @@ export default function CadastroPage() {
                     : check?.reason === "reservado" ? <span className="text-red-300">esse link é reservado</span>
                     : check && !check.available ? <span className="text-red-300">já está em uso</span> : null}
                 </div>
+                {/* preview do link final — o dono vê exatamente o que vai divulgar */}
+                {check?.available && (
+                  <p className="mt-1 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70">Seu cardápio: <b className="text-purple-300">comandapro.net.br/{slug}</b></p>
+                )}
 
-                <label className="mb-1 mt-4 block text-sm text-white/80">WhatsApp (opcional)</label>
+                <label className="mb-1 mt-4 block text-sm text-white/80">WhatsApp da loja</label>
                 <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(99) 99999-9999" inputMode="tel" className={inp} />
+                <p className="mt-1 text-xs text-white/45">É por onde você confirma os pedidos com o cliente. Com DDD.</p>
 
                 <div className="mt-6 flex gap-2">
                   <button onClick={() => setStep(1)} className="rounded-lg border border-white/15 px-4 py-2.5 font-semibold text-white/80 hover:bg-white/5">Voltar</button>
-                  <button onClick={() => setStep(3)} disabled={!check?.available}
+                  <button onClick={() => setStep(3)} disabled={!check?.available || whatsapp.replace(/\D+/g, "").length < 10}
                     className="flex-1 rounded-lg bg-purple-600 py-2.5 font-semibold transition hover:bg-purple-500 disabled:opacity-40">Continuar</button>
                 </div>
               </>
