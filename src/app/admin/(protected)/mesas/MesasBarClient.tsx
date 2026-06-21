@@ -62,25 +62,20 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
   const tempCount = tempLines.reduce((s, l) => s + l.qty, 0);
   const tempTotal = tempLines.reduce((s, l) => s + l.qty * l.product.price_cents, 0);
 
-  // lança o temp na comanda — cria a comanda AGORA se for rascunho (1º item)
+  // lança o temp — UM request transacional (/api/mesas/lancar): se for rascunho, abre a comanda
+  // e lança junto no servidor; se o lançamento falhar, o servidor faz rollback (sem mesa-fantasma).
   async function confirmAdd() {
     if (!drawer || busy || tempCount === 0) return;
     setBusy(true); setErr("");
     try {
-      let tabId = drawer.tabId;
-      if (!tabId) {
-        const r = await fetch("/api/mesas/abrir", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined }),
-        });
-        const d = await r.json();
-        if (!r.ok || !d.tab) throw new Error(d.error || "Não consegui abrir a mesa.");
-        tabId = Number(d.tab.id);
-      }
       const items = tempLines.map((l) => ({ productId: l.product.id, qty: l.qty }));
-      const r2 = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId, items }) });
-      const d2 = await r2.json();
-      if (!r2.ok) throw new Error(d2.error || "Não consegui lançar.");
+      const body = drawer.tabId
+        ? { tabId: drawer.tabId, items }
+        : { tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items };
+      const r = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Não consegui lançar.");
+      const tabId = Number(d.tabId);
       setTemp({}); setDrawer({ table: drawer.table, tabId });
       setView("comanda"); await loadComanda(tabId); loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao lançar."); }
@@ -116,14 +111,15 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
     } finally { setBusy(false); }
   }
 
+  // fechar SERVER-AUTHORITATIVE: o servidor re-busca a comanda FRESCA, calcula a taxa (applyFee),
+  // paga o que falta pelo total fresco e fecha. O total da tela é só preview (não comanda o fecho).
   async function fechar() {
     if (!drawer?.tabId || busy) return;
     setBusy(true); setErr("");
     try {
-      if (falta > 0) {
-        await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents: falta }) });
-      }
-      await fetch("/api/mesas/fechar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, serviceFeeCents: serviceFee }) });
+      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, method }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
       closeDrawer(); loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
