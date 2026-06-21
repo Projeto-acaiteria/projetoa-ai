@@ -1,0 +1,278 @@
+"use client";
+
+// Comanda de SALÃO do operador pro menu RELACIONAL (bar/grid). Espinha espelhada do Medellín
+// (Verbo): rascunho (não cria comanda até o 1º item) → picker grid → temp → confirmAdd (/api/mesas/lancar)
+// → painel consolidado por estação → fechar. RODADA 1 = sem modificador/peso/obs-por-linha (vêm depois).
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { brl } from "@/lib/format";
+import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
+import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
+
+type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null };
+type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string };
+type Comanda = { tab: { id: number; label?: string | null }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
+type Temp = Record<string, { product: BarProduct; qty: number }>;
+
+const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
+const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
+
+export default function MesasBarClient({ categories, coverShow, staff }: {
+  categories: BarCategory[];
+  coverShow: { artist: string; coverCents: number } | null;
+  staff: { id: string; name: string }[];
+}) {
+  const [tables, setTables] = useState<TableCard[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  // drawer: {table, tabId|null} + view ('pick' lança item · 'comanda' vê/fecha)
+  const [drawer, setDrawer] = useState<{ table: TableCard; tabId: number | null } | null>(null);
+  const [view, setView] = useState<"pick" | "comanda">("pick");
+  const [comanda, setComanda] = useState<Comanda | null>(null);
+  const [temp, setTemp] = useState<Temp>({});
+  const [pax, setPax] = useState(1);
+  const [waiter, setWaiter] = useState("");
+  const [fee, setFee] = useState(true);
+  const [method, setMethod] = useState<string>("pix");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadTables = useCallback(async () => {
+    try { const r = await fetch("/api/mesas", { cache: "no-store" }); setTables((await r.json()).tables ?? []); } catch { /* mantém */ }
+  }, []);
+  useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
+  useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
+
+  async function loadComanda(tabId: number) {
+    const r = await fetch(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
+    setComanda(await r.json());
+  }
+
+  function clickTable(t: TableCard) {
+    setErr(""); setTemp({}); setPax(1); setWaiter("");
+    if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
+    else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
+  }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp({}); }
+
+  const inc = (p: BarProduct) => setTemp((c) => ({ ...c, [p.id]: { product: p, qty: (c[p.id]?.qty ?? 0) + 1 } }));
+  const dec = (id: string) => setTemp((c) => { const q = (c[id]?.qty ?? 0) - 1; const n = { ...c }; if (q <= 0) delete n[id]; else n[id] = { ...n[id], qty: q }; return n; });
+  const tempLines = Object.values(temp);
+  const tempCount = tempLines.reduce((s, l) => s + l.qty, 0);
+  const tempTotal = tempLines.reduce((s, l) => s + l.qty * l.product.price_cents, 0);
+
+  // lança o temp na comanda — cria a comanda AGORA se for rascunho (1º item)
+  async function confirmAdd() {
+    if (!drawer || busy || tempCount === 0) return;
+    setBusy(true); setErr("");
+    try {
+      let tabId = drawer.tabId;
+      if (!tabId) {
+        const r = await fetch("/api/mesas/abrir", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.tab) throw new Error(d.error || "Não consegui abrir a mesa.");
+        tabId = Number(d.tab.id);
+      }
+      const items = tempLines.map((l) => ({ productId: l.product.id, qty: l.qty }));
+      const r2 = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId, items }) });
+      const d2 = await r2.json();
+      if (!r2.ok) throw new Error(d2.error || "Não consegui lançar.");
+      setTemp({}); setDrawer({ table: drawer.table, tabId });
+      setView("comanda"); await loadComanda(tabId); loadTables();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao lançar."); }
+    finally { setBusy(false); }
+  }
+
+  // comanda consolidada por estação + item igual (Verbo pegadinha #3)
+  const consolid = useMemo(() => {
+    const map = new Map<string, ComItem & { station: string }>();
+    for (const o of comanda?.orders ?? []) for (const it of o.items) {
+      const st = it.station ?? "cozinha";
+      const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}`;
+      const cur = map.get(k) ?? { ...it, station: st, qty: 0 };
+      cur.qty += it.qty; map.set(k, cur);
+    }
+    return [...map.values()];
+  }, [comanda]);
+
+  const consumo = comanda?.consumoCents ?? 0;
+  const cover = comanda?.coverCents ?? 0;
+  const serviceFee = fee ? Math.round(consumo * 0.1) : 0; // taxa só sobre consumo, nunca sobre cover
+  const grand = consumo + cover + serviceFee;
+  const paid = comanda?.paidCents ?? 0;
+  const falta = Math.max(0, grand - paid);
+
+  async function fechar() {
+    if (!drawer?.tabId || busy) return;
+    setBusy(true); setErr("");
+    try {
+      if (falta > 0) {
+        await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents: falta }) });
+      }
+      await fetch("/api/mesas/fechar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, serviceFeeCents: serviceFee }) });
+      closeDrawer(); loadTables();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
+    finally { setBusy(false); }
+  }
+
+  // ocupada-primeiro (Verbo #2) + agrupa por área
+  const rank = (t: TableCard) => (t.tabId ? 0 : 1);
+  const areas = useMemo(() => {
+    const g: Record<string, TableCard[]> = {};
+    for (const t of tables) (g[t.area || "salao"] ??= []).push(t);
+    for (const k of Object.keys(g)) g[k].sort((a, b) => rank(a) - rank(b) || a.number - b.number);
+    const order = ["balcao", ...Object.keys(g).filter((k) => k !== "balcao")];
+    return order.filter((k) => g[k]?.length).map((k) => ({ area: k, list: g[k] }));
+  }, [tables]);
+
+  const cats = categories.filter((c) => c.products.length);
+
+  return (
+    <>
+      {/* GRID de mesas por área */}
+      <div className="space-y-6">
+        {areas.length === 0 && <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-[var(--text-muted)]">Nenhuma mesa. Adicione mesas no salão.</p>}
+        {areas.map(({ area, list }) => (
+          <section key={area}>
+            <h2 className="mb-2 text-sm font-extrabold capitalize text-ink">{area === "balcao" ? "Balcão" : area}</h2>
+            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
+              {list.map((t) => {
+                const oc = !!t.tabId;
+                return (
+                  <button key={t.number} onClick={() => clickTable(t)}
+                    className="flex aspect-square flex-col items-center justify-center rounded-2xl border bg-bg-elevated p-2 text-center transition active:scale-95"
+                    style={{ borderColor: oc ? "var(--brand-600)" : "var(--line)", borderTopWidth: 3, borderTopColor: oc ? "var(--brand-600)" : "#16A34A" }}>
+                    <span className={`text-3xl font-extrabold ${oc ? "text-ink" : "text-lime"}`}>{t.number}</span>
+                    {oc ? (
+                      <>
+                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-brand-600">{brl(t.openTotalCents)}</span>
+                        <span className="text-[9px] text-[var(--text-faded)]">{agoMin(t.openedAt, now)}</span>
+                      </>
+                    ) : <span className="mt-1 text-[10px] font-semibold text-lime">Livre</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* DRAWER da mesa */}
+      {drawer && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={closeDrawer}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-bg-elevated p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-xl font-extrabold text-ink">{drawer.table.area === "balcao" ? "Balcão" : "Mesa"} {drawer.table.number}</h3>
+              <button onClick={closeDrawer} className="grid h-8 w-8 place-items-center rounded-full border border-line text-lg">✕</button>
+            </div>
+
+            {view === "pick" ? (
+              <>
+                {/* rascunho: cover (pessoas) + garçom só na 1ª abertura */}
+                {drawer.tabId === null && (
+                  <div className="mb-3 space-y-2">
+                    {staff.length > 0 && (
+                      <select value={waiter} onChange={(e) => setWaiter(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm text-ink">
+                        <option value="">Sem garçom</option>
+                        {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    )}
+                    {coverShow && (
+                      <div className="rounded-xl border border-line bg-bg-surface-2 p-2.5">
+                        <p className="text-xs text-[var(--text-muted)]">Couvert · {coverShow.artist} · {brl(coverShow.coverCents)}/pessoa</p>
+                        <div className="mt-1.5 flex items-center justify-center gap-3">
+                          <button onClick={() => setPax((p) => Math.max(1, p - 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-lg">−</button>
+                          <span className="w-8 text-center text-2xl font-extrabold text-ink">{pax}</span>
+                          <button onClick={() => setPax((p) => p + 1)} className="grid h-8 w-8 place-items-center rounded-lg brand-gradient text-lg text-white">+</button>
+                          <span className="ml-2 text-sm text-[var(--text-muted)]">pessoas</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* picker grid: categorias → produtos (espinha: toca + soma; sem modal — round 2) */}
+                <div className="space-y-4">
+                  {cats.map((cat) => (
+                    <div key={cat.id}>
+                      <p className="mb-1.5 text-xs font-bold uppercase text-[var(--text-muted)]">{cat.name}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {cat.products.filter((p) => !p.by_weight).map((p) => {
+                          const q = temp[p.id]?.qty ?? 0;
+                          return (
+                            <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-bg-base p-2.5">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-ink">{p.name}</div>
+                                <div className="text-xs font-bold text-brand-600">{brl(p.price_cents)}</div>
+                              </div>
+                              {q > 0 ? (
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <button onClick={() => dec(p.id)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
+                                  <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>
+                                  <button onClick={() => inc(p)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => inc(p)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-xl leading-none text-white">+</button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+                <div className="sticky bottom-0 mt-3 flex gap-2 bg-bg-elevated pt-2">
+                  {drawer.tabId !== null && <button onClick={() => { setView("comanda"); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Ver comanda</button>}
+                  <button onClick={confirmAdd} disabled={busy || tempCount === 0} className="flex flex-1 items-center justify-center gap-2 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
+                    <IconArrowRight width={16} height={16} /> {tempCount ? `Lançar ${tempCount} · ${brl(tempTotal)}` : "Lançar"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* COMANDA consolidada */}
+                <div className="rounded-xl border border-line">
+                  <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-xs font-bold uppercase text-[var(--text-muted)]"><IconReceipt width={14} height={14} /> Na comanda</div>
+                  {consolid.length === 0 ? <p className="px-3 py-4 text-sm text-[var(--text-faded)]">Comanda vazia.</p> : (
+                    <ul className="divide-y divide-line">
+                      {consolid.map((it, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                          <span className="text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span></span>
+                          <span className="tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-3 space-y-1 text-sm">
+                  <div className="flex justify-between text-[var(--text-muted)]"><span>Consumo</span><span className="tabular-nums">{brl(consumo)}</span></div>
+                  {cover > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Couvert</span><span className="tabular-nums">{brl(cover)}</span></div>}
+                  <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={fee} onChange={(e) => setFee(e.target.checked)} /> Taxa de serviço 10%</span><span className="tabular-nums">{brl(serviceFee)}</span></label>
+                  <div className="flex justify-between border-t border-line pt-1 text-base font-extrabold text-ink"><span>Total</span><span className="tabular-nums text-brand-600">{brl(grand)}</span></div>
+                  {paid > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Pago</span><span className="tabular-nums">{brl(paid)}</span></div>}
+                </div>
+
+                <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {PAYS.map(([id, label]) => <button key={id} onClick={() => setMethod(id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold ${method === id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{label}</button>)}
+                </div>
+
+                {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => { setView("pick"); setTemp({}); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
+                  <button onClick={fechar} disabled={busy || grand === 0} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">{busy ? "..." : "Fechar conta"}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
