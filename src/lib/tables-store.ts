@@ -82,6 +82,7 @@ export type TableCard = {
   tabId: number | null;
   openTotalCents: number;
   openedAt: string | null;
+  contaCalled: boolean; // cliente pediu a conta (service_call 'conta' pendente) — tile âmbar no topo
 };
 
 // Item novo a lançar numa comanda
@@ -139,6 +140,21 @@ export async function getTables(): Promise<TableCard[]> {
     }
   }
 
+  // "pediu a conta": chamados 'conta' pendentes — mapeia por tab_id (preferido) ou nº da mesa.
+  // Como só marcamos contaCalled em mesa COM comanda aberta, chamado de mesa já liberada não vaza.
+  const { data: calls } = await d
+    .from("service_calls")
+    .select("tab_id, table_number, type")
+    .eq("store_id", sid)
+    .eq("status", "pendente")
+    .eq("type", "conta");
+  const contaTabIds = new Set<number>();
+  const contaTableNums = new Set<number>();
+  for (const c of (calls ?? []) as Array<{ tab_id: number | null; table_number: number }>) {
+    if (c.tab_id != null) contaTabIds.add(num(c.tab_id));
+    else contaTableNums.add(num(c.table_number));
+  }
+
   return (tables ?? []).map((tbl) => {
     const open = tabByTable.get(num(tbl.id));
     return {
@@ -147,6 +163,7 @@ export async function getTables(): Promise<TableCard[]> {
       tabId: open?.id ?? null,
       openTotalCents: open ? totalByTab.get(open.id) ?? 0 : 0,
       openedAt: open?.opened_at ?? null,
+      contaCalled: open ? contaTabIds.has(open.id) || contaTableNums.has(num(tbl.number)) : false,
     };
   });
 }
@@ -197,6 +214,26 @@ export async function getOrCreateOpenTab(tableId: number, label?: string, storeI
     .single();
   if (error) throw error;
   return data as Tab;
+}
+
+/** Ajusta o nº de pessoas de uma comanda ABERTA e RE-FAZ o snapshot do couvert (cover × pessoas).
+ *  Server-authoritative: o valor do show vem do getActiveEvent, nunca do client. */
+export async function setTabPeople(tabId: number, pax: number): Promise<{ people_count: number; cover_cents: number }> {
+  const d = db();
+  const sid = await resolveStoreId();
+  const { data: tab } = await d.from("tabs").select("id, status").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!tab) throw new Error("Comanda não encontrada.");
+  if ((tab as { status: string }).status === "fechada") throw new Error("Comanda já fechada.");
+  const people_count = Math.max(1, Math.round(pax));
+  let cover_cents = 0;
+  const cfg = await getStoreConfig(sid);
+  if (cfg?.cover_enabled) {
+    const ev = await getActiveEvent(sid);
+    if (ev) cover_cents = ev.cover_cents * people_count;
+  }
+  const { error } = await d.from("tabs").update({ people_count, cover_cents }).eq("id", tabId).eq("store_id", sid);
+  if (error) throw error;
+  return { people_count, cover_cents };
 }
 
 /** Resolve a mesa pelo NÚMERO (cria se não existir). Pro QR público /[slug]/mesa/N. */
@@ -513,6 +550,12 @@ export async function getPendingCalls(): Promise<ServiceCall[]> {
 export async function markCallAttended(id: number): Promise<void> {
   const sid = await resolveStoreId();
   await db().from("service_calls").update({ status: "atendido" }).eq("id", id).eq("store_id", sid);
+}
+
+/** Quita todos os chamados pendentes de uma comanda (ao fechar a conta, o "pediu a conta" some). */
+export async function markTabCallsAttended(tabId: number): Promise<void> {
+  const sid = await resolveStoreId();
+  await db().from("service_calls").update({ status: "atendido" }).eq("tab_id", tabId).eq("store_id", sid).eq("status", "pendente");
 }
 
 // ── Receita das mesas para o financeiro/caixa ────────────────────────────────

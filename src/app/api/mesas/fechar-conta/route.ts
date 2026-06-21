@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { getTabFull, addPayment, closeTab } from "@/lib/tables-store";
+import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
 import { getFees } from "@/lib/settings-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       await addPayment(b.tabId, method, falta, feePercent); // valida dono + grava taxa da maquininha
     }
     const r = await closeTab(b.tabId, { serviceFeeCents, customerPhone: b.customerPhone, customerName: b.customerName });
+    await markTabCallsAttended(b.tabId); // ao fechar, quita o "pediu a conta" (some o âmbar do tile)
     return NextResponse.json({ ok: true, totalCents: grand, paidNowCents: falta, pointsAwarded: r.pointsAwarded });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

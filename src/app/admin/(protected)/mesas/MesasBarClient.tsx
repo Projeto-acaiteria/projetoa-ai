@@ -13,9 +13,9 @@ import WeightModal from "@/components/admin/WeightModal";
 import { printTicket } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 
-type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null };
+type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null; contaCalled: boolean };
 type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null; mods?: { name: string; price_cents: number }[] | null };
-type Comanda = { tab: { id: number; label?: string | null }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
+type Comanda = { tab: { id: number; label?: string | null; people_count?: number }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
 // linha do carrinho temp: produto simples (qty), com modificadores (modifierIds) ou por peso (grams) + obs
 type TempLine = { uid: string; product: BarProduct; label: string; qty: number; unitPriceCents: number; modifierIds?: string[]; grams?: number; note?: string };
 let _seq = 0;
@@ -134,6 +134,20 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   const consumo = comanda?.consumoCents ?? 0;
   const cover = comanda?.coverCents ?? 0;
+  const people = comanda?.tab.people_count ?? 1;
+
+  // couvert ajustável DEPOIS da abertura: muda nº de pessoas → servidor re-faz o snapshot do cover
+  async function setPeople(next: number) {
+    if (!drawer?.tabId || busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/mesas/pessoas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, pax: Math.max(1, next) }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Não consegui ajustar.");
+      await loadComanda(drawer.tabId); loadTables();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao ajustar pessoas."); }
+    finally { setBusy(false); }
+  }
   const serviceFee = fee ? Math.round(consumo * 0.1) : 0; // taxa só sobre consumo, nunca sobre cover
   const grand = consumo + cover + serviceFee;
   const paid = comanda?.paidCents ?? 0;
@@ -177,8 +191,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     finally { setBusy(false); }
   }
 
-  // ocupada-primeiro (Verbo #2) + agrupa por área
-  const rank = (t: TableCard) => (t.tabId ? 0 : 1);
+  // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
+  const rank = (t: TableCard) => (t.contaCalled ? 0 : t.tabId ? 1 : 2);
   const areas = useMemo(() => {
     const g: Record<string, TableCard[]> = {};
     for (const t of tables) (g[t.area || "salao"] ??= []).push(t);
@@ -213,14 +227,17 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
               {list.map((t) => {
                 const oc = !!t.tabId;
+                const conta = t.contaCalled; // pediu a conta → âmbar pulsando, no topo
+                const topColor = conta ? "#D97706" : oc ? "var(--brand-600)" : "#16A34A";
                 return (
                   <button key={t.number} onClick={() => clickTable(t)}
-                    className="flex aspect-square flex-col items-center justify-center rounded-2xl border bg-bg-elevated p-2 text-center transition active:scale-95"
-                    style={{ borderColor: oc ? "var(--brand-600)" : "var(--line)", borderTopWidth: 3, borderTopColor: oc ? "var(--brand-600)" : "#16A34A" }}>
-                    <span className={`text-3xl font-extrabold ${oc ? "text-ink" : "text-lime"}`}>{t.number}</span>
+                    className={`relative flex aspect-square flex-col items-center justify-center rounded-2xl border bg-bg-elevated p-2 text-center transition active:scale-95 ${conta ? "animate-pulse ring-2 ring-amber-400" : ""}`}
+                    style={{ borderColor: conta ? "#D97706" : oc ? "var(--brand-600)" : "var(--line)", borderTopWidth: 3, borderTopColor: topColor }}>
+                    {conta && <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-white">pediu a conta</span>}
+                    <span className={`text-3xl font-extrabold ${conta ? "text-amber-600" : oc ? "text-ink" : "text-lime"}`}>{t.number}</span>
                     {oc ? (
                       <>
-                        <span className="mt-0.5 text-[11px] font-bold tabular-nums text-brand-600">{brl(t.openTotalCents)}</span>
+                        <span className={`mt-0.5 text-[11px] font-bold tabular-nums ${conta ? "text-amber-600" : "text-brand-600"}`}>{brl(t.openTotalCents)}</span>
                         <span className="text-[9px] text-[var(--text-faded)]">{agoMin(t.openedAt, now)}</span>
                       </>
                     ) : <span className="mt-1 text-[10px] font-semibold text-lime">Livre</span>}
@@ -345,7 +362,19 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
                 <div className="mt-3 space-y-1 text-sm">
                   <div className="flex justify-between text-[var(--text-muted)]"><span>Consumo</span><span className="tabular-nums">{brl(consumo)}</span></div>
-                  {cover > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Couvert</span><span className="tabular-nums">{brl(cover)}</span></div>}
+                  {coverShow ? (
+                    <div className="flex items-center justify-between text-[var(--text-muted)]">
+                      <span className="flex items-center gap-2">Couvert
+                        <span className="flex items-center gap-1.5">
+                          <button onClick={() => setPeople(people - 1)} disabled={busy || people <= 1} className="grid h-6 w-6 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
+                          <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{people}</span>
+                          <button onClick={() => setPeople(people + 1)} disabled={busy} className="grid h-6 w-6 place-items-center rounded-md brand-gradient text-base leading-none text-white">+</button>
+                        </span>
+                        <span className="text-xs">pessoas</span>
+                      </span>
+                      <span className="tabular-nums">{brl(cover)}</span>
+                    </div>
+                  ) : (cover > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Couvert</span><span className="tabular-nums">{brl(cover)}</span></div>)}
                   <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={fee} onChange={(e) => setFee(e.target.checked)} /> Taxa de serviço 10%</span><span className="tabular-nums">{brl(serviceFee)}</span></label>
                   <div className="flex justify-between border-t border-line pt-1 text-base font-extrabold text-ink"><span>Total</span><span className="tabular-nums text-brand-600">{brl(grand)}</span></div>
                   {paid > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Pago</span><span className="tabular-nums">{brl(paid)}</span></div>}
