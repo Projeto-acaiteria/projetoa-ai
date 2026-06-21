@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     if (error || !table) {
       return NextResponse.json({ error: "Mesa não encontrada" }, { status: 400 });
     }
-    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || undefined, storeId, b.pax);
+    // label default "Mesa N" — senão a comanda fica sem rótulo e o KDS mostra "Balcão" (bug do teste)
+    const tab = await getOrCreateOpenTab(Number(table.id), b.label?.trim() || `Mesa ${b.tableNumber}`, storeId, b.pax);
     if (b.waiterId) await setTabWaiter(Number(tab.id), b.waiterId, storeId);
     return NextResponse.json({ tab });
   } catch (e) {

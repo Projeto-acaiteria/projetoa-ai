@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { StatCard, Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
+import { dateBR, todayBR } from "@/lib/date-br";
 import { IconWallet, IconChart, IconReceipt, IconPlus, IconTrash } from "@/components/Icons";
 import FluxoCaixaTabela from "@/components/admin/FluxoCaixaTabela";
 
@@ -24,7 +25,7 @@ const PERIODS = [
   { k: "tudo", label: "Tudo", days: -1 },
 ] as const;
 
-const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
+const dmy = (d: string) => (d.length > 10 ? dateBR(d) : d).split("-").reverse().join("/"); // ISO→data BR; data pura fica
 
 export default function FinanceiroClient() {
   const [vendas, setVendas] = useState<Venda[]>([]);
@@ -64,12 +65,11 @@ export default function FinanceiroClient() {
     const days = PERIODS.find((p) => p.k === period)!.days;
     if (days < 0) return "0000-00-00";
     const d = new Date();
-    d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+    return dateBR(d); // corte no fuso do Brasil (não UTC)
   }, [period]);
 
-  const fVendas = vendas.filter((v) => v.date.slice(0, 10) >= cutoff);
+  const fVendas = vendas.filter((v) => dateBR(v.date) >= cutoff);
   const fDespesas = despesas.filter((e) => e.date >= cutoff);
 
   const grossCents = fVendas.reduce((s, v) => s + v.grossCents, 0);
@@ -94,7 +94,7 @@ export default function FinanceiroClient() {
   const byDay = useMemo(() => {
     const map: Record<string, { rec: number; desp: number }> = {};
     for (const v of fVendas) {
-      const d = v.date.slice(0, 10);
+      const d = dateBR(v.date);
       (map[d] ??= { rec: 0, desp: 0 }).rec += v.netCents;
     }
     for (const e of fDespesas) (map[e.date] ??= { rec: 0, desp: 0 }).desp += e.amountCents;
@@ -321,7 +321,7 @@ function DespesaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("insumos");
   const [valor, setValor] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayBR());
   const [saving, setSaving] = useState(false);
   const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 

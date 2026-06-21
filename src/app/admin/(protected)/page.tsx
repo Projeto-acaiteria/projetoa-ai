@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader, StatCard, Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
+import { dateBR, todayBR } from "@/lib/date-br";
 import { getOpenSession } from "@/lib/cash-store";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
@@ -14,11 +15,11 @@ export default async function AdminHome() {
   // caixa fechado NÃO bloqueia mais — vira um aviso suave (login cai no painel, não na tela de abrir caixa)
   const semCaixa = !(await getOpenSession());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
   const orders = await listOrders();
   const expenses = await listExpenses();
 
-  const vendasHoje = orders.filter((o) => o.status === "entregue" && o.createdAt.slice(0, 10) === today);
+  const vendasHoje = orders.filter((o) => o.status === "entregue" && dateBR(o.createdAt) === today);
   const brutoHoje = vendasHoje.reduce((s, o) => s + o.totalCents, 0);
   const liquidoHoje = vendasHoje.reduce((s, o) => s + o.totalCents - (o.cardFeeCents ?? 0), 0);
   const despHoje = expenses.filter((e) => e.date === today).reduce((s, e) => s + e.amountCents, 0);
