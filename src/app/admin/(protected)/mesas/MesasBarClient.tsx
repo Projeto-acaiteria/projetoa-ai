@@ -34,6 +34,8 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
   const [method, setMethod] = useState<string>("pix");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addN, setAddN] = useState("");
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -104,6 +106,16 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
   const paid = comanda?.paidCents ?? 0;
   const falta = Math.max(0, grand - paid);
 
+  async function criarMesas() {
+    const n = Math.floor(Number(addN) || 0);
+    if (n < 1) return;
+    setBusy(true);
+    try {
+      await fetch("/api/mesas/adicionar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n }) });
+      setAddOpen(false); setAddN(""); loadTables();
+    } finally { setBusy(false); }
+  }
+
   async function fechar() {
     if (!drawer?.tabId || busy) return;
     setBusy(true); setErr("");
@@ -131,6 +143,19 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
 
   return (
     <>
+      {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez) */}
+      <div className="mb-4 flex items-center justify-end gap-2">
+        {addOpen ? (
+          <>
+            <input autoFocus type="number" min={1} value={addN} onChange={(e) => setAddN(e.target.value)} placeholder="total de mesas" className="w-36 rounded-lg border border-line bg-bg-base px-3 py-2 text-sm text-ink outline-none focus:border-brand-600" />
+            <button onClick={criarMesas} disabled={busy} className="rounded-lg brand-gradient px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Criar</button>
+            <button onClick={() => { setAddOpen(false); setAddN(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-bold text-[var(--text-muted)]">Cancelar</button>
+          </>
+        ) : (
+          <button onClick={() => setAddOpen(true)} className="rounded-lg border border-line px-3 py-2 text-sm font-bold text-brand-600 hover:border-brand-400">+ Adicionar mesas</button>
+        )}
+      </div>
+
       {/* GRID de mesas por área */}
       <div className="space-y-6">
         {areas.length === 0 && <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-[var(--text-muted)]">Nenhuma mesa. Adicione mesas no salão.</p>}
