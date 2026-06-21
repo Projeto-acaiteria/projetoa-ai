@@ -54,7 +54,8 @@ export async function POST(req: Request) {
   const userId = created.user.id;
   const rollbackUser = async () => {
     try {
-      await db().auth.admin.deleteUser(userId);
+      // hard-delete (shouldSoftDelete=false) — senão o e-mail fica "preso" e a 2ª tentativa falha
+      await db().auth.admin.deleteUser(userId, false);
     } catch {}
   };
 

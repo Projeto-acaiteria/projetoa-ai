@@ -5,6 +5,7 @@ import { moveStock } from "@/lib/stock-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getStoreConfig } from "@/lib/auth/store-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // Pedido entregue = pago. Credita pontos uma única vez, sobre o valor dos
   // produtos (sem a taxa de entrega). Regra: pontua só em venda paga.
   let awarded = 0;
-  if (order.status === "entregue" && !order.pointsAwarded && order.phone) {
+  const storeCfg = await getStoreConfig(sid);
+  if (order.status === "entregue" && !order.pointsAwarded && order.phone && storeCfg?.loyalty_enabled) {
     const cfg = await getLoyalty();
     const existing = await getByPhone(order.phone);
     const isFirstPurchase = !existing || existing.history.length === 0;

@@ -259,7 +259,10 @@ export default function TemplateBar({
                         {hasGroups && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,59,78,0.15)", color: ACCENT_HI }}>monta</span>}
                       </div>
                     </div>
-                    {q > 0 ? (
+                    {p.by_weight ? (
+                      // vendido por peso = pesado no balcão; não é pedível online
+                      <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">pesado no balcão</span>
+                    ) : q > 0 ? (
                       <div className="flex items-center gap-2.5">
                         <button onClick={() => decKey(p.id)} aria-label="menos" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-lg leading-none active:scale-95">−</button>
                         <span className="w-4 text-center font-bold tabular-nums">{q}</span>

@@ -234,7 +234,10 @@ export default function TemplateGrid({
                   <div key={p.id} className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
                     <div className="relative">
                       <Thumb p={p} />
-                      {q > 0 ? (
+                      {p.by_weight ? (
+                        // vendido por peso = pesado no balcão; não é pedível online (evita o beco-sem-saída no checkout)
+                        <span className="absolute bottom-2 right-2 rounded-full bg-zinc-900/75 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">pesado no balcão</span>
+                      ) : q > 0 ? (
                         <div className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 p-1 shadow-md backdrop-blur">
                           <button onClick={() => decKey(p.id)} aria-label="menos" className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-zinc-600 active:scale-95">−</button>
                           <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>

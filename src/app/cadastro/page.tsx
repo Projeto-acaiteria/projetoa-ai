@@ -28,8 +28,14 @@ const FEATURE_LABEL: Partial<Record<keyof Features, string>> = {
 const TEMPLATE_LABEL = { acai: "Cardápio montagem", bar: "Comanda estilo bar", grid: "Cardápio com foto" };
 
 const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g"); // marcas de acento (NFD) — sem char literal no fonte
+// versão FINAL (auto-sugestão / blur): tira hífen do início E do fim.
 function slugify(s: string) {
   return s.normalize("NFD").replace(DIACRITICS, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+}
+// versão de DIGITAÇÃO: NÃO tira o hífen do fim — senão não dá pra digitar "marmitaria-do-teo"
+// (a cada tecla o "-" sumia). Só normaliza acento/caixa/inválidos e colapsa hífens repetidos.
+function slugifyTyping(s: string) {
+  return s.normalize("NFD").replace(DIACRITICS, "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+/, "").slice(0, 50);
 }
 function featureChips(f: Features): string[] {
   return (Object.keys(FEATURE_LABEL) as (keyof Features)[]).filter((k) => f[k]).map((k) => FEATURE_LABEL[k]!);
@@ -158,7 +164,7 @@ export default function CadastroPage() {
                 <p className="mb-4 text-sm text-white/60">É o endereço do cardápio que o cliente acessa.</p>
                 <div className="flex items-center rounded-lg border border-white/15 bg-white/10 px-3">
                   <span className="text-sm text-white/40">/</span>
-                  <input value={slug} onChange={(e) => { setSlug(slugify(e.target.value)); setSlugTouched(true); }}
+                  <input value={slug} onChange={(e) => { setSlug(slugifyTyping(e.target.value)); setSlugTouched(true); }} onBlur={() => setSlug((s) => slugify(s))}
                     placeholder="acai-do-joao" className="w-full bg-transparent px-1 py-2.5 text-white outline-none placeholder:text-white/30" />
                 </div>
                 <div className="mt-1.5 h-5 text-xs">
