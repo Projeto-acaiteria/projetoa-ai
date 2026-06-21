@@ -27,8 +27,8 @@ export default async function MesasPage() {
 
   // bar/grid (menu relacional): comanda do operador espelhada do Medellín
   if (isRelacional) {
-    const categories = await readBarMenu(storeId);
-    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} /></>;
+    const [categories, store] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
+    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} storeName={store.name} /></>;
   }
 
   // açaí (copo/peso): fluxo existente

@@ -43,7 +43,7 @@ export type StationTicketData = {
   tableLabel: string;
   dateLabel: string;
   orderId: number;
-  items: { qty: number; name: string; sizeLabel?: string | null; mods?: { name: string; price_cents: number }[] | null }[];
+  items: { qty: number; name: string; sizeLabel?: string | null; mods?: { name: string; price_cents: number }[] | null; note?: string | null }[];
   note?: string | null;
 };
 
@@ -55,6 +55,8 @@ export function stationTicketHtml(d: StationTicketData): string {
           it.sizeLabel ? `<div class="sz">${esc(it.sizeLabel)}</div>` : ""
         }${
           it.mods && it.mods.length ? `<div class="mods">${it.mods.map((m) => "+ " + esc(m.name)).join("<br>")}</div>` : ""
+        }${
+          it.note ? `<div class="inote">OBS: ${esc(it.note)}</div>` : ""
         }</span></div>`,
     )
     .join("");
@@ -70,6 +72,7 @@ export function stationTicketHtml(d: StationTicketData): string {
     .it .n{font-size:18px;font-weight:600;flex:1}
     .it .sz{font-size:12px;font-weight:400}
     .it .mods{font-size:14px;font-weight:700;padding-left:2px;line-height:1.4}
+    .it .inote{font-size:13px;font-weight:700;padding-left:2px;text-decoration:underline}
     .obs{border:2px solid #000;padding:4px 6px;font-weight:700;font-size:15px}
   </style></head><body>
     <div class="stn">${esc(d.station).toUpperCase()}</div>

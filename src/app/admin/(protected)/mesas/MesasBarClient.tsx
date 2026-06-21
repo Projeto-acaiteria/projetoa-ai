@@ -10,6 +10,8 @@ import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
+import { printTicket } from "@/lib/print";
+import { ticketHtml } from "@/lib/ticket";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null };
 type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null; mods?: { name: string; price_cents: number }[] | null };
@@ -22,10 +24,11 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
+  storeName: string;
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -155,6 +158,20 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
       const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, method }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
+      // cupom de fechamento: itens (mods no nome + totalCents que JÁ inclui os mods) + total fresco do servidor
+      const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
+      const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
+      void printTicket(ticketHtml({
+        loja: storeName, display: dest,
+        dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
+        modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
+        items: [
+          ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
+          ...(cover > 0 ? [{ qty: 1, name: "Couvert", totalCents: cover }] : []),
+          ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
+        ],
+        totalCents: d.totalCents ?? grand,
+      }));
       closeDrawer(); loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
