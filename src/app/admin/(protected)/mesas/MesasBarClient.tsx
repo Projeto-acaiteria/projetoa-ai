@@ -2,16 +2,22 @@
 
 // Comanda de SALÃO do operador pro menu RELACIONAL (bar/grid). Espinha espelhada do Medellín
 // (Verbo): rascunho (não cria comanda até o 1º item) → picker grid → temp → confirmAdd (/api/mesas/lancar)
-// → painel consolidado por estação → fechar. RODADA 1 = sem modificador/peso/obs-por-linha (vêm depois).
+// → painel consolidado por estação → fechar. RODADA 2: diferenciais entre o "+" e o temp —
+// modificadores (ProductCustomizer), peso (WeightModal compartilhado) e observação por linha.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
+import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
+import WeightModal from "@/components/admin/WeightModal";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null };
-type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string };
+type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null };
 type Comanda = { tab: { id: number; label?: string | null }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
-type Temp = Record<string, { product: BarProduct; qty: number }>;
+// linha do carrinho temp: produto simples (qty), com modificadores (modifierIds) ou por peso (grams) + obs
+type TempLine = { uid: string; product: BarProduct; label: string; qty: number; unitPriceCents: number; modifierIds?: string[]; grams?: number; note?: string };
+let _seq = 0;
+const uid = () => `t${++_seq}`;
 
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
@@ -27,7 +33,9 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
   const [drawer, setDrawer] = useState<{ table: TableCard; tabId: number | null } | null>(null);
   const [view, setView] = useState<"pick" | "comanda">("pick");
   const [comanda, setComanda] = useState<Comanda | null>(null);
-  const [temp, setTemp] = useState<Temp>({});
+  const [temp, setTemp] = useState<TempLine[]>([]);
+  const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
+  const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
   const [waiter, setWaiter] = useState("");
   const [fee, setFee] = useState(true);
@@ -50,17 +58,41 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
   }
 
   function clickTable(t: TableCard) {
-    setErr(""); setTemp({}); setPax(1); setWaiter("");
+    setErr(""); setTemp([]); setPax(1); setWaiter("");
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp({}); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); }
 
-  const inc = (p: BarProduct) => setTemp((c) => ({ ...c, [p.id]: { product: p, qty: (c[p.id]?.qty ?? 0) + 1 } }));
-  const dec = (id: string) => setTemp((c) => { const q = (c[id]?.qty ?? 0) - 1; const n = { ...c }; if (q <= 0) delete n[id]; else n[id] = { ...n[id], qty: q }; return n; });
-  const tempLines = Object.values(temp);
-  const tempCount = tempLines.reduce((s, l) => s + l.qty, 0);
-  const tempTotal = tempLines.reduce((s, l) => s + l.qty * l.product.price_cents, 0);
+  // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
+  function onProduct(p: BarProduct) {
+    setErr("");
+    if (p.by_weight) { setWeightFor(p); return; }
+    if (p.groups && p.groups.length) { setCustomizeFor({ product: p }); return; }
+    setTemp((c) => {
+      const ix = c.findIndex((l) => l.product.id === p.id && !l.grams && !l.modifierIds);
+      if (ix >= 0) { const n = [...c]; n[ix] = { ...n[ix], qty: n[ix].qty + 1 }; return n; }
+      return [...c, { uid: uid(), product: p, label: p.name, qty: 1, unitPriceCents: p.price_cents }];
+    });
+  }
+  function addWeight(p: BarProduct, grams: number) {
+    const liquido = Math.max(0, grams - (p.tare_grams || 0));
+    const cents = Math.round((liquido / 1000) * p.price_cents);
+    setTemp((c) => [...c, { uid: uid(), product: p, label: `${p.name} ${liquido}g`, qty: 1, unitPriceCents: cents, grams }]);
+    setWeightFor(null);
+  }
+  function addCustom(p: BarProduct, r: CustomizeResult) {
+    const nm = p.name + (r.mods.length ? ` (${r.mods.map((m) => m.name).join(", ")})` : "");
+    setTemp((c) => [...c, { uid: uid(), product: p, label: nm, qty: r.qty, unitPriceCents: r.unitPriceCents, modifierIds: r.modifierIds }]);
+    setCustomizeFor(null);
+  }
+  const incLine = (u: string) => setTemp((c) => c.map((l) => (l.uid === u ? { ...l, qty: l.qty + 1 } : l)));
+  const decLine = (u: string) => setTemp((c) => c.flatMap((l) => (l.uid === u ? (l.qty > 1 ? [{ ...l, qty: l.qty - 1 }] : []) : [l])));
+  const delLine = (u: string) => setTemp((c) => c.filter((l) => l.uid !== u));
+  const setLineNote = (u: string, note: string) => setTemp((c) => c.map((l) => (l.uid === u ? { ...l, note } : l)));
+  const qtyOf = (p: BarProduct) => temp.find((l) => l.product.id === p.id && !l.grams && !l.modifierIds)?.qty ?? 0;
+  const tempCount = temp.reduce((s, l) => s + l.qty, 0);
+  const tempTotal = temp.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
 
   // lança o temp — UM request transacional (/api/mesas/lancar): se for rascunho, abre a comanda
   // e lança junto no servidor; se o lançamento falhar, o servidor faz rollback (sem mesa-fantasma).
@@ -68,7 +100,7 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
     if (!drawer || busy || tempCount === 0) return;
     setBusy(true); setErr("");
     try {
-      const items = tempLines.map((l) => ({ productId: l.product.id, qty: l.qty }));
+      const items = temp.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds, grams: l.grams, note: l.note }));
       const body = drawer.tabId
         ? { tabId: drawer.tabId, items }
         : { tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items };
@@ -76,7 +108,7 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui lançar.");
       const tabId = Number(d.tabId);
-      setTemp({}); setDrawer({ table: drawer.table, tabId });
+      setTemp([]); setDrawer({ table: drawer.table, tabId });
       setView("comanda"); await loadComanda(tabId); loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao lançar."); }
     finally { setBusy(false); }
@@ -87,7 +119,7 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
     const map = new Map<string, ComItem & { station: string }>();
     for (const o of comanda?.orders ?? []) for (const it of o.items) {
       const st = it.station ?? "cozinha";
-      const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}`;
+      const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}|${it.note ?? ""}`; // obs diferente = linha separada
       const cur = map.get(k) ?? { ...it, station: st, qty: 0 };
       cur.qty += it.qty; map.set(k, cur);
     }
@@ -215,28 +247,29 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
                   </div>
                 )}
 
-                {/* picker grid: categorias → produtos (espinha: toca + soma; sem modal — round 2) */}
+                {/* picker grid: categorias → produtos. peso/modificador abrem modal; simples soma inline */}
                 <div className="space-y-4">
                   {cats.map((cat) => (
                     <div key={cat.id}>
                       <p className="mb-1.5 text-xs font-bold uppercase text-[var(--text-muted)]">{cat.name}</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {cat.products.filter((p) => !p.by_weight).map((p) => {
-                          const q = temp[p.id]?.qty ?? 0;
+                        {cat.products.map((p) => {
+                          const monta = (p.groups && p.groups.length > 0) || p.by_weight;
+                          const q = qtyOf(p);
                           return (
                             <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-bg-base p-2.5">
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-ink">{p.name}</div>
-                                <div className="text-xs font-bold text-brand-600">{brl(p.price_cents)}</div>
+                                <div className="text-xs font-bold text-brand-600">{brl(p.price_cents)}{p.by_weight && <span className="font-medium text-[var(--text-faded)]">/kg</span>}{monta && <span className="ml-1 rounded bg-bg-surface-2 px-1 text-[9px] font-bold text-[var(--text-muted)]">{p.by_weight ? "pesar" : "monta"}</span>}</div>
                               </div>
-                              {q > 0 ? (
+                              {!monta && q > 0 ? (
                                 <div className="flex shrink-0 items-center gap-1.5">
-                                  <button onClick={() => dec(p.id)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
+                                  <button onClick={() => { const u = temp.find((l) => l.product.id === p.id && !l.grams && !l.modifierIds)?.uid; if (u) decLine(u); }} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
                                   <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>
-                                  <button onClick={() => inc(p)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
+                                  <button onClick={() => onProduct(p)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
                                 </div>
                               ) : (
-                                <button onClick={() => inc(p)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-xl leading-none text-white">+</button>
+                                <button onClick={() => onProduct(p)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-xl leading-none text-white">+</button>
                               )}
                             </div>
                           );
@@ -245,6 +278,25 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
                     </div>
                   ))}
                 </div>
+
+                {/* a lançar: linhas do temp com obs por linha (diferencial) */}
+                {temp.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-line bg-bg-surface-2 p-2.5">
+                    <p className="mb-1 text-[11px] font-bold uppercase text-[var(--text-muted)]">A lançar</p>
+                    <ul className="space-y-1.5">
+                      {temp.map((l) => (
+                        <li key={l.uid}>
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="min-w-0 flex-1 truncate text-ink"><b className="tabular-nums">{l.qty}×</b> {l.label}</span>
+                            <span className="tabular-nums text-[var(--text-muted)]">{brl(l.qty * l.unitPriceCents)}</span>
+                            <button onClick={() => delLine(l.uid)} className="text-[var(--text-faded)] hover:text-[var(--red-no)]">✕</button>
+                          </div>
+                          <input value={l.note ?? ""} onChange={(e) => setLineNote(l.uid, e.target.value)} placeholder="obs (ex: sem cebola, mal passado)" className="mt-1 w-full rounded-lg border border-line bg-bg-base px-2 py-1 text-xs text-ink outline-none focus:border-brand-600" />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                 <div className="sticky bottom-0 mt-3 flex gap-2 bg-bg-elevated pt-2">
@@ -262,9 +314,9 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
                   {consolid.length === 0 ? <p className="px-3 py-4 text-sm text-[var(--text-faded)]">Comanda vazia.</p> : (
                     <ul className="divide-y divide-line">
                       {consolid.map((it, i) => (
-                        <li key={i} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                          <span className="text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span></span>
-                          <span className="tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
+                        <li key={i} className="flex items-start justify-between gap-2 px-3 py-2 text-sm">
+                          <span className="min-w-0 text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span>{it.note ? <span className="block text-[11px] italic text-[var(--text-muted)]">obs: {it.note}</span> : null}</span>
+                          <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
                         </li>
                       ))}
                     </ul>
@@ -286,7 +338,7 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
 
                 {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                 <div className="mt-3 flex gap-2">
-                  <button onClick={() => { setView("pick"); setTemp({}); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
+                  <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
                   <button onClick={fechar} disabled={busy || grand === 0} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">{busy ? "..." : "Fechar conta"}</button>
                 </div>
               </>
@@ -294,6 +346,10 @@ export default function MesasBarClient({ categories, coverShow, staff }: {
           </div>
         </div>
       )}
+
+      {/* diferenciais (entre o "+" e o temp): peso e modificadores */}
+      {weightFor && <WeightModal product={weightFor} onClose={() => setWeightFor(null)} onConfirm={(g) => addWeight(weightFor, g)} />}
+      {customizeFor && <ProductCustomizer product={customizeFor.product} accent="#7C3AED" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor.product, r)} />}
     </>
   );
 }

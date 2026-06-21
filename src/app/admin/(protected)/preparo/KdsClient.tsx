@@ -8,7 +8,7 @@ import { stationTicketHtml } from "@/lib/ticket";
 // e avança status pendente → preparando → pronto → entregue (sai do quadro). Polling 8s + tick
 // de 1s pro tempo/urgência. O aparelho da cozinha fixa a estação; persiste em localStorage.
 
-type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null };
+type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null };
 type KdsOrder = { id: number; station: string; status: string; created_at: string; table_label: string; note: string | null; items: KdsItem[] };
 
 const COLS = [
@@ -51,7 +51,7 @@ export default function KdsClient({ stations }: { stations: string[] }) {
       tableLabel: o.table_label,
       dateLabel: new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       orderId: o.id,
-      items: o.items.map((i) => ({ qty: i.qty, name: i.name, sizeLabel: i.size_label, mods: i.mods })),
+      items: o.items.map((i) => ({ qty: i.qty, name: i.name, sizeLabel: i.size_label, mods: i.mods, note: i.note })),
       note: o.note,
     });
   }
@@ -179,6 +179,7 @@ export default function KdsClient({ stations }: { stations: string[] }) {
                                 {it.mods.map((m, j) => <div key={j}>+ {m.name}</div>)}
                               </div>
                             )}
+                            {it.note && <div className="pl-6 text-xs font-bold italic text-amber-700">obs: {it.note}</div>}
                           </li>
                         ))}
                       </ul>

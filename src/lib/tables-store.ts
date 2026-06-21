@@ -44,6 +44,7 @@ export type TabItem = {
   qty: number;
   unit_price_cents: number;
   consumes: StockConsume[] | null;
+  note?: string | null;
 };
 
 export type TabOrder = {
@@ -94,6 +95,7 @@ export type NewTabItem = {
   productId?: string; // bar: ficha técnica do menu_product resolvida no servidor (baixa automática)
   station?: string; // estação de preparo (bar). Ausente = 'cozinha' (açaí).
   mods?: { name: string; price_cents: number }[] | null; // personalização escolhida (espelha no KDS/cupom)
+  note?: string | null; // observação da LINHA (ex: ponto da carne, sem cebola)
 };
 
 // ── Mesas ────────────────────────────────────────────────────────────────────
@@ -272,6 +274,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       unit_price_cents: it.unitPriceCents,
       consumes: it.consumes,
       mods: it.mods ?? null,
+      note: it.note ?? null,
     }));
     const { error: e2 } = await d.from("tab_order_items").insert(rows);
     if (e2) throw e2;
@@ -289,7 +292,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
 }
 
 // ── KDS (telas de preparo por estação) ───────────────────────────────────────
-export type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null };
+export type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null };
 export type KdsOrder = {
   id: number;
   station: string;
@@ -325,15 +328,15 @@ export async function getStationOrders(stations: string[]): Promise<KdsOrder[]> 
   const orderIds = list.map((o) => o.id);
   const tabIds = [...new Set(list.map((o) => o.tab_id))];
   const [{ data: items }, { data: tabs }] = await Promise.all([
-    d.from("tab_order_items").select("tab_order_id, name, size_label, qty, mods").in("tab_order_id", orderIds),
+    d.from("tab_order_items").select("tab_order_id, name, size_label, qty, mods, note").in("tab_order_id", orderIds),
     d.from("tabs").select("id, label").in("id", tabIds),
   ]);
   const labelByTab = new Map<number, string>();
   for (const t of (tabs ?? []) as Array<{ id: number; label: string | null }>) labelByTab.set(t.id, t.label ?? "Balcão");
   const byOrder = new Map<number, KdsItem[]>();
-  for (const it of (items ?? []) as Array<{ tab_order_id: number; name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null }>) {
+  for (const it of (items ?? []) as Array<{ tab_order_id: number; name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note: string | null }>) {
     const arr = byOrder.get(it.tab_order_id) ?? [];
-    arr.push({ name: it.name, size_label: it.size_label, qty: num(it.qty), mods: it.mods ?? null });
+    arr.push({ name: it.name, size_label: it.size_label, qty: num(it.qty), mods: it.mods ?? null, note: (it.note ?? null) });
     byOrder.set(it.tab_order_id, arr);
   }
   return list.map((o) => ({
