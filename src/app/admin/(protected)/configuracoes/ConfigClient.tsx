@@ -21,7 +21,7 @@ const FEE_ROWS: { k: keyof Fees; label: string; hint: string }[] = [
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-type Config = { has_delivery: boolean } | null;
+type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean } | null;
 
 export default function ConfigClient() {
   const [fees, setFees] = useState<Fees | null>(null);
@@ -33,7 +33,7 @@ export default function ConfigClient() {
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ?? { has_delivery: false }); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose } : null); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -167,6 +167,19 @@ export default function ConfigClient() {
         </Card>
       )}
 
+      {/* Recursos da loja — ligar/desligar features (couvert, fidelidade, dose) */}
+      {config && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-extrabold text-ink">Recursos da loja</h2>
+          <p className="mb-3 text-sm text-[var(--text-muted)]">Ligue só o que o seu negócio usa.</p>
+          <div className="divide-y divide-line">
+            <FeatureToggle label="Couvert / Shows" hint="Cobra couvert por pessoa quando tem atração ao vivo (bar)." on={config.cover_enabled} onToggle={() => { setConfig((c) => c ? { ...c, cover_enabled: !c.cover_enabled } : c); setSaved(false); }} />
+            <FeatureToggle label="Fidelidade (pontos)" hint="Cliente junta pontos e troca por brinde." on={config.loyalty_enabled} onToggle={() => { setConfig((c) => c ? { ...c, loyalty_enabled: !c.loyalty_enabled } : c); setSaved(false); }} />
+            <FeatureToggle label="Dose / garrafa" hint="Controle de destilado em doses (estoque do bar)." on={config.stock_dose} onToggle={() => { setConfig((c) => c ? { ...c, stock_dose: !c.stock_dose } : c); setSaved(false); }} />
+          </div>
+        </Card>
+      )}
+
       {/* Identidade visual (cardápio público) */}
       <Card className="p-5 sm:p-6">
         <div className="mb-1 flex items-center gap-2">
@@ -250,6 +263,21 @@ export default function ConfigClient() {
         </button>
         {saved && <span className="text-sm font-semibold text-lime">Salvo ✓</span>}
       </div>
+    </div>
+  );
+}
+
+function FeatureToggle({ label, hint, on, onToggle }: { label: string; hint: string; on: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3.5">
+      <div>
+        <div className="text-sm font-bold text-ink">{label}</div>
+        <div className="text-xs text-[var(--text-muted)]">{hint}</div>
+      </div>
+      <button type="button" onClick={onToggle} role="switch" aria-checked={on}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? "brand-gradient" : "bg-bg-surface-2 border border-line"}`}>
+        <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+      </button>
     </div>
   );
 }
