@@ -29,8 +29,41 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  // fidelidade: identifica o cliente pelo telefone p/ pontuar a venda e resgatar prêmio (item inteiro)
+  const [phone, setPhone] = useState("");
+  const [customer, setCustomer] = useState<{ name: string; points: number; found: boolean } | null>(null);
+  const [rewards, setRewards] = useState<{ label: string; points: number }[]>([]);
+  const [loyMsg, setLoyMsg] = useState("");
+  const [loyBusy, setLoyBusy] = useState(false);
 
   const total = cart.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
+
+  async function buscarCliente() {
+    const p = phone.trim();
+    if (!p || loyBusy) return;
+    setLoyBusy(true); setLoyMsg("");
+    try {
+      const r = await fetch(`/api/pontos?phone=${encodeURIComponent(p)}`, { cache: "no-store" });
+      const d = await r.json();
+      setRewards(Array.isArray(d.rewards) ? d.rewards : []);
+      if (d.customer) setCustomer({ name: d.customer.name || "Cliente", points: d.customer.points ?? 0, found: true });
+      else setCustomer({ name: "", points: 0, found: false });
+    } catch { setLoyMsg("Não consegui buscar o cliente."); }
+    finally { setLoyBusy(false); }
+  }
+
+  async function resgatar(rewardPoints: number, label: string) {
+    if (loyBusy || !phone.trim()) return;
+    setLoyBusy(true); setLoyMsg("");
+    try {
+      const r = await fetch("/api/pontos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: phone.trim(), rewardPoints }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha no resgate.");
+      setCustomer((c) => (c ? { ...c, points: d.customer?.points ?? c.points } : c));
+      setLoyMsg(`Resgatado: ${label} ✓ (entregue ao cliente)`);
+    } catch (e) { setLoyMsg(e instanceof Error ? e.message : "Falha no resgate."); }
+    finally { setLoyBusy(false); }
+  }
 
   function onProduct(p: BarProduct) {
     setErr("");
@@ -64,7 +97,7 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: pay, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
+        body: JSON.stringify({ paymentMethod: pay, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -77,7 +110,9 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
         items: o.items.map((it: { qty: number; name: string; paidCents: number }) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
         totalCents: o.totalCents, code: o.code, origem: "balcao",
       }));
-      setDone(o.display); setCart([]);
+      const pts = d.pointsAwarded ?? 0;
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "")); setCart([]);
+      setPhone(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Falha ao registrar a venda.");
@@ -140,6 +175,31 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
           <div className="flex items-center justify-between border-t border-line pt-3">
             <span className="text-[var(--text-muted)]">Total</span>
             <span className="text-2xl font-extrabold text-brand-600">{brl(total)}</span>
+          </div>
+
+          {/* fidelidade: identifica cliente p/ pontuar + resgatar prêmio (item inteiro, não vira desconto) */}
+          <div className="mt-3 rounded-xl border border-line bg-bg-surface-2 p-2.5">
+            <p className="mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Fidelidade (opcional)</p>
+            <div className="flex gap-1.5">
+              <input value={phone} onChange={(e) => { setPhone(e.target.value); setCustomer(null); setLoyMsg(""); }} onKeyDown={(e) => { if (e.key === "Enter") buscarCliente(); }} inputMode="tel" placeholder="telefone do cliente" className="min-w-0 flex-1 rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm text-ink outline-none focus:border-brand-600" />
+              <button onClick={buscarCliente} disabled={loyBusy || !phone.trim()} className="rounded-lg border border-line px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-40">Buscar</button>
+            </div>
+            {customer && (customer.found ? (
+              <div className="mt-2">
+                <p className="text-sm text-ink"><b>{customer.name}</b> · <span className="font-bold text-brand-600">{customer.points} pts</span></p>
+                {rewards.filter((rw) => customer.points >= rw.points).length > 0 ? (
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-[11px] font-bold uppercase text-[var(--text-muted)]">Resgatar prêmio</p>
+                    {rewards.filter((rw) => customer.points >= rw.points).map((rw) => (
+                      <button key={rw.points} onClick={() => resgatar(rw.points, rw.label)} disabled={loyBusy} className="flex w-full items-center justify-between rounded-lg border border-brand-400 px-2.5 py-1.5 text-xs font-bold text-brand-600 disabled:opacity-40">
+                        <span className="truncate">{rw.label}</span><span className="shrink-0">−{rw.points} pts</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : <p className="mt-1 text-[11px] text-[var(--text-faded)]">Sem prêmio disponível ainda. A venda vai somar pontos.</p>}
+              </div>
+            ) : <p className="mt-2 text-[11px] text-[var(--text-faded)]">Cliente novo — a venda vai cadastrar e pontuar.</p>)}
+            {loyMsg && <p className="mt-2 rounded-lg bg-[#E8F6DD] px-2.5 py-1.5 text-[11px] font-semibold text-lime">{loyMsg}</p>}
           </div>
 
           <p className="mt-3 mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Pagamento</p>

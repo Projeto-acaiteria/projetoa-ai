@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
-import { addOrder, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
+import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
 import { getFees, feeCentsFor } from "@/lib/settings-store";
 import { moveStock } from "@/lib/stock-store";
+import { awardPoints, getByPhone } from "@/lib/customers-store";
+import { pointsForSale } from "@/lib/loyalty";
+import { getLoyalty } from "@/lib/loyalty-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +20,7 @@ type Body = {
   items?: { productId: string; qty: number; grams?: number; modifierIds?: string[] }[];
   paymentMethod?: string;
   customerName?: string;
+  customerPhone?: string; // fidelidade: identifica o cliente p/ pontuar a venda
 };
 
 export async function POST(req: Request) {
@@ -74,12 +78,27 @@ export async function POST(req: Request) {
     );
 
     // baixa automática de estoque pela ficha técnica (mesa e delivery já baixavam; balcão faltava)
-    const today = new Date().toISOString().slice(0, 10);
+    const nowIso = new Date().toISOString();
+    const today = nowIso.slice(0, 10);
     for (const c of consumes) {
       if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Venda ${order.display}`, today, storeId);
     }
 
-    return NextResponse.json({ ok: true, order }, { status: 201 });
+    // fidelidade: pontua a venda se o operador identificou o cliente pelo telefone (espelha /api/vendas)
+    let pointsAwarded = 0;
+    const phone = b.customerPhone?.trim();
+    if (phone) {
+      const cfg = await getLoyalty(storeId);
+      const existing = await getByPhone(phone);
+      const isFirstPurchase = !existing || existing.history.length === 0;
+      pointsAwarded = pointsForSale(subtotalCents, cfg, { isFirstPurchase });
+      if (pointsAwarded > 0) {
+        await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
+        await markPointsAwarded(order.id, pointsAwarded, storeId);
+      }
+    }
+
+    return NextResponse.json({ ok: true, order, pointsAwarded }, { status: 201 });
   } catch (e) {
     console.error("balcao-venda:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });
