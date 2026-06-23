@@ -4,6 +4,7 @@ import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
 import { getFees, feeCentsFor } from "@/lib/settings-store";
 import { applyConsumes } from "@/lib/stock-store";
+import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -35,6 +36,12 @@ export async function POST(req: Request) {
   const method: PaymentMethod = PAYMENTS.includes(b.paymentMethod as PaymentMethod) ? (b.paymentMethod as PaymentMethod) : "dinheiro";
 
   const storeId = await resolveStoreId();
+
+  // sem caixa aberto, não vende (regra de PDV — uniforme com /api/vendas; venda em dinheiro
+  // precisa pertencer a uma sessão pra fechar a gaveta na conferência)
+  if (!(await getOpenSession())) {
+    return NextResponse.json({ error: "Abra o caixa antes de vender" }, { status: 409 });
+  }
 
   try {
     const resolved = await resolveOrderItems(storeId, sel);
