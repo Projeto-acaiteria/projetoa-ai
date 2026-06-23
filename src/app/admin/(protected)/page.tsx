@@ -5,6 +5,9 @@ import { dateBR, todayBR } from "@/lib/date-br";
 import { getOpenSession } from "@/lib/cash-store";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
+import { getStore } from "@/lib/settings-store";
+import { getCurrentStore } from "@/lib/auth/store";
+import SetupChecklist from "@/components/admin/SetupChecklist";
 import { IconWallet, IconReceipt, IconChart, IconMoto, IconBag, IconClock } from "@/components/Icons";
 
 const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregue: "lime" } as const;
@@ -18,6 +21,7 @@ export default async function AdminHome() {
   const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
   const orders = await listOrders();
   const expenses = await listExpenses();
+  const [settings, cur] = await Promise.all([getStore(), getCurrentStore()]);
 
   const vendasHoje = orders.filter((o) => o.status === "entregue" && dateBR(o.createdAt) === today);
   const brutoHoje = vendasHoje.reduce((s, o) => s + o.totalCents, 0);
@@ -42,6 +46,8 @@ export default async function AdminHome() {
   return (
     <>
       <PageHeader title="Início" sub="Resumo de hoje" />
+
+      <SetupChecklist hasLogo={!!settings.logoUrl} hasSale={orders.length > 0} slug={cur?.slug ?? ""} />
 
       {semCaixa && (
         <Link href="/admin/caixa" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-3.5 transition hover:border-brand-400">
