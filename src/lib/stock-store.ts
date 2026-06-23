@@ -132,6 +132,33 @@ export async function moveStock(id: string, type: "entrada" | "saida", qty: numb
   return item;
 }
 
+/** Baixa NÃO-FATAL de estoque pela ficha técnica. A venda/comanda já está commitada quando isto
+ *  roda, então uma falha de baixa NUNCA pode derrubar nem duplicar a venda: cada item é isolado
+ *  (um erro não aborta os outros), `moveStock`=null (insumo inexistente) também vira falha (não
+ *  some em silêncio), e tudo é logado com contexto. O `consumes[]` do pedido é a fonte da verdade
+ *  e o inventário concilia a deriva. NUNCA lança. storeId explícito é obrigatório no caminho público. */
+export async function applyConsumes(
+  consumes: { stockId: string; qty: number }[],
+  reason: string,
+  at: string,
+  storeId?: string,
+): Promise<{ applied: number; failed: { stockId: string; qty: number; error: string }[] }> {
+  const failed: { stockId: string; qty: number; error: string }[] = [];
+  let applied = 0;
+  for (const c of consumes) {
+    if (!c.stockId || !(c.qty > 0)) continue;
+    try {
+      const item = await moveStock(c.stockId, "saida", c.qty, reason, at, storeId);
+      if (item) applied++;
+      else failed.push({ stockId: c.stockId, qty: c.qty, error: "item de estoque não encontrado" });
+    } catch (e) {
+      failed.push({ stockId: c.stockId, qty: c.qty, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (failed.length) console.error(`applyConsumes: ${failed.length} baixa(s) falharam (${reason}):`, JSON.stringify(failed));
+  return { applied, failed };
+}
+
 /** Entrada por GARRAFA (item dose/garrafa): soma bottles × dosesPerBottle ao estoque em doses. */
 export async function addBottles(id: string, bottles: number, at: string): Promise<StockItem | null> {
   const all = await readAll();

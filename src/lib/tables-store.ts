@@ -5,7 +5,7 @@
 // SEM garçom/comissão. Todos os valores em CENTAVOS (int).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
-import { moveStock } from "@/lib/stock-store";
+import { applyConsumes } from "@/lib/stock-store";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -319,13 +319,11 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
     created.push(order as TabOrder);
   }
 
-  // baixa de estoque pela ficha técnica resolvida (sobre todos os itens, independente da estação)
+  // baixa de estoque pela ficha técnica resolvida — NÃO-FATAL (os itens já estão na comanda acima;
+  // uma falha de baixa não pode derrubar o lançamento já commitado).
   const today = new Date().toISOString().slice(0, 10);
-  for (const it of resolved) {
-    for (const c of it.consumes) {
-      await moveStock(c.stockId, "saida", c.qty * it.qty, "Mesa comanda", today, sid);
-    }
-  }
+  const consumes = resolved.flatMap((it) => it.consumes.map((c) => ({ stockId: c.stockId, qty: c.qty * it.qty })));
+  await applyConsumes(consumes, "Mesa comanda", today, sid);
   return created;
 }
 

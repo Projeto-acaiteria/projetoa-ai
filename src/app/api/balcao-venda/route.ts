@@ -3,7 +3,7 @@ import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
 import { getFees, feeCentsFor } from "@/lib/settings-store";
-import { moveStock } from "@/lib/stock-store";
+import { applyConsumes } from "@/lib/stock-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -77,12 +77,11 @@ export async function POST(req: Request) {
       storeId,
     );
 
-    // baixa automática de estoque pela ficha técnica (mesa e delivery já baixavam; balcão faltava)
+    // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada acima;
+    // uma falha de baixa não pode virar 500 → operador refaz → pedido duplicado).
     const nowIso = new Date().toISOString();
     const today = nowIso.slice(0, 10);
-    for (const c of consumes) {
-      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Venda ${order.display}`, today, storeId);
-    }
+    await applyConsumes(consumes, `Venda ${order.display}`, today, storeId);
 
     // fidelidade: pontua a venda se o operador identificou o cliente pelo telefone (espelha /api/vendas)
     let pointsAwarded = 0;

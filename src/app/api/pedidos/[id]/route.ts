@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { setStatus, markPointsAwarded, markConsumed, type OrderStatus } from "@/lib/orders-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
-import { moveStock } from "@/lib/stock-store";
+import { applyConsumes } from "@/lib/stock-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { resolveStoreId } from "@/lib/auth/current";
@@ -42,11 +42,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
   }
 
-  // Baixa de estoque do delivery: abate a ficha técnica ao entregar (uma vez).
+  // Baixa de estoque do delivery: abate a ficha técnica ao entregar (uma vez). NÃO-FATAL + marca
+  // consumido SEMPRE após a tentativa — senão uma falha no meio re-baixaria os que já saíram na
+  // próxima troca de status (dupla-baixa).
   if (order.status === "entregue" && !order.consumed && order.consumes?.length) {
-    for (const c of order.consumes) {
-      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Pedido ${order.display}`, order.createdAt.slice(0, 10), sid);
-    }
+    await applyConsumes(order.consumes, `Pedido ${order.display}`, order.createdAt.slice(0, 10), sid);
     await markConsumed(order.id, sid);
   }
 

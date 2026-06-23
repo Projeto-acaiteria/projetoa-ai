@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addOrder, markPointsAwarded, type OrderItem } from "@/lib/orders-store";
-import { moveStock } from "@/lib/stock-store";
+import { applyConsumes } from "@/lib/stock-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -72,12 +72,8 @@ export async function POST(req: Request) {
     "entregue", // balcão = já entregue/pago
   );
 
-  // baixa automática de estoque pela ficha técnica (insumos + produtos de revenda)
-  for (const c of b.consumes || []) {
-    if (c.stockId && c.qty > 0) {
-      await moveStock(c.stockId, "saida", c.qty, `Venda ${order.display}`, nowIso.slice(0, 10));
-    }
-  }
+  // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
+  await applyConsumes(b.consumes || [], `Venda ${order.display}`, nowIso.slice(0, 10));
 
   // pontos (só se identificou o cliente por telefone)
   let pointsAwarded = 0;
