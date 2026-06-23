@@ -11,7 +11,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar } from "@/components/Icons";
 
 type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
-type Resumo = { salesCashCents: number; salesTotalCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number };
+type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number };
 
 const hhmm = (iso: string) => {
   const d = new Date(iso);
@@ -146,7 +146,7 @@ function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSe
 
       {modal === "sangria" && <MovModal type="sangria" onClose={() => setModal(null)} onDone={() => { setModal(null); onChanged(); }} />}
       {modal === "suprimento" && <MovModal type="suprimento" onClose={() => setModal(null)} onDone={() => { setModal(null); onChanged(); }} />}
-      {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} onClose={() => setModal(null)} onDone={onClosed} />}
+      {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
     </div>
@@ -185,6 +185,9 @@ function HistoricoModal({ onClose }: { onClose: () => void }) {
                   <span>Total vendido: {brl(s.salesTotalCents ?? 0)}</span>
                   <span>Esperado: {brl(s.expectedCents ?? 0)}</span>
                   <span>Contado: {brl(s.countedCents ?? 0)}</span>
+                  {(s.salesCardCents ?? 0) > 0 && <span>Cartão líq.: {brl(s.cardNetCents ?? 0)}</span>}
+                  {(s.salesPixCents ?? 0) > 0 && <span>Pix: {brl(s.salesPixCents ?? 0)}</span>}
+                  {s.closedBy && <span className="col-span-2">Fechado por: {s.closedBy}</span>}
                 </div>
               </div>
             );
@@ -301,18 +304,40 @@ function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; o
   );
 }
 
-function FecharModal({ expected, onClose, onDone }: { expected: number; onClose: () => void; onDone: (s: CashSession) => void }) {
+function DiffPill({ diff }: { diff: number }) {
+  return (
+    <div className={`flex items-center justify-between rounded-xl px-4 py-2 ${diff === 0 ? "bg-[#E8F6DD]" : "bg-[#FEECEC]"}`}>
+      <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: diff === 0 ? "var(--lime)" : "var(--red-no)" }}>
+        {diff !== 0 && <IconAlert width={14} height={14} />}
+        {diff === 0 ? "Bateu certinho" : diff > 0 ? "Sobra" : "Quebra"}
+      </span>
+      {diff !== 0 && <span className="font-extrabold" style={{ color: "var(--red-no)" }}>{brl(Math.abs(diff))}</span>}
+    </div>
+  );
+}
+
+function FecharModal({ expected, salesCard, salesPix, cardFee, onClose, onDone }: { expected: number; salesCard: number; salesPix: number; cardFee: number; onClose: () => void; onDone: (s: CashSession) => void }) {
   const [counted, setCounted] = useState("");
+  const [cardCounted, setCardCounted] = useState("");
+  const [pixCounted, setPixCounted] = useState("");
   const [saving, setSaving] = useState(false);
   const countedCents = Math.round((parseFloat(counted) || 0) * 100);
+  const cardCents = Math.round((parseFloat(cardCounted) || 0) * 100);
+  const pixCents = Math.round((parseFloat(pixCounted) || 0) * 100);
   const diff = countedCents - expected;
+  const cardNet = salesCard - cardFee;
 
   async function fechar() {
     setSaving(true);
     const r = await fetch("/api/caixa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "fechar", countedCents }),
+      body: JSON.stringify({
+        action: "fechar",
+        countedCents,
+        cardCountedCents: salesCard > 0 && cardCounted !== "" ? cardCents : undefined,
+        pixCountedCents: salesPix > 0 && pixCounted !== "" ? pixCents : undefined,
+      }),
     });
     const d = await r.json();
     if (r.ok) onDone(d.session);
@@ -321,25 +346,52 @@ function FecharModal({ expected, onClose, onDone }: { expected: number; onClose:
 
   return (
     <Overlay title="Fechar caixa" onClose={onClose}>
+      {/* DINHEIRO */}
       <div className="flex items-center justify-between rounded-xl bg-bg-surface-2 px-4 py-3">
-        <span className="text-sm font-semibold text-[var(--text-muted)]">Esperado em caixa</span>
+        <span className="text-sm font-semibold text-[var(--text-muted)]">Esperado na gaveta (dinheiro)</span>
         <span className="text-lg font-extrabold text-ink">{brl(expected)}</span>
       </div>
-      <label className="text-xs font-semibold text-[var(--text-muted)]">Dinheiro contado na gaveta</label>
+      <label className="text-xs font-semibold text-[var(--text-muted)]">Dinheiro contado</label>
       <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
         <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
         <input type="number" min={0} step="0.5" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" autoFocus className="w-full bg-transparent px-2 py-3 text-xl font-extrabold text-ink outline-none" />
       </div>
-      {counted !== "" && (
-        <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${diff === 0 ? "bg-[#E8F6DD]" : "bg-[#FEECEC]"}`}>
-          <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: diff === 0 ? "var(--lime)" : "var(--red-no)" }}>
-            {diff !== 0 && <IconAlert width={14} height={14} />}
-            {diff === 0 ? "Caixa bateu certinho" : diff > 0 ? "Sobra" : "Quebra"}
-          </span>
-          {diff !== 0 && <span className="font-extrabold" style={{ color: "var(--red-no)" }}>{brl(Math.abs(diff))}</span>}
+      {counted !== "" && <DiffPill diff={diff} />}
+
+      {/* CARTÃO */}
+      {salesCard > 0 && (
+        <div className="mt-2 space-y-1.5 border-t border-line pt-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-[var(--text-muted)]">Cartão (bruto)</span>
+            <span className="font-bold text-ink">{brl(salesCard)}</span>
+          </div>
+          <p className="text-[11px] text-[var(--text-faded)]">taxa maquininha {brl(cardFee)} · líquido a receber {brl(cardNet)}</p>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Cartão conferido (relatório da maquininha)</label>
+          <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
+            <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
+            <input type="number" min={0} step="0.5" value={cardCounted} onChange={(e) => setCardCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" />
+          </div>
+          {cardCounted !== "" && <DiffPill diff={cardCents - salesCard} />}
         </div>
       )}
-      <button onClick={fechar} disabled={saving || counted === ""} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
+
+      {/* PIX */}
+      {salesPix > 0 && (
+        <div className="mt-2 space-y-1.5 border-t border-line pt-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-[var(--text-muted)]">Pix (esperado)</span>
+            <span className="font-bold text-ink">{brl(salesPix)}</span>
+          </div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Pix conferido (extrato)</label>
+          <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
+            <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
+            <input type="number" min={0} step="0.5" value={pixCounted} onChange={(e) => setPixCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" />
+          </div>
+          {pixCounted !== "" && <DiffPill diff={pixCents - salesPix} />}
+        </div>
+      )}
+
+      <button onClick={fechar} disabled={saving || counted === ""} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Fechando..." : "Confirmar fechamento"}
       </button>
     </Overlay>
@@ -354,13 +406,31 @@ function FechamentoResultado({ s, onNew }: { s: CashSession; onNew: () => void }
         <IconCheck width={30} height={30} />
       </div>
       <h2 className="text-xl font-extrabold text-ink">Caixa fechado</h2>
+      {s.closedBy && <p className="mt-1 text-sm text-[var(--text-muted)]">por {s.closedBy}</p>}
       <div className="card mt-6 divide-y divide-[var(--line)] text-left">
         <Row label="Fundo de troco" value={brl(s.openingFloatCents)} />
-        <Row label="Vendas em dinheiro" value={brl(s.salesCashCents ?? 0)} />
         <Row label="Total vendido (dia)" value={brl(s.salesTotalCents ?? 0)} />
-        <Row label="Esperado em caixa" value={brl(s.expectedCents ?? 0)} />
-        <Row label="Contado" value={brl(s.countedCents ?? 0)} />
-        <Row label={diff === 0 ? "Diferença" : diff > 0 ? "Sobra" : "Quebra"} value={brl(Math.abs(diff))} strong tone={diff === 0 ? "ok" : "bad"} />
+        <Row label="Dinheiro · esperado" value={brl(s.expectedCents ?? 0)} />
+        <Row label="Dinheiro · contado" value={brl(s.countedCents ?? 0)} />
+        <Row label={diff === 0 ? "Dinheiro · diferença" : diff > 0 ? "Dinheiro · sobra" : "Dinheiro · quebra"} value={brl(Math.abs(diff))} strong tone={diff === 0 ? "ok" : "bad"} />
+        {(s.salesCardCents ?? 0) > 0 && (
+          <>
+            <Row label="Cartão · bruto" value={brl(s.salesCardCents ?? 0)} />
+            <Row label="Cartão · taxa maquininha" value={`− ${brl(s.cardFeeCents ?? 0)}`} />
+            <Row label="Cartão · líquido a receber" value={brl(s.cardNetCents ?? 0)} />
+            {s.cardCountedCents != null && (
+              <Row label={(s.cardDiffCents ?? 0) === 0 ? "Cartão · conferido (bateu)" : (s.cardDiffCents ?? 0) > 0 ? "Cartão · sobra" : "Cartão · quebra"} value={brl(Math.abs(s.cardDiffCents ?? 0))} tone={(s.cardDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+            )}
+          </>
+        )}
+        {(s.salesPixCents ?? 0) > 0 && (
+          <>
+            <Row label="Pix · esperado" value={brl(s.salesPixCents ?? 0)} />
+            {s.pixCountedCents != null && (
+              <Row label={(s.pixDiffCents ?? 0) === 0 ? "Pix · conferido (bateu)" : (s.pixDiffCents ?? 0) > 0 ? "Pix · sobra" : "Pix · quebra"} value={brl(Math.abs(s.pixDiffCents ?? 0))} tone={(s.pixDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+            )}
+          </>
+        )}
       </div>
       <button onClick={onNew} className="mt-6 w-full rounded-2xl brand-gradient py-4 font-bold text-white shadow-[var(--shadow-brand)]">
         Abrir novo caixa

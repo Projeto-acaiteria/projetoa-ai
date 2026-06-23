@@ -23,6 +23,16 @@ export type CashSession = {
   diffCents?: number; // contado - esperado (quebra/sobra)
   salesCashCents?: number; // snapshot vendas dinheiro
   salesTotalCents?: number; // snapshot total vendido
+  // conferência tripla (fechamento) — cartão e pix além do dinheiro
+  salesCardCents?: number; // bruto cartão (débito+crédito) na sessão
+  salesPixCents?: number; // bruto pix na sessão
+  cardFeeCents?: number; // taxa de maquininha total das vendas em cartão
+  cardNetCents?: number; // líquido cartão (bruto − taxa)
+  cardCountedCents?: number; // cartão conferido (relatório da maquininha)
+  pixCountedCents?: number; // pix conferido (extrato)
+  cardDiffCents?: number; // conferido − bruto cartão
+  pixDiffCents?: number; // conferido − bruto pix
+  closedBy?: string; // quem fechou (email do operador logado)
 };
 
 async function readAll(storeId?: string): Promise<CashSession[]> {
@@ -84,18 +94,42 @@ export async function addMovement(type: "sangria" | "suprimento", amountCents: n
   }));
 }
 
-export async function closeCash(countedCents: number, expectedCents: number, salesCashCents: number, salesTotalCents: number, at: string): Promise<CashSession | null> {
+export type CloseCashInput = {
+  at: string;
+  closedBy?: string;
+  countedCents: number; // dinheiro contado
+  cardCountedCents?: number; // cartão conferido (relatório maquininha)
+  pixCountedCents?: number; // pix conferido (extrato)
+  expectedCents: number; // dinheiro esperado (saldo de caixa)
+  salesCashCents: number;
+  salesCardCents: number;
+  salesPixCents: number;
+  salesTotalCents: number;
+  cardFeeCents: number;
+};
+export async function closeCash(input: CloseCashInput): Promise<CashSession | null> {
   const open = await getOpenSession();
   if (!open) return null;
-  const counted = Math.max(0, Math.round(countedCents));
+  const counted = Math.max(0, Math.round(input.countedCents));
+  const cardCounted = input.cardCountedCents != null ? Math.max(0, Math.round(input.cardCountedCents)) : undefined;
+  const pixCounted = input.pixCountedCents != null ? Math.max(0, Math.round(input.pixCountedCents)) : undefined;
   return patchSession(open.id, (s) => ({
     ...s,
     status: "fechado",
-    closedAt: at,
+    closedAt: input.at,
+    closedBy: input.closedBy,
     countedCents: counted,
-    expectedCents,
-    diffCents: counted - expectedCents,
-    salesCashCents,
-    salesTotalCents,
+    expectedCents: input.expectedCents,
+    diffCents: counted - input.expectedCents,
+    salesCashCents: input.salesCashCents,
+    salesCardCents: input.salesCardCents,
+    salesPixCents: input.salesPixCents,
+    salesTotalCents: input.salesTotalCents,
+    cardFeeCents: input.cardFeeCents,
+    cardNetCents: input.salesCardCents - input.cardFeeCents,
+    cardCountedCents: cardCounted,
+    pixCountedCents: pixCounted,
+    cardDiffCents: cardCounted != null ? cardCounted - input.salesCardCents : undefined,
+    pixDiffCents: pixCounted != null ? pixCounted - input.salesPixCents : undefined,
   }));
 }
