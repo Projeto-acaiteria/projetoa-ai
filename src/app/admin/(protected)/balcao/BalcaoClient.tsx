@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { PaymentMethod } from "@/lib/orders-store";
+import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import { printTicket } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
@@ -21,11 +22,14 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 let seq = 0;
 const uid = () => `l${++seq}`;
 
-export default function BalcaoClient({ categories, storeName }: { categories: BarCategory[]; storeName: string }) {
+export default function BalcaoClient({ categories, storeName, machines }: { categories: BarCategory[]; storeName: string; machines: CardMachine[] }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
   const [pay, setPay] = useState<PaymentMethod>("dinheiro");
+  const activeMachines = machines.filter((m) => m.active);
+  const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
+  const [parcelas, setParcelas] = useState(1);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -97,7 +101,7 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: pay, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
+        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -208,6 +212,21 @@ export default function BalcaoClient({ categories, storeName }: { categories: Ba
               <button key={m.id} onClick={() => setPay(m.id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold transition ${pay === m.id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{m.label}</button>
             ))}
           </div>
+
+          {(pay === "debito" || pay === "credito") && activeMachines.length > 0 && (
+            <div className="mt-2 space-y-1.5 rounded-lg border border-line bg-bg-surface-2 p-2.5">
+              {activeMachines.length > 1 && (
+                <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                  {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              )}
+              {pay === "credito" && (
+                <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                  {Array.from({ length: activeMachines.find((x) => x.id === machineId)?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
+                </select>
+              )}
+            </div>
+          )}
 
           {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
 

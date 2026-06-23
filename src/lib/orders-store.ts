@@ -29,6 +29,10 @@ export type Order = {
   pointsAwarded?: number; // pontos já creditados (evita duplicar)
   paymentMethod?: PaymentMethod; // venda de balcão
   cardFeeCents?: number; // taxa da maquininha cobrada (líquido = total - cardFee)
+  cardMachineId?: string; // máquina usada na cobrança (snapshot imutável)
+  cardMachineName?: string; // nome da máquina no momento da venda
+  cardFeePercent?: number; // % da taxa fotografado
+  parcelas?: number; // nº de parcelas (crédito; 1 = à vista)
   consumes?: { stockId: string; qty: number }[]; // ficha técnica (baixa de estoque)
   consumed?: boolean; // estoque já abatido (evita duplicar na entrega)
   bairro?: string; // zona de entrega (delivery)

@@ -190,3 +190,24 @@ export function machineFeeCentsFor(
   const rate = tipo === "debito" ? machine.debito : tipo === "parcelado" ? machine.creditoParcelado : machine.credito;
   return Math.round((totalCents * (rate || 0)) / 100);
 }
+
+/** Taxa de cartão de uma venda: usa a MÁQUINA escolhida (snapshot) ou cai na taxa flat por método.
+ *  crédito com parcelas>1 = taxa de parcelado. Resolve a máquina no SERVIDOR (não confia no client). */
+export async function resolveCardFee(
+  method: PaymentMethod,
+  totalCents: number,
+  storeId: string,
+  opts?: { machineId?: string; parcelas?: number },
+): Promise<{ feeCents: number; feePercent: number; machineId?: string; machineName?: string; parcelas: number }> {
+  const parcelas = Math.max(1, Math.min(12, Math.round(Number(opts?.parcelas) || 1)));
+  if ((method === "debito" || method === "credito") && opts?.machineId) {
+    const machine = (await getCardMachines(storeId)).find((m) => m.id === opts.machineId && m.active);
+    if (machine) {
+      const tipo = method === "debito" ? "debito" : parcelas > 1 ? "parcelado" : "credito";
+      const feePercent = tipo === "debito" ? machine.debito : tipo === "parcelado" ? machine.creditoParcelado : machine.credito;
+      return { feeCents: machineFeeCentsFor(machine, tipo, totalCents), feePercent, machineId: machine.id, machineName: machine.name, parcelas: method === "credito" ? parcelas : 1 };
+    }
+  }
+  const fees = await getFees(storeId);
+  return { feeCents: feeCentsFor(method, totalCents, fees), feePercent: fees[method] || 0, parcelas: 1 };
+}

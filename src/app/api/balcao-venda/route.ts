@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
-import { getFees, feeCentsFor } from "@/lib/settings-store";
+import { resolveCardFee } from "@/lib/settings-store";
 import { applyConsumes } from "@/lib/stock-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
@@ -20,6 +20,8 @@ const PAYMENTS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
 type Body = {
   items?: { productId: string; qty: number; grams?: number; modifierIds?: string[] }[];
   paymentMethod?: string;
+  machineId?: string; // máquina do cartão (define a taxa)
+  parcelas?: number; // parcelas no crédito
   customerName?: string;
   customerPhone?: string; // fidelidade: identifica o cliente p/ pontuar a venda
 };
@@ -50,8 +52,8 @@ export async function POST(req: Request) {
     const subtotalCents = resolved.reduce((s, it) => s + it.qty * it.unitPriceCents, 0);
     if (subtotalCents <= 0) return NextResponse.json({ error: "Confira os pesos/itens — total zerado." }, { status: 400 });
 
-    const fees = await getFees(storeId);
-    const cardFeeCents = feeCentsFor(method, subtotalCents, fees);
+    // taxa do cartão: usa a MÁQUINA escolhida (snapshot) ou cai na taxa flat por método
+    const card = await resolveCardFee(method, subtotalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
 
     // item: peso entra no nome (ex "Comida a quilo 500g"); senão tamanho do produto se houver
     const items: OrderItem[] = resolved.map((it) => ({
@@ -77,7 +79,11 @@ export async function POST(req: Request) {
         totalCents: subtotalCents,
         consumes,
         paymentMethod: method,
-        cardFeeCents,
+        cardFeeCents: card.feeCents,
+        cardMachineId: card.machineId,
+        cardMachineName: card.machineName,
+        cardFeePercent: card.feePercent,
+        parcelas: card.parcelas,
       },
       new Date().toISOString(),
       "entregue", // venda de balcão já sai pronta (não passa pela fila de preparo do delivery)
