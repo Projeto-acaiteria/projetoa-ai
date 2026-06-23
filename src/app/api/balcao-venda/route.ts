@@ -3,6 +3,7 @@ import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
 import { getFees, feeCentsFor } from "@/lib/settings-store";
+import { moveStock } from "@/lib/stock-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +72,12 @@ export async function POST(req: Request) {
       "entregue", // venda de balcão já sai pronta (não passa pela fila de preparo do delivery)
       storeId,
     );
+
+    // baixa automática de estoque pela ficha técnica (mesa e delivery já baixavam; balcão faltava)
+    const today = new Date().toISOString().slice(0, 10);
+    for (const c of consumes) {
+      if (c.stockId && c.qty > 0) await moveStock(c.stockId, "saida", c.qty, `Venda ${order.display}`, today, storeId);
+    }
 
     return NextResponse.json({ ok: true, order }, { status: 201 });
   } catch (e) {
