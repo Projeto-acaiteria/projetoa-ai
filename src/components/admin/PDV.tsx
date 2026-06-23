@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { brl } from "@/lib/format";
+import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
@@ -37,7 +38,7 @@ function groupCost(g: ModifierGroup, qty: Qty) {
   return cents;
 }
 
-export default function PDV({ sizes, groups, produtos, fees, storeName, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; onSold?: () => void }) {
+export default function PDV({ sizes, groups, produtos, fees, storeName, machines, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; onSold?: () => void }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [tab, setTab] = useState<"acai" | "produtos">("acai");
   const [customer, setCustomer] = useState<Cust | null>(null);
@@ -221,6 +222,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, onSold }
         <PayModal
           total={total}
           fees={fees}
+          machines={machines}
           onClose={() => setPay(false)}
           onDone={(r) => {
             setPay(false);
@@ -490,20 +492,29 @@ function PayModal({
   onClose,
   onDone,
   fees,
+  machines,
 }: {
   total: number;
   cart: CartLine[];
   phone: string;
   fees: Fees;
+  machines: CardMachine[];
   onClose: () => void;
   onDone: (r: { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number }) => void;
 }) {
   const [method, setMethod] = useState<PayMethod>("dinheiro");
   const [received, setReceived] = useState("");
   const [sending, setSending] = useState(false);
+  const activeMachines = machines.filter((m) => m.active);
+  const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
+  const [parcelas, setParcelas] = useState(1);
   const recCents = Math.round((parseFloat(received) || 0) * 100);
   const change = method === "dinheiro" ? Math.max(0, recCents - total) : 0;
-  const feePct = fees[method] || 0;
+  const selMachine = activeMachines.find((m) => m.id === machineId);
+  const useMachine = (method === "debito" || method === "credito") && !!selMachine;
+  const feePct = useMachine
+    ? method === "debito" ? selMachine!.debito : parcelas > 1 ? selMachine!.creditoParcelado : selMachine!.credito
+    : fees[method] || 0;
   const feeCents = Math.round((total * feePct) / 100);
   const netCents = total - feeCents;
 
@@ -527,6 +538,8 @@ function PayModal({
           items: cart.map((l) => ({ name: l.note ? `${l.label} — ${l.note}` : l.label, qty: l.qty, unitCents: l.unitCents, group: l.group, stockId: l.stockId })),
           consumes: buildConsumes(),
           paymentMethod: method,
+          machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined,
+          parcelas: method === "credito" ? parcelas : 1,
           amountPaidCents: method === "dinheiro" ? recCents : undefined,
           customerPhone: phone.trim() || undefined,
         }),
@@ -566,6 +579,21 @@ function PayModal({
             </button>
           ))}
         </div>
+
+        {(method === "debito" || method === "credito") && activeMachines.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {activeMachines.length > 1 && (
+              <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-xl border border-line bg-bg-base px-3 py-2.5 text-sm font-semibold text-ink outline-none">
+                {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            )}
+            {method === "credito" && (
+              <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-xl border border-line bg-bg-base px-3 py-2.5 text-sm font-semibold text-ink outline-none">
+                {Array.from({ length: selMachine?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
+              </select>
+            )}
+          </div>
+        )}
 
         {feePct > 0 && (
           <div className="mt-3 flex items-center justify-between rounded-xl bg-[#FBF1DC] px-4 py-2.5">

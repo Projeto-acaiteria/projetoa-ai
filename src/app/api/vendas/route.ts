@@ -5,7 +5,8 @@ import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { getOpenSession } from "@/lib/cash-store";
-import { getFees, feeCentsFor } from "@/lib/settings-store";
+import { resolveCardFee } from "@/lib/settings-store";
+import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 const METHODS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
@@ -22,6 +23,8 @@ export async function POST(req: Request) {
     items?: CartItem[];
     consumes?: Consume[];
     paymentMethod?: PaymentMethod;
+    machineId?: string; // máquina do cartão (taxa)
+    parcelas?: number; // parcelas no crédito
     amountPaidCents?: number;
     customerPhone?: string;
     customerName?: string;
@@ -44,9 +47,9 @@ export async function POST(req: Request) {
   }
 
   const subtotalCents = items.reduce((s, i) => s + i.unitCents * i.qty, 0);
-  // taxa da maquininha (calculada no servidor pela config — não confia no client)
-  const fees = await getFees();
-  const feeCents = feeCentsFor(b.paymentMethod, subtotalCents, fees);
+  // taxa do cartão: máquina escolhida (snapshot) ou taxa flat por método — resolvido no servidor
+  const storeId = await resolveStoreId();
+  const card = await resolveCardFee(b.paymentMethod, subtotalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
   const orderItems: OrderItem[] = items.map((i) => ({
     group: i.group || "Venda",
     name: i.name,
@@ -66,7 +69,11 @@ export async function POST(req: Request) {
       feeCents: 0, // sem taxa de entrega no balcão
       totalCents: subtotalCents,
       paymentMethod: b.paymentMethod,
-      cardFeeCents: feeCents, // taxa da maquininha
+      cardFeeCents: card.feeCents,
+      cardMachineId: card.machineId,
+      cardMachineName: card.machineName,
+      cardFeePercent: card.feePercent,
+      parcelas: card.parcelas,
     },
     nowIso,
     "entregue", // balcão = já entregue/pago
@@ -95,7 +102,7 @@ export async function POST(req: Request) {
       : 0;
 
   return NextResponse.json(
-    { ok: true, order, pointsAwarded, changeCents, feeCents, netCents: subtotalCents - feeCents },
+    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: subtotalCents - card.feeCents },
     { status: 201 },
   );
 }
