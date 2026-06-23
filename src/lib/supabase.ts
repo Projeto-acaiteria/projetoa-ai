@@ -9,8 +9,10 @@ let _browser: SupabaseClient | null = null;
 export function db(): SupabaseClient {
   if (_admin) return _admin;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase não configurado — defina as chaves no .env.local");
+  // Exige service-role: NÃO cair no anon. Com RLS ligada, anon não enxerga nada → o server
+  // falharia em silêncio. Melhor explodir com erro claro do que degradar invisível.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase service-role não configurado — defina SUPABASE_SERVICE_ROLE_KEY (.env.local / envs da Vercel)");
   _admin = createClient(url, key, { auth: { persistSession: false } });
   return _admin;
 }
