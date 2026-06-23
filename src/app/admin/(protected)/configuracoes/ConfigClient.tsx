@@ -9,6 +9,17 @@ type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
 type Store = { name: string; tagline: string; whatsapp: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
+type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
+
+// presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
+const MACHINE_PRESETS: Omit<Machine, "id" | "active">[] = [
+  { name: "InfinitePay", debito: 1.37, credito: 3.15, creditoParcelado: 4.2, maxParcelas: 12 },
+  { name: "Stone", debito: 1.99, credito: 3.15, creditoParcelado: 4.6, maxParcelas: 12 },
+  { name: "Cielo", debito: 1.39, credito: 3.09, creditoParcelado: 4.5, maxParcelas: 12 },
+  { name: "PagBank", debito: 1.99, credito: 3.19, creditoParcelado: 4.66, maxParcelas: 12 },
+  { name: "Mercado Pago", debito: 1.99, credito: 3.03, creditoParcelado: 4.51, maxParcelas: 12 },
+  { name: "SumUp", debito: 1.9, credito: 3.45, creditoParcelado: 4.95, maxParcelas: 12 },
+];
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -27,13 +38,14 @@ export default function ConfigClient() {
   const [fees, setFees] = useState<Fees | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [config, setConfig] = useState<Config>(null);
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose } : null); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -44,6 +56,15 @@ export default function ConfigClient() {
     setFees((f) => (f ? { ...f, [k]: parseFloat(v) || 0 } : f));
     setSaved(false);
   }
+  function addMachine(preset?: Omit<Machine, "id" | "active">) {
+    const base = preset ?? { name: "", debito: 0, credito: 0, creditoParcelado: 0, maxParcelas: 12 };
+    setMachines((a) => [...a, { ...base, id: crypto.randomUUID(), active: true }]);
+    setSaved(false);
+  }
+  function updMachine(id: string, patch: Partial<Machine>) {
+    setMachines((a) => a.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    setSaved(false);
+  }
 
   async function save() {
     if (!fees || !store) return;
@@ -51,7 +72,7 @@ export default function ConfigClient() {
     const r = await fetch("/api/configuracoes", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fees, store, config: config ?? undefined }),
+      body: JSON.stringify({ fees, store, config: config ?? undefined, machines }),
     });
     if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
     setSaving(false);
@@ -254,6 +275,52 @@ export default function ConfigClient() {
               </div>
             </div>
           ))}
+        </div>
+      </Card>
+
+      {/* Maquininhas */}
+      <Card className="p-5 sm:p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <IconCard width={20} height={20} className="text-brand-600" />
+          <h2 className="text-base font-extrabold text-ink">Maquininhas</h2>
+        </div>
+        <p className="mb-4 text-sm text-[var(--text-muted)]">Cadastre suas máquinas e as taxas que cada uma cobra. Ao receber no cartão você escolhe a máquina e as parcelas — o sistema desconta a taxa certa e mostra o líquido.</p>
+
+        <div className="space-y-3">
+          {machines.map((m) => (
+            <div key={m.id} className="rounded-xl border border-line p-3.5">
+              <div className="mb-3 flex items-center gap-2">
+                <input value={m.name} onChange={(e) => updMachine(m.id, { name: e.target.value })} placeholder="Nome (ex: Stone)" className={`${inp} flex-1 font-semibold`} />
+                <button onClick={() => { setMachines((a) => a.filter((x) => x.id !== m.id)); setSaved(false); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-ink">remover</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([["debito", "Débito"], ["credito", "Crédito à vista"], ["creditoParcelado", "Crédito parcelado"]] as const).map(([k, label]) => (
+                  <label key={k} className="block">
+                    <span className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">{label}</span>
+                    <div className="flex items-center rounded-lg border border-line bg-bg-base px-2.5">
+                      <input type="number" min={0} max={100} step="0.1" value={m[k]} onChange={(e) => updMachine(m.id, { [k]: parseFloat(e.target.value) || 0 })} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
+                      <span className="text-xs font-semibold text-[var(--text-muted)]">%</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)]">
+                Máx. parcelas
+                <select value={m.maxParcelas} onChange={(e) => updMachine(m.id, { maxParcelas: Number(e.target.value) })} className="rounded-lg border border-line bg-bg-base px-2 py-1.5 text-sm font-bold text-ink outline-none">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}x</option>)}
+                </select>
+              </label>
+            </div>
+          ))}
+          {machines.length === 0 && <p className="rounded-xl border border-dashed border-line py-4 text-center text-sm text-[var(--text-muted)]">Nenhuma máquina ainda. Adicione pelo provedor abaixo ou em branco.</p>}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-[var(--text-muted)]">Adicionar:</span>
+          {MACHINE_PRESETS.map((p) => (
+            <button key={p.name} onClick={() => addMachine(p)} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-semibold text-brand-600 hover:border-brand-600">{p.name}</button>
+          ))}
+          <button onClick={() => addMachine()} className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink"><IconPlus width={14} height={14} /> Em branco</button>
         </div>
       </Card>
 

@@ -50,7 +50,20 @@ const DEFAULT_STORE: StoreSettings = {
   primaryColor: "",
 };
 
-type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings> };
+// Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
+// Modelo food-service (opção B): por máquina, SEM bandeira — débito / crédito à vista / crédito
+// parcelado. A taxa escolhida é fotografada no pedido na hora de receber (histórico imutável).
+export type CardMachine = {
+  id: string;
+  name: string;
+  debito: number; // % débito
+  credito: number; // % crédito à vista
+  creditoParcelado: number; // % crédito parcelado (taxa única — simplificação p/ food-service)
+  maxParcelas: number; // teto de parcelas (1–12)
+  active: boolean;
+};
+
+type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings>; machines?: CardMachine[] };
 
 async function readSettings(storeId: string): Promise<SettingsBlob> {
   const { data } = await db().from("app_settings").select("data").eq("store_id", storeId).maybeSingle();
@@ -139,4 +152,41 @@ export async function setFees(
 
 export function feeCentsFor(method: PaymentMethod, totalCents: number, fees: PaymentFees): number {
   return Math.round((totalCents * (fees[method] || 0)) / 100);
+}
+
+function sanitizeMachine(m: Partial<CardMachine>): CardMachine {
+  const pct = (v: unknown) => Math.max(0, Math.min(100, Number(v) || 0));
+  return {
+    id: typeof m.id === "string" && m.id ? m.id : crypto.randomUUID(),
+    name: String(m.name ?? "").trim().slice(0, 40) || "Maquininha",
+    debito: pct(m.debito),
+    credito: pct(m.credito),
+    creditoParcelado: pct(m.creditoParcelado),
+    maxParcelas: Math.max(1, Math.min(12, Math.round(Number(m.maxParcelas) || 12))),
+    active: m.active !== false,
+  };
+}
+
+export async function getCardMachines(storeId?: string): Promise<CardMachine[]> {
+  const raw = await readSettings(storeId ?? (await resolveStoreId()));
+  return Array.isArray(raw.machines) ? raw.machines.map(sanitizeMachine) : [];
+}
+
+export async function setCardMachines(machines: Partial<CardMachine>[], storeId?: string): Promise<CardMachine[]> {
+  storeId = storeId ?? (await resolveStoreId());
+  const raw = await readSettings(storeId);
+  const clean = (Array.isArray(machines) ? machines : []).slice(0, 20).map(sanitizeMachine);
+  await writeSettings(storeId, { ...raw, machines: clean });
+  return clean;
+}
+
+/** Taxa da máquina pra um tipo de cobrança. tipo: 'debito' | 'credito' | 'parcelado'. */
+export function machineFeeCentsFor(
+  machine: CardMachine | undefined,
+  tipo: "debito" | "credito" | "parcelado",
+  totalCents: number,
+): number {
+  if (!machine) return 0;
+  const rate = tipo === "debito" ? machine.debito : tipo === "parcelado" ? machine.creditoParcelado : machine.credito;
+  return Math.round((totalCents * (rate || 0)) / 100);
 }
