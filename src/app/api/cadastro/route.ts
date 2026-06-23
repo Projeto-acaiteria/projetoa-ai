@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { SEGMENTOS, type BusinessType } from "@/config/segments";
 import { setStore } from "@/lib/settings-store";
+import { seedStarterMenu } from "@/lib/seed-menu";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,6 +113,12 @@ export async function POST(req: Request) {
   try {
     await setStore({ name: b.negocio.trim(), whatsapp: (b.whatsapp ?? "").replace(/\D+/g, "") }, storeId);
   } catch { /* não bloqueia o cadastro — o dono ajusta em Configurações */ }
+
+  // 6. cardápio-semente do segmento (só bar/grid; acai já tem default) — o dono não encara tela
+  //    em branco, vê a estrutura pronta e edita. Não bloqueia o cadastro se falhar.
+  try {
+    await seedStarterMenu(storeId, seg);
+  } catch { /* segue sem seed — o dono cadastra do zero em Cardápio */ }
 
   return NextResponse.json({ ok: true, slug, storeId });
 }
