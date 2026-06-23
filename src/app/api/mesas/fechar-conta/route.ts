@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
-import { getFees } from "@/lib/settings-store";
+import { resolveCardFee } from "@/lib/settings-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const PAYS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
 
 export async function POST(req: Request) {
-  let b: { tabId?: number; applyFee?: boolean; method?: string; customerPhone?: string; customerName?: string };
+  let b: { tabId?: number; applyFee?: boolean; method?: string; machineId?: string; parcelas?: number; customerPhone?: string; customerName?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
   if (typeof b.tabId !== "number" || !Number.isFinite(b.tabId)) {
     return NextResponse.json({ error: "tabId é obrigatório" }, { status: 400 });
@@ -31,9 +31,8 @@ export async function POST(req: Request) {
     const falta = Math.max(0, grand - full.paidCents);
 
     if (falta > 0) {
-      const fees = await getFees(sid);
-      const feePercent = fees[method] ?? 0;
-      await addPayment(b.tabId, method, falta, feePercent); // valida dono + grava taxa da maquininha
+      const card = await resolveCardFee(method, falta, sid, { machineId: b.machineId, parcelas: b.parcelas });
+      await addPayment(b.tabId, method, falta, card.feePercent); // valida dono + grava taxa da máquina escolhida
     }
     const r = await closeTab(b.tabId, { serviceFeeCents, customerPhone: b.customerPhone, customerName: b.customerName });
     await markTabCallsAttended(b.tabId); // ao fechar, quita o "pediu a conta" (some o âmbar do tile)

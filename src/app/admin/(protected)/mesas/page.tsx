@@ -1,5 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
-import { getStore } from "@/lib/settings-store";
+import { getStore, getCardMachines } from "@/lib/settings-store";
 import { readMenu } from "@/lib/menu-store";
 import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -27,8 +27,8 @@ export default async function MesasPage() {
 
   // bar/grid (menu relacional): comanda do operador espelhada do Medellín
   if (isRelacional) {
-    const [categories, store] = await Promise.all([readBarMenu(storeId), getStore(storeId)]);
-    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} storeName={store.name} /></>;
+    const [categories, store, machines] = await Promise.all([readBarMenu(storeId), getStore(storeId), getCardMachines(storeId)]);
+    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} storeName={store.name} machines={machines} /></>;
   }
 
   // açaí (copo/peso): fluxo existente

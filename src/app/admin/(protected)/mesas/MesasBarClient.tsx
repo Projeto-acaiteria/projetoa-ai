@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
+import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
@@ -24,11 +25,12 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
   storeName: string;
+  machines: CardMachine[];
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -43,6 +45,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [waiter, setWaiter] = useState("");
   const [fee, setFee] = useState(true);
   const [method, setMethod] = useState<string>("pix");
+  const activeMachines = machines.filter((m) => m.active);
+  const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
+  const [parcelas, setParcelas] = useState(1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -169,7 +174,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (!drawer?.tabId || busy) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, method }) });
+      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, method, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
       // cupom de fechamento: itens (mods no nome + totalCents que JÁ inclui os mods) + total fresco do servidor
@@ -384,6 +389,20 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 <div className="grid grid-cols-4 gap-1.5">
                   {PAYS.map(([id, label]) => <button key={id} onClick={() => setMethod(id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold ${method === id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{label}</button>)}
                 </div>
+                {(method === "debito" || method === "credito") && activeMachines.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {activeMachines.length > 1 && (
+                      <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                        {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    )}
+                    {method === "credito" && (
+                      <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                        {Array.from({ length: activeMachines.find((x) => x.id === machineId)?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
 
                 {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                 <div className="mt-3 flex gap-2">
