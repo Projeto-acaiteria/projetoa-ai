@@ -9,7 +9,8 @@ type SeedProduct = { name: string; price_cents: number; size_label?: string | nu
 type SeedOption = { name: string; price_cents: number };
 // Grupo de modificador aplicado a TODOS os produtos da categoria (turnkey por nicho).
 // single=escolha 1 · required=obrigatório · price_mode sum(adicionais)/highest(meio-a-meio)/average.
-type SeedGroup = { title: string; required?: boolean; single?: boolean; price_mode?: "sum" | "highest" | "average"; free_up_to?: number; options: SeedOption[] };
+// single=escolha 1 (max 1) · max=teto explícito (ex: meio-a-meio = max 2) · required=min 1
+type SeedGroup = { title: string; required?: boolean; single?: boolean; max?: number; price_mode?: "sum" | "highest" | "average"; free_up_to?: number; options: SeedOption[] };
 type SeedCategory = { name: string; station: string; description?: string; groups?: SeedGroup[]; produtos: SeedProduct[] };
 
 // Cardápio-semente por segmento (poucos itens — é ponto de partida, não cardápio final).
@@ -50,46 +51,38 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
       ],
     },
   ],
+  // Pizza = MODELO B (builder real, ref. Dom João/pedido.app): 1 produto-base R$0 + grupo "Sabores"
+  // (min 1, máx 2, price_mode "highest" = meio-a-meio PAGA A MAIS CARA, confirmado ao vivo). Inteira
+  // = 1 sabor. Sabores em 3 faixas (45/50/55). Borda opcional (a ref não usa, mas o schema cobre).
   pizzaria: [
     {
-      name: "Pizzas Tradicionais", station: "cozinha", description: "As clássicas da casa",
+      name: "Pizzas", station: "cozinha", description: "Monte: 1 sabor (inteira) ou 2 (meio a meio) — paga a mais cara",
       groups: [
+        { title: "Sabores (escolha 1 ou 2 — meio a meio)", required: true, max: 2, price_mode: "highest", options: [
+          { name: "Mussarela", price_cents: 4500 },
+          { name: "Calabresa", price_cents: 4500 },
+          { name: "Marguerita", price_cents: 4500 },
+          { name: "Bacon Crocante", price_cents: 4500 },
+          { name: "Frango com Catupiry", price_cents: 5000 },
+          { name: "Quatro Queijos", price_cents: 5000 },
+          { name: "Portuguesa", price_cents: 5500 },
+          { name: "A Moda da Casa", price_cents: 5500 },
+        ] },
         { title: "Borda recheada", single: true, price_mode: "sum", options: [
           { name: "Sem borda", price_cents: 0 }, { name: "Catupiry", price_cents: 800 }, { name: "Cheddar", price_cents: 800 },
         ] },
       ],
       produtos: [
-        { name: "Mussarela", size_label: "grande", price_cents: 4500 },
-        { name: "Calabresa", size_label: "grande", price_cents: 4900 },
-        { name: "Portuguesa", size_label: "grande", price_cents: 5500 },
-        { name: "Frango com Catupiry", size_label: "grande", price_cents: 5500 },
-      ],
-    },
-    {
-      name: "Pizzas Especiais", station: "cozinha", description: "Pra caprichar",
-      groups: [
-        { title: "Borda recheada", single: true, price_mode: "sum", options: [
-          { name: "Sem borda", price_cents: 0 }, { name: "Catupiry", price_cents: 800 }, { name: "Cheddar", price_cents: 800 },
-        ] },
-      ],
-      produtos: [
-        { name: "Quatro Queijos", size_label: "grande", price_cents: 5900 },
-        { name: "Pepperoni", size_label: "grande", price_cents: 5900 },
-      ],
-    },
-    {
-      name: "Pizzas Doces", station: "cozinha", description: "Pra fechar a noite",
-      produtos: [
-        { name: "Chocolate", size_label: "grande", price_cents: 4500 },
-        { name: "Romeu e Julieta", size_label: "grande", price_cents: 4500 },
+        { name: "Pizza Grande (8 fatias)", size_label: "8 fatias", price_cents: 0 },
       ],
     },
     {
       name: "Bebidas", station: "cozinha", description: "Geladas",
       produtos: [
-        { name: "Refrigerante 2L", size_label: "2L", price_cents: 1200 },
         { name: "Refrigerante lata", size_label: "350ml", price_cents: 600 },
-        { name: "Suco", size_label: "copo", price_cents: 800 },
+        { name: "Refrigerante 2L", size_label: "2L", price_cents: 1200 },
+        { name: "Suco natural", size_label: "copo", price_cents: 1100 },
+        { name: "Água mineral", size_label: null, price_cents: 500 },
       ],
     },
   ],
@@ -292,7 +285,7 @@ export async function seedStarterMenu(storeId: string, seg: BusinessType): Promi
           const g = cat.groups[gi];
           const { data: grp } = await d.from("menu_modifier_groups").insert({
             store_id: storeId, product_id: (prod as { id: string }).id, title: g.title,
-            min_select: g.required ? 1 : 0, max_select: g.single ? 1 : 0,
+            min_select: g.required ? 1 : 0, max_select: g.max ?? (g.single ? 1 : 0),
             free_up_to: g.free_up_to ?? 0, price_mode: g.price_mode ?? "sum", sort: gi,
           }).select("id").single();
           if (!grp) continue;
