@@ -6,7 +6,11 @@ import { db } from "@/lib/supabase";
 import type { BusinessType } from "@/config/segments";
 
 type SeedProduct = { name: string; price_cents: number; size_label?: string | null };
-type SeedCategory = { name: string; station: string; description?: string; produtos: SeedProduct[] };
+type SeedOption = { name: string; price_cents: number };
+// Grupo de modificador aplicado a TODOS os produtos da categoria (turnkey por nicho).
+// single=escolha 1 · required=obrigatório · price_mode sum(adicionais)/highest(meio-a-meio)/average.
+type SeedGroup = { title: string; required?: boolean; single?: boolean; price_mode?: "sum" | "highest" | "average"; free_up_to?: number; options: SeedOption[] };
+type SeedCategory = { name: string; station: string; description?: string; groups?: SeedGroup[]; produtos: SeedProduct[] };
 
 // Cardápio-semente por segmento (poucos itens — é ponto de partida, não cardápio final).
 const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
@@ -49,6 +53,11 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
   pizzaria: [
     {
       name: "Pizzas Tradicionais", station: "cozinha", description: "As clássicas da casa",
+      groups: [
+        { title: "Borda recheada", single: true, price_mode: "sum", options: [
+          { name: "Sem borda", price_cents: 0 }, { name: "Catupiry", price_cents: 800 }, { name: "Cheddar", price_cents: 800 },
+        ] },
+      ],
       produtos: [
         { name: "Mussarela", size_label: "grande", price_cents: 4500 },
         { name: "Calabresa", size_label: "grande", price_cents: 4900 },
@@ -58,6 +67,11 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
     },
     {
       name: "Pizzas Especiais", station: "cozinha", description: "Pra caprichar",
+      groups: [
+        { title: "Borda recheada", single: true, price_mode: "sum", options: [
+          { name: "Sem borda", price_cents: 0 }, { name: "Catupiry", price_cents: 800 }, { name: "Cheddar", price_cents: 800 },
+        ] },
+      ],
       produtos: [
         { name: "Quatro Queijos", size_label: "grande", price_cents: 5900 },
         { name: "Pepperoni", size_label: "grande", price_cents: 5900 },
@@ -121,6 +135,14 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
   hamburgueria: [
     {
       name: "Hambúrgueres", station: "cozinha", description: "Artesanais",
+      groups: [
+        { title: "Ponto da carne", required: true, single: true, options: [
+          { name: "Mal passado", price_cents: 0 }, { name: "Ao ponto", price_cents: 0 }, { name: "Bem passado", price_cents: 0 },
+        ] },
+        { title: "Adicionais", price_mode: "sum", options: [
+          { name: "Bacon", price_cents: 500 }, { name: "Cheddar", price_cents: 400 }, { name: "Ovo", price_cents: 300 }, { name: "Salada extra", price_cents: 200 },
+        ] },
+      ],
       produtos: [
         { name: "X-Burger", size_label: null, price_cents: 2200 },
         { name: "X-Salada", size_label: null, price_cents: 2500 },
@@ -213,8 +235,25 @@ export async function seedStarterMenu(storeId: string, seg: BusinessType): Promi
       store_id: storeId, category_id: c.id, name: p.name, price_cents: p.price_cents,
       size_label: p.size_label ?? null, sort: j, active: true,
     }));
-    const { error: pE } = await d.from("menu_products").insert(rows);
-    if (!pE) total += rows.length;
+    const { data: prods, error: pE } = await d.from("menu_products").insert(rows).select("id");
+    if (pE || !prods) continue;
+    total += prods.length;
+    // Modificadores turnkey: cada grupo da categoria é criado pra CADA produto dela.
+    if (cat.groups?.length) {
+      for (const prod of prods) {
+        for (let gi = 0; gi < cat.groups.length; gi++) {
+          const g = cat.groups[gi];
+          const { data: grp } = await d.from("menu_modifier_groups").insert({
+            store_id: storeId, product_id: (prod as { id: string }).id, title: g.title,
+            min_select: g.required ? 1 : 0, max_select: g.single ? 1 : 0,
+            free_up_to: g.free_up_to ?? 0, price_mode: g.price_mode ?? "sum", sort: gi,
+          }).select("id").single();
+          if (!grp) continue;
+          const modRows = g.options.map((o, oi) => ({ store_id: storeId, group_id: (grp as { id: string }).id, name: o.name, price_cents: o.price_cents, sort: oi, active: true }));
+          await d.from("menu_modifiers").insert(modRows);
+        }
+      }
+    }
   }
   return total;
 }
