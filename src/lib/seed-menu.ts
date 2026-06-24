@@ -93,34 +93,70 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
       ],
     },
   ],
+  // Sushi = catálogo PLANO (item → preço + porção). Sem engine de modificador: extras (hashi,
+  // shoyu…) são ITENS avulsos em "Porções Extra", e variação "Sem Arroz" é SKU separado.
+  // Anatomia baseada em cardápio real (Ichiban) — ponto de partida, o dono edita/expande.
   sushi: [
     {
-      name: "Combinados", station: "cozinha", description: "Pra dividir",
+      name: "Combinados", station: "cozinha", description: "Composição fixa, pra dividir",
       produtos: [
-        { name: "Combinado Sakura", size_label: "20 peças", price_cents: 5900 },
-        { name: "Combinado Tóquio", size_label: "30 peças", price_cents: 8900 },
-        { name: "Combinado Família", size_label: "50 peças", price_cents: 13900 },
+        { name: "Combinado 17 peças", size_label: "17 peças", price_cents: 5100 },
+        { name: "Combinado 30 peças", size_label: "30 peças", price_cents: 9000 },
+        { name: "Combinado 52 peças", size_label: "52 peças", price_cents: 15000 },
       ],
     },
     {
-      name: "Hot Rolls", station: "cozinha", description: "Empanados quentinhos",
+      name: "Temaki", station: "cozinha", description: "Cone de alga (200g)",
       produtos: [
-        { name: "Hot Philadelphia", size_label: "8 un", price_cents: 2900 },
-        { name: "Hot Salmão", size_label: "8 un", price_cents: 3200 },
+        { name: "Temaki Salmão", size_label: "200g", price_cents: 3000 },
+        { name: "Temaki Salmão Sem Arroz", size_label: "200g", price_cents: 3000 },
+        { name: "Temaki Hot", size_label: "200g", price_cents: 3500 },
+        { name: "Temaki Califórnia", size_label: "200g", price_cents: 2800 },
       ],
     },
     {
-      name: "Temaki", station: "cozinha", description: "Cone de alga",
+      name: "Hossomaki", station: "cozinha", description: "Enrolado fino — porção",
       produtos: [
-        { name: "Temaki Salmão", size_label: null, price_cents: 2500 },
-        { name: "Temaki Califórnia", size_label: null, price_cents: 2200 },
+        { name: "Sakemaki (salmão)", size_label: "10 peças", price_cents: 4000 },
+        { name: "Pepino", size_label: "10 peças", price_cents: 2200 },
       ],
     },
     {
-      name: "Entradas", station: "cozinha", description: "Pra começar",
+      name: "Uramaki", station: "cozinha", description: "Enrolado invertido — porção",
       produtos: [
-        { name: "Guioza", size_label: "6 un", price_cents: 2200 },
+        { name: "Califórnia", size_label: "10 peças", price_cents: 3500 },
+        { name: "Salmão", size_label: "10 peças", price_cents: 3800 },
+        { name: "Ebiten (camarão)", size_label: "10 peças", price_cents: 4000 },
+      ],
+    },
+    {
+      name: "Niguiri", station: "cozinha", description: "Bolinho de arroz coberto — porção",
+      produtos: [
+        { name: "Niguiri Salmão", size_label: "5 peças", price_cents: 2500 },
+        { name: "Niguiri Tilápia", size_label: "5 peças", price_cents: 2000 },
+      ],
+    },
+    {
+      name: "Sashimi", station: "cozinha", description: "Fatias do peixe — porção",
+      produtos: [
+        { name: "Sashimi Salmão", size_label: "10 fatias", price_cents: 4500 },
+        { name: "Sashimi Tilápia", size_label: "5 fatias", price_cents: 2800 },
+      ],
+    },
+    {
+      name: "Hot", station: "cozinha", description: "Empanado e frito (inclui doces)",
+      produtos: [
+        { name: "Hot Roll", size_label: "8 peças", price_cents: 2500 },
+        { name: "Hot Philadelphia", size_label: "8 peças", price_cents: 2800 },
+        { name: "Hot Doce de Banana", size_label: "sobremesa", price_cents: 2000 },
+      ],
+    },
+    {
+      name: "Entradas", station: "cozinha", description: "Quentes e frias",
+      produtos: [
+        { name: "Gyoza", size_label: "6 un", price_cents: 2200 },
         { name: "Sunomono", size_label: null, price_cents: 1800 },
+        { name: "Ceviche de Salmão", size_label: null, price_cents: 3500 },
       ],
     },
     {
@@ -128,7 +164,18 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
       produtos: [
         { name: "Refrigerante lata", size_label: "350ml", price_cents: 600 },
         { name: "Chá gelado", size_label: "copo", price_cents: 800 },
-        { name: "Água mineral", size_label: null, price_cents: 400 },
+        { name: "Água mineral", size_label: null, price_cents: 500 },
+      ],
+    },
+    {
+      name: "Porções Extra", station: "cozinha", description: "Hashi, molhos e adicionais avulsos",
+      produtos: [
+        { name: "Hashi (par)", size_label: null, price_cents: 100 },
+        { name: "Shoyu", size_label: null, price_cents: 500 },
+        { name: "Gengibre", size_label: null, price_cents: 500 },
+        { name: "Wasabi", size_label: null, price_cents: 500 },
+        { name: "Cream Cheese", size_label: null, price_cents: 500 },
+        { name: "Tarê", size_label: null, price_cents: 800 },
       ],
     },
   ],
