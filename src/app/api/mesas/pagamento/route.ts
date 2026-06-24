@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addPayment } from "@/lib/tables-store";
-import { getFees } from "@/lib/settings-store";
+import { resolveCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/mesas/pagamento — registra um pagamento na comanda
 export async function POST(req: Request) {
-  let b: { tabId?: number; method?: string; amountCents?: number };
+  let b: { tabId?: number; method?: string; amountCents?: number; machineId?: string; parcelas?: number };
   try {
     b = await req.json();
   } catch {
@@ -28,11 +28,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    // taxa da maquininha vem da CONFIG da loja por método (server-authoritative) — não do client.
+    // taxa do cartão: máquina escolhida (snapshot) ou flat por método — server-authoritative
     const sid = await resolveStoreId();
-    const fees = await getFees(sid);
-    const feePercent = fees[method as PaymentMethod] ?? 0;
-    await addPayment(b.tabId, method, b.amountCents, feePercent);
+    const card = await resolveCardFee(method as PaymentMethod, b.amountCents, sid, { machineId: b.machineId, parcelas: b.parcelas });
+    await addPayment(b.tabId, method, b.amountCents, card.feePercent);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

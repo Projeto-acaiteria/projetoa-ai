@@ -48,6 +48,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
+  const [parcial, setParcial] = useState(""); // valor de um pagamento parcial (split); vazio = paga a falta
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -170,6 +171,23 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   // fechar SERVER-AUTHORITATIVE: o servidor re-busca a comanda FRESCA, calcula a taxa (applyFee),
   // paga o que falta pelo total fresco e fecha. O total da tela é só preview (não comanda o fecho).
+  // pagamento PARCIAL (split): registra um pagamento sem fechar — método/máquina do picker.
+  // vários parciais (métodos diferentes) → "Fechar conta" paga o que sobrar.
+  async function registrarParcial() {
+    if (!drawer?.tabId || busy) return;
+    const amountCents = parcial ? Math.round((parseFloat(parcial) || 0) * 100) : falta;
+    if (amountCents <= 0) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
+      setParcial("");
+      await loadComanda(drawer.tabId);
+    } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
+    finally { setBusy(false); }
+  }
+
   async function fechar() {
     if (!drawer?.tabId || busy) return;
     setBusy(true); setErr("");
@@ -383,6 +401,12 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                   <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={fee} onChange={(e) => setFee(e.target.checked)} /> Taxa de serviço 10%</span><span className="tabular-nums">{brl(serviceFee)}</span></label>
                   <div className="flex justify-between border-t border-line pt-1 text-base font-extrabold text-ink"><span>Total</span><span className="tabular-nums text-brand-600">{brl(grand)}</span></div>
                   {paid > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Pago</span><span className="tabular-nums">{brl(paid)}</span></div>}
+                  {(comanda?.payments?.length ?? 0) > 0 && (
+                    <div className="space-y-0.5 pl-2 text-xs text-[var(--text-faded)]">
+                      {comanda!.payments.map((pmt, i) => <div key={i} className="flex justify-between"><span className="capitalize">{pmt.method}</span><span className="tabular-nums">{brl(pmt.amountCents)}</span></div>)}
+                    </div>
+                  )}
+                  {paid > 0 && falta > 0 && <div className="flex justify-between font-bold text-[var(--red-no)]"><span>Falta</span><span className="tabular-nums">{brl(falta)}</span></div>}
                 </div>
 
                 <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
@@ -401,6 +425,17 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                         {Array.from({ length: activeMachines.find((x) => x.id === machineId)?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
                       </select>
                     )}
+                  </div>
+                )}
+
+                {/* split: registra pagamento parcial (vazio = paga a falta toda) sem fechar */}
+                {grand > 0 && (
+                  <div className="mt-2 flex gap-1.5">
+                    <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                      <span className="text-xs font-semibold text-[var(--text-muted)]">R$</span>
+                      <input type="number" min={0} step="0.5" value={parcial} onChange={(e) => setParcial(e.target.value)} placeholder={falta > 0 ? `parcial (vazio = ${brl(falta)})` : "parcial"} className="w-full bg-transparent px-1.5 py-2 text-sm font-bold text-ink outline-none" />
+                    </div>
+                    <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar pagamento</button>
                   </div>
                 )}
 
