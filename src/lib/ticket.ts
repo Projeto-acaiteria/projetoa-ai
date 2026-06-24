@@ -9,6 +9,9 @@ export type TicketItem = { qty: number; name: string; note?: string; totalCents?
 export type TicketData = {
   loja: string;
   tagline?: string; // ex: "Açaiteria", "Hamburgueria" — vem do settings da loja
+  endereco?: string; // cabeçalho do cupom (settings da loja)
+  cnpj?: string; // CNPJ/CPF no cabeçalho
+  tel?: string; // telefone/WhatsApp no cabeçalho
   display: string;
   dateLabel: string;
   modeLabel: string;
@@ -31,6 +34,9 @@ export type TicketData = {
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
 
+// CNPJ = 14 dígitos, CPF = 11 — rotula certo no cabeçalho do cupom
+const docLabel = (doc: string) => (doc.replace(/\D/g, "").length === 11 ? "CPF" : "CNPJ");
+
 // linha com pontilhado que alinha label -> valor sozinho (chave do visual)
 const lead = (l: string, r: string, cls = "") =>
   `<div class="lead ${cls}"><span>${l}</span><span class="dots"></span><span>${r}</span></div>`;
@@ -39,6 +45,7 @@ const lead = (l: string, r: string, cls = "") =>
 // Cupom sem preço (é comanda de preparo): faixa da ESTAÇÃO + destino (mesa) gigante + qty grande +
 // observação em caixa. A faixa é dinâmica (station.toUpperCase()) — serve cozinha, bar, copa...
 export type StationTicketData = {
+  loja?: string; // nome do negócio no topo da via (padrão de impressão: cabeçalho + negrito)
   station: string;
   tableLabel: string;
   dateLabel: string;
@@ -62,7 +69,8 @@ export function stationTicketHtml(d: StationTicketData): string {
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     *{font-family:'Courier New',monospace;color:#000;margin:0}
-    body{width:72mm;padding:2mm;line-height:1.3}
+    body{width:72mm;padding:2mm;line-height:1.3;font-weight:700}
+    .loja{font-weight:700;font-size:15px;text-align:center;margin-bottom:3px}
     .stn{font-weight:700;font-size:16px;text-align:center;border:2px solid #000;padding:3px 0;margin-bottom:4px;letter-spacing:2px}
     .dest{font-weight:700;font-size:30px;text-align:center;line-height:1.1}
     .meta{font-size:11px;text-align:center;margin-bottom:5px}
@@ -70,11 +78,12 @@ export function stationTicketHtml(d: StationTicketData): string {
     .it{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px}
     .it .q{font-weight:700;font-size:20px;min-width:36px}
     .it .n{font-size:18px;font-weight:600;flex:1}
-    .it .sz{font-size:12px;font-weight:400}
+    .it .sz{font-size:12px;font-weight:700}
     .it .mods{font-size:14px;font-weight:700;padding-left:2px;line-height:1.4}
     .it .inote{font-size:13px;font-weight:700;padding-left:2px;text-decoration:underline}
     .obs{border:2px solid #000;padding:4px 6px;font-weight:700;font-size:15px}
   </style></head><body>
+    ${d.loja ? `<div class="loja">${esc(d.loja).toUpperCase()}</div>` : ""}
     <div class="stn">${esc(d.station).toUpperCase()}</div>
     <div class="dest">${esc(d.tableLabel).toUpperCase()}</div>
     <div class="meta">${esc(d.dateLabel)} &middot; #${d.orderId}</div>
@@ -107,7 +116,7 @@ export function ticketHtml(d: TicketData): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     *{font-family:'Courier New',monospace;color:#000;margin:0}
-    body{width:72mm;padding:2mm;font-size:12px;line-height:1.35}
+    body{width:72mm;padding:2mm;font-size:13px;line-height:1.4;font-weight:700}
     .c{text-align:center}.b{font-weight:700}
     .dash{border-top:1px dashed #000;margin:5px 0}
     .lead{display:flex;align-items:baseline}
@@ -120,8 +129,8 @@ export function ticketHtml(d: TicketData): string {
     .it{margin-bottom:3px}
     .it .ln{display:flex;gap:6px;align-items:baseline}
     .it .q{font-weight:700;min-width:26px}
-    .it .n{flex:1;font-size:13px;font-weight:600}
-    .it .v{font-weight:600}
+    .it .n{flex:1;font-size:13px;font-weight:700}
+    .it .v{font-weight:700}
     .it .note{padding-left:32px;font-size:11px}
     .total{font-size:16px}
     .track{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin:4px 0;letter-spacing:3px;font-size:15px}
@@ -131,6 +140,11 @@ export function ticketHtml(d: TicketData): string {
     ${isLink ? `<div class="tag">NOVO PEDIDO ONLINE</div>` : ""}
     <div class="brand">${esc(d.loja).toUpperCase()}</div>
     ${d.tagline ? `<div class="sub">${esc(d.tagline)}</div>` : ""}
+    ${d.endereco ? `<div class="sub">${esc(d.endereco)}</div>` : ""}
+    ${d.tel ? `<div class="sub">Tel: ${esc(d.tel)}</div>` : ""}
+    ${d.cnpj ? `<div class="sub">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
+    <div class="dash"></div>
+    <div class="c b" style="font-size:13px;letter-spacing:1px">COMPROVANTE NÃO FISCAL</div>
     <div class="dash"></div>
     ${lead(esc(d.display), esc(d.dateLabel))}
     <div class="b" style="text-align:center;font-size:15px;margin:2px 0">${esc(d.modeLabel).toUpperCase()}</div>

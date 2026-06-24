@@ -25,12 +25,15 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
   storeName: string;
   machines: CardMachine[];
+  endereco: string;
+  cnpj: string;
+  tel: string;
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -199,7 +202,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
       void printTicket(ticketHtml({
-        loja: storeName, display: dest,
+        loja: storeName, endereco, cnpj, tel, display: dest,
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
         items: [

@@ -34,7 +34,7 @@ function StationIcon({ station, size = 14 }: { station: string; size?: number })
   return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 11h16a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z" /><path d="M6 15l1 5h10l1-5" /></svg>);
 }
 
-export default function KdsClient({ stations }: { stations: string[] }) {
+export default function KdsClient({ stations, loja }: { stations: string[]; loja: string }) {
   const multi = stations.length > 1;
   const [sel, setSel] = useState<string>("todas");
   const [orders, setOrders] = useState<KdsOrder[]>([]);
@@ -47,6 +47,7 @@ export default function KdsClient({ stations }: { stations: string[] }) {
 
   function buildTicket(o: KdsOrder) {
     return stationTicketHtml({
+      loja,
       station: o.station,
       tableLabel: o.table_label,
       dateLabel: new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),

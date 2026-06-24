@@ -25,6 +25,9 @@ export type StoreSettings = {
   logoUrl: string; // logo no header (vazio = só o nome)
   bannerUrl: string; // foto de fundo do header/hero (vazio = gradiente padrão do template)
   primaryColor: string; // cor de destaque (#RRGGBB) aplicada no CTA principal (vazio = padrão do template)
+  // dados do cabeçalho do cupom (impressão térmica) — cada loja preenche os seus
+  endereco: string; // endereço completo (ex: "Quadra Arse 14, Alameda 17 - Palmas/TO")
+  cnpj: string; // CNPJ ou CPF do negócio (sai no cabeçalho do cupom)
 };
 
 // taxas padrão de mercado (editáveis pelo adm)
@@ -48,6 +51,8 @@ const DEFAULT_STORE: StoreSettings = {
   logoUrl: "",
   bannerUrl: "",
   primaryColor: "",
+  endereco: "",
+  cnpj: "",
 };
 
 // Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
@@ -93,6 +98,8 @@ export async function setStore(
   if (store.pricePerKgCents != null) clean.pricePerKgCents = Math.max(0, Math.round(Number(store.pricePerKgCents)));
   if (store.deliveryMode === "fixed" || store.deliveryMode === "zones") clean.deliveryMode = store.deliveryMode;
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
+  if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);
+  if (typeof store.cnpj === "string") clean.cnpj = store.cnpj.trim().slice(0, 24);
   if (typeof store.logoUrl === "string") clean.logoUrl = store.logoUrl.trim().slice(0, 500);
   if (typeof store.bannerUrl === "string") clean.bannerUrl = store.bannerUrl.trim().slice(0, 500);
   if (typeof store.primaryColor === "string") {

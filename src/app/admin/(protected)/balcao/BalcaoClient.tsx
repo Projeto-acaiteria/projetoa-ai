@@ -22,7 +22,7 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 let seq = 0;
 const uid = () => `l${++seq}`;
 
-export default function BalcaoClient({ categories, storeName, machines }: { categories: BarCategory[]; storeName: string; machines: CardMachine[] }) {
+export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
@@ -109,7 +109,7 @@ export default function BalcaoClient({ categories, storeName, machines }: { cate
       const o = d.order;
       const now = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       void printTicket(ticketHtml({
-        loja: storeName, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
+        loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number }) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
         totalCents: o.totalCents, code: o.code, origem: "balcao",

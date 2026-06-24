@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -102,6 +102,15 @@ export default function ConfigClient() {
             <label className="text-xs font-semibold text-[var(--text-muted)]">WhatsApp (com DDD)</label>
             <input className={`${inp} mt-1`} inputMode="tel" value={store.whatsapp} onChange={(e) => setS("whatsapp", e.target.value)} placeholder="5599991234567" />
             <p className="mt-1 text-[11px] text-[var(--text-faded)]">Formato: 55 + DDD + número (só números).</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Endereço (cabeçalho do cupom)</label>
+            <input className={`${inp} mt-1`} value={store.endereco} onChange={(e) => setS("endereco", e.target.value)} placeholder="Ex: Quadra Arse 14, Alameda 17 - Palmas/TO" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">CNPJ ou CPF (cupom)</label>
+            <input className={`${inp} mt-1`} value={store.cnpj} onChange={(e) => setS("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
+            <p className="mt-1 text-[11px] text-[var(--text-faded)]">Sai no cabeçalho do cupom. Vazio = não mostra.</p>
           </div>
         </div>
       </Card>
