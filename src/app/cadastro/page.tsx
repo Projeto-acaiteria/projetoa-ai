@@ -37,6 +37,14 @@ function slugify(s: string) {
 function slugifyTyping(s: string) {
   return s.normalize("NFD").replace(DIACRITICS, "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+/, "").slice(0, 50);
 }
+// máscara de telefone BR enquanto digita: (99) 99999-9999 (ou 8 díg). Backend guarda só dígitos.
+function formatPhone(s: string) {
+  const d = s.replace(/\D+/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 function featureChips(f: Features): string[] {
   return (Object.keys(FEATURE_LABEL) as (keyof Features)[]).filter((k) => f[k]).map((k) => FEATURE_LABEL[k]!);
 }
@@ -58,6 +66,8 @@ export default function CadastroPage() {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState<{ slug: string } | null>(null);
+  const slugFinal = slugify(slug); // versão limpa (sem hífen nas pontas) p/ check, preview e submit
+  const waDigits = whatsapp.replace(/\D+/g, "").length;
 
   // auto-sugere o link a partir do nome (até o dono editar manualmente)
   useEffect(() => {
@@ -66,16 +76,16 @@ export default function CadastroPage() {
 
   // checa disponibilidade do link ao vivo (debounce)
   useEffect(() => {
-    if (step !== 2 || slug.length < 3) { setCheck(null); return; }
+    if (step !== 2 || slugFinal.length < 3) { setCheck(null); return; }
     setChecking(true);
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/cadastro/check?slug=${encodeURIComponent(slug)}`);
+        const r = await fetch(`/api/cadastro/check?slug=${encodeURIComponent(slugFinal)}`);
         setCheck(await r.json());
       } finally { setChecking(false); }
     }, 350);
     return () => clearTimeout(t);
-  }, [slug, step]);
+  }, [slugFinal, step]);
 
   const senhaOk = senha.length >= 8 && /[A-Z]/.test(senha) && /[0-9]/.test(senha);
   const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
@@ -85,7 +95,7 @@ export default function CadastroPage() {
     try {
       const r = await fetch("/api/cadastro", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ negocio, segmento, slug, whatsapp, nome, email, senha }),
+        body: JSON.stringify({ negocio, segmento, slug: slugFinal, whatsapp, nome, email, senha }),
       });
       const d = await r.json();
       if (!r.ok) { setErro(d.error ?? "Não consegui criar a loja."); return; }
@@ -168,7 +178,7 @@ export default function CadastroPage() {
                     placeholder="acai-do-joao" className="w-full bg-transparent px-1 py-2.5 text-white outline-none placeholder:text-white/30" />
                 </div>
                 <div className="mt-1.5 h-5 text-xs">
-                  {slug.length < 3 ? <span className="text-white/40">mínimo 3 letras/números</span>
+                  {slugFinal.length < 3 ? <span className="text-white/40">mínimo 3 letras/números</span>
                     : checking ? <span className="text-white/40">verificando…</span>
                     : check?.available ? <span className="text-emerald-300">✓ disponível</span>
                     : check?.reason === "reservado" ? <span className="text-red-300">esse link é reservado</span>
@@ -176,12 +186,16 @@ export default function CadastroPage() {
                 </div>
                 {/* preview do link final — o dono vê exatamente o que vai divulgar */}
                 {check?.available && (
-                  <p className="mt-1 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70">Seu cardápio: <b className="text-purple-300">comandapro.net.br/{slug}</b></p>
+                  <p className="mt-1 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70">Seu cardápio: <b className="text-purple-300">comandapro.net.br/{slugFinal}</b></p>
                 )}
 
                 <label className="mb-1 mt-4 block text-sm text-white/80">WhatsApp da loja</label>
-                <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(99) 99999-9999" inputMode="tel" className={inp} />
-                <p className="mt-1 text-xs text-white/45">É por onde você confirma os pedidos com o cliente. Com DDD.</p>
+                <input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="(99) 99999-9999" inputMode="tel" className={inp} />
+                <div className="mt-1 h-4 text-xs">
+                  {waDigits > 0 && waDigits < 10
+                    ? <span className="text-amber-300">número incompleto — inclua o DDD (ex: (11) 98888-7777)</span>
+                    : <span className="text-white/45">É por onde você confirma os pedidos com o cliente. Com DDD.</span>}
+                </div>
 
                 <div className="mt-6 flex gap-2">
                   <button onClick={() => setStep(1)} className="rounded-lg border border-white/15 px-4 py-2.5 font-semibold text-white/80 hover:bg-white/5">Voltar</button>
@@ -201,7 +215,7 @@ export default function CadastroPage() {
                 <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="voce@email.com" className={`${inp} mb-1`} />
                 <div className="mb-3 h-4 text-xs">{email && !emailOk && <span className="text-red-300">e-mail inválido</span>}</div>
                 <label className="mb-1 block text-sm text-white/80">Senha</label>
-                <input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" autoComplete="new-password" placeholder="mínimo 8 caracteres" className={`${inp} mb-1`} />
+                <input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" autoComplete="new-password" placeholder="8+ caracteres, 1 maiúscula, 1 número" className={`${inp} mb-1`} />
                 <div className="mb-2 h-4 text-xs">
                   {senha && !senhaOk ? <span className="text-amber-300">precisa de 8+ caracteres, 1 maiúscula e 1 número</span>
                     : senha && senhaOk ? <span className="text-emerald-300">✓ senha boa</span> : null}
