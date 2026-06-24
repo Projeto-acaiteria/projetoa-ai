@@ -19,7 +19,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[] }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -47,7 +47,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
   return (
     <div className="space-y-5">
       <PainelCaixa session={session} resumo={resumo!} onChanged={load} onClosed={(s) => setCloseResult(s)} />
-      <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} onSold={load} />
+      <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} onSold={load} />
     </div>
   );
 }

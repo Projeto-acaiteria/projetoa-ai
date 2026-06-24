@@ -9,6 +9,9 @@ import { ticketHtml } from "@/lib/ticket";
 export type CupomItem = { qty: number; name: string; note?: string; totalCents: number };
 export type CupomData = {
   loja: string;
+  endereco?: string;
+  cnpj?: string;
+  tel?: string;
   display: string;
   dateLabel: string;
   modeLabel: string;
