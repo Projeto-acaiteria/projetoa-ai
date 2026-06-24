@@ -90,7 +90,7 @@ export default function ModifierManager({ product, onClose, onChanged }: { produ
                 <div className="mt-2 flex gap-2">
                   <input autoFocus value={optName} onChange={(e) => setOptName(e.target.value)} placeholder="Opção (ex: Bacon)" className={inputCls} />
                   <input value={optPrice} onChange={(e) => setOptPrice(e.target.value)} inputMode="decimal" placeholder="+R$" className={`${inputCls} w-20`} />
-                  <button onClick={() => addOpt(g.id)} disabled={busy} className="rounded-lg brand-gradient px-3 text-sm font-bold text-white">ok</button>
+                  <button onClick={() => addOpt(g.id)} disabled={busy} className="rounded-lg brand-gradient px-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "…" : "ok"}</button>
                 </div>
               ) : (
                 <button onClick={() => { setOptFor(g.id); setOptName(""); setOptPrice(""); }} className="mt-2 text-xs font-bold text-brand-600">+ opção</button>
@@ -113,7 +113,7 @@ export default function ModifierManager({ product, onClose, onChanged }: { produ
             <option value="highest">Cálculo: paga a mais cara (pizza meio-a-meio)</option>
             <option value="average">Cálculo: média dos preços</option>
           </select>
-          <button onClick={addGroup} disabled={busy || !gTitle.trim()} className="mt-3 w-full rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-50">Adicionar grupo</button>
+          <button onClick={addGroup} disabled={busy || !gTitle.trim()} className="mt-3 w-full rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? "Adicionando…" : "Adicionar grupo"}</button>
         </div>
       </div>
     </div>

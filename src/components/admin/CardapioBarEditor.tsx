@@ -130,6 +130,7 @@ export default function CardapioBarEditor() {
   const [prodModal, setProdModal] = useState<ProdForm | null>(null);
   const [modProduct, setModProduct] = useState<BarProduct | null>(null);
   const [recipeProduct, setRecipeProduct] = useState<BarProduct | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ message: string; onYes: () => void } | null>(null);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/cardapio-bar", { cache: "no-store" });
@@ -156,9 +157,8 @@ export default function CardapioBarEditor() {
     else await api("cat.create", { name: f.name.trim(), station: f.station, description: f.description || null, sort: cats.length });
     setCatModal(null);
   }
-  async function delCat(c: BarCategory) {
-    if (!confirm(`Excluir a categoria "${c.name}" e todos os seus produtos?`)) return;
-    await api("cat.delete", { id: c.id });
+  function delCat(c: BarCategory) {
+    setConfirmDel({ message: `Excluir a categoria "${c.name}" e todos os seus produtos? Não dá pra desfazer.`, onYes: () => api("cat.delete", { id: c.id }) });
   }
 
   async function saveProd() {
@@ -170,9 +170,8 @@ export default function CardapioBarEditor() {
     else await api("prod.create", { category_id: f.category_id, name: f.name.trim(), price_cents: cents, size_label: f.size_label || null, img: f.img || null, sort: 0, by_weight: f.by_weight, tare_grams: tara });
     setProdModal(null);
   }
-  async function delProd(p: BarProduct) {
-    if (!confirm(`Excluir o produto "${p.name}"?`)) return;
-    await api("prod.delete", { id: p.id });
+  function delProd(p: BarProduct) {
+    setConfirmDel({ message: `Excluir o produto "${p.name}"?`, onYes: () => api("prod.delete", { id: p.id }) });
   }
 
   if (loading) return <p className="text-sm text-[var(--text-muted)]">Carregando cardápio…</p>;
@@ -262,13 +261,27 @@ export default function CardapioBarEditor() {
               <Field label="Tamanho (opcional)"><input value={prodModal.size_label} onChange={(e) => setProdModal({ ...prodModal, size_label: e.target.value })} placeholder="500g / 600ml" className={inputCls} /></Field>
             )}
           </div>
-          <Field label="Foto (opcional)"><ImagePicker value={prodModal.img} onChange={(url) => setProdModal({ ...prodModal, img: url })} /></Field>
+          <Field label="Foto (opcional)"><ImagePicker value={prodModal.img} onChange={(url) => setProdModal((m) => (m ? { ...m, img: url } : m))} /></Field>
           <label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={prodModal.active} onChange={(e) => setProdModal({ ...prodModal, active: e.target.checked })} /> Disponível</label>
         </Modal>
       )}
 
       {modProduct && <ModifierManager product={modProduct} onClose={() => setModProduct(null)} onChanged={reload} />}
       {recipeProduct && <RecipeManager product={recipeProduct} onClose={() => setRecipeProduct(null)} onChanged={reload} />}
+
+      {confirmDel && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDel(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-sm rounded-2xl bg-bg-elevated p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-extrabold text-ink">Confirmar exclusão</h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">{confirmDel.message}</p>
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setConfirmDel(null)} className="flex-1 rounded-xl border border-line py-2.5 text-sm font-bold text-[var(--text-secondary)]">Cancelar</button>
+              <button onClick={() => { const fn = confirmDel.onYes; setConfirmDel(null); fn(); }} disabled={saving} className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-bold text-white disabled:opacity-60">Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
