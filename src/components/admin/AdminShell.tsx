@@ -22,32 +22,37 @@ import {
   IconTable,
 } from "@/components/Icons";
 
-const NAV = [
+// NAV por SEGMENTO: cada negócio vê só o seu sistema (gate pelas flags do store_config).
+// "Caixa" aparece pra todos (gestão de caixa); o PDV de copo dentro dele é só pra açaí (ver caixa/page).
+// "Balcão" (cardápio relacional) só pra bar/grid; açaí vende pelo Caixa.
+export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean };
+type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean };
+const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
-  { href: "/admin/balcao", label: "Balcão", Icon: IconBag },
-  { href: "/admin/mesas", label: "Mesas", Icon: IconTable },
-  { href: "/admin/garcons", label: "Garçons", Icon: IconUsers },
-  { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt },
-  { href: "/admin/preparo", label: "Preparo", Icon: IconFlame },
-  { href: "/admin/eventos", label: "Shows", Icon: IconMusic },
+  { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai" },
+  { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables },
+  { href: "/admin/garcons", label: "Garçons", Icon: IconUsers, show: (c) => c.hasTables },
+  { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt, show: (c) => c.hasDelivery },
+  { href: "/admin/preparo", label: "Preparo", Icon: IconFlame, show: (c) => c.hasStations },
+  { href: "/admin/eventos", label: "Shows", Icon: IconMusic, show: (c) => c.coverEnabled },
   { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl },
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox },
   { href: "/admin/cmv", label: "CMV", Icon: IconChart },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
-  { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar },
+  { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled },
   { href: "/admin/clientes", label: "Clientes", Icon: IconUsers },
   { href: "/admin/impressora", label: "Impressora", Icon: IconPrinter },
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName }: { children: React.ReactNode; storeName: string }) {
+export default function AdminShell({ children, storeName, nav }: { children: React.ReactNode; storeName: string; nav: NavCtx }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, Icon }) => {
+      {NAV.filter((n) => !n.show || n.show(nav)).map(({ href, label, Icon }) => {
         const active = href === "/admin" ? path === href : path.startsWith(href);
         return (
           <Link

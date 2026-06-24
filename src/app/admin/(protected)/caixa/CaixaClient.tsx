@@ -19,7 +19,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, showPdv }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; showPdv: boolean }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -47,7 +47,8 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
   return (
     <div className="space-y-5">
       <PainelCaixa session={session} resumo={resumo!} onChanged={load} onClosed={(s) => setCloseResult(s)} />
-      <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} onSold={load} />
+      {showPdv && <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} onSold={load} />}
+      {!showPdv && <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>}
     </div>
   );
 }
