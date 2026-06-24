@@ -5,11 +5,14 @@
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
+import type { BusinessType } from "@/config/segments";
 
 export type PaymentFees = Record<PaymentMethod, number>; // % por método
 
 export type DeliveryZone = { bairro: string; feeCents: number };
 export type OpenHours = { open: string; close: string; closed: boolean }; // por dia (HH:MM)
+// mensagens do WhatsApp por status (editáveis pelo dono). Placeholders: {nome} {codigo} {loja}
+export type WaMsgs = { recebido: string; preparo: string; saiu: string; entregue: string };
 
 export type StoreSettings = {
   name: string;
@@ -28,6 +31,7 @@ export type StoreSettings = {
   // dados do cabeçalho do cupom (impressão térmica) — cada loja preenche os seus
   endereco: string; // endereço completo (ex: "Quadra Arse 14, Alameda 17 - Palmas/TO")
   cnpj: string; // CNPJ ou CPF do negócio (sai no cabeçalho do cupom)
+  waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
 };
 
 // taxas padrão de mercado (editáveis pelo adm)
@@ -37,6 +41,39 @@ const DEFAULT_FEES: PaymentFees = {
   debito: 2.0,
   credito: 3.5,
 };
+
+// mensagens padrão genéricas (fallback). {nome} {codigo} {loja}
+export const WA_MSG_DEFAULTS: WaMsgs = {
+  recebido: "Olá {nome}! Recebemos seu pedido {codigo} aqui na {loja}. Já vamos preparar 👍",
+  preparo: "Oi {nome}, seu pedido {codigo} já está em preparo!",
+  saiu: "{nome}, seu pedido {codigo} saiu para entrega 🛵 chega já!",
+  entregue: "Pedido {codigo} entregue. Obrigado, {nome}! 🙌",
+};
+
+// nicho → como chamar o item + emoji, pra personalizar as mensagens POR NEGÓCIO
+const WA_NOUN: Record<BusinessType, { noun: string; emoji: string }> = {
+  acaiteria: { noun: "seu açaí", emoji: "🍧" },
+  sorveteria: { noun: "seu sorvete", emoji: "🍨" },
+  marmitaria: { noun: "sua marmita", emoji: "🍱" },
+  restaurante: { noun: "seu pedido", emoji: "🍽️" },
+  pizzaria: { noun: "sua pizza", emoji: "🍕" },
+  sushi: { noun: "seu pedido", emoji: "🍣" },
+  hamburgueria: { noun: "seu lanche", emoji: "🍔" },
+  petiscaria: { noun: "seu pedido", emoji: "🍢" },
+  bar: { noun: "seu pedido", emoji: "🍻" },
+};
+
+/** Defaults do WhatsApp JÁ com o tom do nicho (semeado no cadastro; o dono edita depois). */
+export function waMsgsForSegment(seg: BusinessType): WaMsgs {
+  const { noun, emoji } = WA_NOUN[seg] ?? { noun: "seu pedido", emoji: "👍" };
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+  return {
+    recebido: `Olá {nome}! Recebemos ${noun} {codigo} na {loja}. Já vamos preparar ${emoji}`,
+    preparo: `Oi {nome}, ${noun} {codigo} já está sendo preparado!`,
+    saiu: `{nome}, ${noun} {codigo} saiu para entrega 🛵 chega já!`,
+    entregue: `${Noun} {codigo} entregue. Obrigado, {nome}! 🙌`,
+  };
+}
 
 const DEFAULT_STORE: StoreSettings = {
   name: "Açaí do Vidal",
@@ -53,6 +90,7 @@ const DEFAULT_STORE: StoreSettings = {
   primaryColor: "",
   endereco: "",
   cnpj: "",
+  waMsgs: WA_MSG_DEFAULTS,
 };
 
 // Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
@@ -80,7 +118,9 @@ async function writeSettings(storeId: string, data: SettingsBlob) {
 
 export async function getStore(storeId?: string): Promise<StoreSettings> {
   const raw = await readSettings(storeId ?? (await resolveStoreId()));
-  return { ...DEFAULT_STORE, ...(raw.store || {}) };
+  const s = { ...DEFAULT_STORE, ...(raw.store || {}) };
+  s.waMsgs = { ...WA_MSG_DEFAULTS, ...(s.waMsgs || {}) }; // robusto contra dado antigo/parcial
+  return s;
 }
 
 export async function setStore(
@@ -100,6 +140,16 @@ export async function setStore(
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
   if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);
   if (typeof store.cnpj === "string") clean.cnpj = store.cnpj.trim().slice(0, 24);
+  if (store.waMsgs && typeof store.waMsgs === "object") {
+    const m = store.waMsgs as Partial<WaMsgs>;
+    const pick = (v: unknown, def: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 280) : def);
+    clean.waMsgs = {
+      recebido: pick(m.recebido, WA_MSG_DEFAULTS.recebido),
+      preparo: pick(m.preparo, WA_MSG_DEFAULTS.preparo),
+      saiu: pick(m.saiu, WA_MSG_DEFAULTS.saiu),
+      entregue: pick(m.entregue, WA_MSG_DEFAULTS.entregue),
+    };
+  }
   if (typeof store.logoUrl === "string") clean.logoUrl = store.logoUrl.trim().slice(0, 500);
   if (typeof store.bannerUrl === "string") clean.bannerUrl = store.bannerUrl.trim().slice(0, 500);
   if (typeof store.primaryColor === "string") {

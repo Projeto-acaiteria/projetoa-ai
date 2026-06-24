@@ -8,6 +8,7 @@ import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
 import { printTicket } from "@/lib/print";
 import { ticketHtml, type TicketData } from "@/lib/ticket";
 import type { Order, OrderStatus } from "@/lib/orders-store";
+import type { WaMsgs } from "@/lib/settings-store";
 
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão débito", credito: "Cartão crédito" };
 const MODE_LABEL: Record<string, string> = { balcao: "Balcão", retirada: "Retirada", entrega: "Entrega" };
@@ -86,17 +87,17 @@ function waPhone(raw?: string): string {
 }
 // mensagem pronta pro cliente, conforme o status do pedido (loja → cliente). Anexa o link de
 // rastreio (quando há slug + código) pro cliente acompanhar o status ao vivo na página.
-function customerMsg(o: Order, storeName: string, trackBase: string): string {
+// usa os templates editáveis da loja (Ajustes), com placeholders {nome} {codigo} {loja}.
+// anexa o link de rastreio (quando há slug + código) pro cliente acompanhar ao vivo.
+function customerMsg(o: Order, storeName: string, trackBase: string, msgs: WaMsgs): string {
   const nome = (o.customerName || "").split(" ")[0] || "";
-  const cod = o.code ? ` (${o.code})` : "";
-  const ent = o.mode === "entrega";
-  const m: Record<string, string> = {
-    recebido: `Olá ${nome}! Recebemos seu pedido${cod} aqui na ${storeName}. Já vamos preparar 👍`,
-    preparo: `Oi ${nome}, seu pedido${cod} já está em preparo!`,
-    saiu: ent ? `${nome}, seu pedido${cod} saiu para entrega 🛵 chega já!` : `${nome}, seu pedido${cod} está pronto para retirada!`,
-    entregue: `Pedido${cod} ${ent ? "entregue" : "retirado"}. Obrigado, ${nome}! 🙌`,
-  };
-  const base = m[o.status] ?? `Olá ${nome}, sobre seu pedido${cod} na ${storeName}.`;
+  const tmpl = msgs[o.status as keyof WaMsgs] ?? "Olá {nome}, sobre seu pedido {codigo} na {loja}.";
+  const base = tmpl
+    .replace(/\{nome\}/g, nome)
+    .replace(/\{codigo\}/g, o.code || "")
+    .replace(/\{loja\}/g, storeName)
+    .replace(/ {2,}/g, " ")
+    .trim();
   const link = trackBase && o.code && o.status !== "entregue" ? `\n\nAcompanhe aqui: ${trackBase}/pedido/${o.code}` : "";
   return base + link;
 }
@@ -104,7 +105,7 @@ const IconWhats = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 0 0 1.51 5.26l-.999 3.648 3.978-1.607z"/></svg>
 );
 
-export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, tel }: { storeName: string; storeSlug: string; endereco: string; cnpj: string; tel: string }) {
+export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, tel, waMsgs }: { storeName: string; storeSlug: string; endereco: string; cnpj: string; tel: string; waMsgs: WaMsgs }) {
   // base do link de rastreio (origem do navegador + slug da loja) p/ anexar na mensagem do WhatsApp
   const trackBase = typeof window !== "undefined" && storeSlug ? `${window.location.origin}/${storeSlug}` : "";
   const [orders, setOrders] = useState<Order[]>([]);
@@ -195,7 +196,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
     // semi-auto: avisa o cliente no WhatsApp com a msg do NOVO status. Abre ANTES do await
     // (senão o popup é bloqueado por perder o gesto do clique). Controlado pelo toggle do topo.
     if (notifyWhats && o.phone) {
-      window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg({ ...o, status: next }, storeName, trackBase))}`, "_blank", "noopener,noreferrer");
+      window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg({ ...o, status: next }, storeName, trackBase, waMsgs))}`, "_blank", "noopener,noreferrer");
     }
     setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: next } : x)));
     await fetch(`/api/pedidos/${o.id}`, {
@@ -286,7 +287,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
                     <div className="flex items-center gap-1.5">
                       {o.phone && (
                         <a
-                          href={`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg(o, storeName, trackBase))}`}
+                          href={`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg(o, storeName, trackBase, waMsgs))}`}
                           target="_blank" rel="noopener noreferrer"
                           title="Falar com o cliente no WhatsApp"
                           className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[#25D366] hover:border-[#25D366]"

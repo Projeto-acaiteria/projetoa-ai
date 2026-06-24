@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -330,6 +330,25 @@ export default function ConfigClient() {
             <button key={p.name} onClick={() => addMachine(p)} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-semibold text-brand-600 hover:border-brand-600">{p.name}</button>
           ))}
           <button onClick={() => addMachine()} className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink"><IconPlus width={14} height={14} /> Em branco</button>
+        </div>
+      </Card>
+
+      {/* Mensagens do WhatsApp — por status, editáveis (disparadas ao avançar o pedido) */}
+      <Card className="p-5 sm:p-6">
+        <h2 className="mb-1 text-base font-extrabold text-ink">Mensagens do WhatsApp</h2>
+        <p className="mb-3 text-sm text-[var(--text-muted)]">O que o cliente recebe quando você avança o pedido. Use <b className="text-ink">{"{nome}"}</b>, <b className="text-ink">{"{codigo}"}</b> e <b className="text-ink">{"{loja}"}</b> — o link de rastreio entra sozinho.</p>
+        <div className="space-y-3">
+          {(([
+            ["recebido", "Pedido recebido"],
+            ["preparo", "Em preparo"],
+            ["saiu", "Saiu para entrega / pronto"],
+            ["entregue", "Entregue"],
+          ] as const)).map(([k, label]) => (
+            <label key={k} className="block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+              <textarea value={store.waMsgs[k]} onChange={(e) => setS("waMsgs", { ...store.waMsgs, [k]: e.target.value })} rows={2} className={`${inp} resize-none`} />
+            </label>
+          ))}
         </div>
       </Card>
 

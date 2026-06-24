@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { SEGMENTOS, type BusinessType } from "@/config/segments";
-import { setStore } from "@/lib/settings-store";
+import { setStore, waMsgsForSegment } from "@/lib/settings-store";
 import { seedStarterMenu } from "@/lib/seed-menu";
 
 export const runtime = "nodejs";
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
   // 5. config inicial da loja: NOME + WhatsApp já valem no cardápio/cupom desde o 1º acesso
   //    (senão getStore cai no DEFAULT "Açaí do Vidal"/zap placeholder até o dono configurar).
   try {
-    await setStore({ name: b.negocio.trim(), whatsapp: (b.whatsapp ?? "").replace(/\D+/g, "") }, storeId);
+    await setStore({ name: b.negocio.trim(), whatsapp: (b.whatsapp ?? "").replace(/\D+/g, ""), waMsgs: waMsgsForSegment(seg) }, storeId);
   } catch { /* não bloqueia o cadastro — o dono ajusta em Configurações */ }
 
   // 6. cardápio-semente do segmento (só bar/grid; acai já tem default) — o dono não encara tela
