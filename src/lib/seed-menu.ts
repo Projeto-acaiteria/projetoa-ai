@@ -46,6 +46,111 @@ const STARTERS: Partial<Record<BusinessType, SeedCategory[]>> = {
       ],
     },
   ],
+  pizzaria: [
+    {
+      name: "Pizzas Tradicionais", station: "cozinha", description: "As clássicas da casa",
+      produtos: [
+        { name: "Mussarela", size_label: "grande", price_cents: 4500 },
+        { name: "Calabresa", size_label: "grande", price_cents: 4900 },
+        { name: "Portuguesa", size_label: "grande", price_cents: 5500 },
+        { name: "Frango com Catupiry", size_label: "grande", price_cents: 5500 },
+      ],
+    },
+    {
+      name: "Pizzas Especiais", station: "cozinha", description: "Pra caprichar",
+      produtos: [
+        { name: "Quatro Queijos", size_label: "grande", price_cents: 5900 },
+        { name: "Pepperoni", size_label: "grande", price_cents: 5900 },
+      ],
+    },
+    {
+      name: "Pizzas Doces", station: "cozinha", description: "Pra fechar a noite",
+      produtos: [
+        { name: "Chocolate", size_label: "grande", price_cents: 4500 },
+        { name: "Romeu e Julieta", size_label: "grande", price_cents: 4500 },
+      ],
+    },
+    {
+      name: "Bebidas", station: "cozinha", description: "Geladas",
+      produtos: [
+        { name: "Refrigerante 2L", size_label: "2L", price_cents: 1200 },
+        { name: "Refrigerante lata", size_label: "350ml", price_cents: 600 },
+        { name: "Suco", size_label: "copo", price_cents: 800 },
+      ],
+    },
+  ],
+  sushi: [
+    {
+      name: "Combinados", station: "cozinha", description: "Pra dividir",
+      produtos: [
+        { name: "Combinado Sakura", size_label: "20 peças", price_cents: 5900 },
+        { name: "Combinado Tóquio", size_label: "30 peças", price_cents: 8900 },
+        { name: "Combinado Família", size_label: "50 peças", price_cents: 13900 },
+      ],
+    },
+    {
+      name: "Hot Rolls", station: "cozinha", description: "Empanados quentinhos",
+      produtos: [
+        { name: "Hot Philadelphia", size_label: "8 un", price_cents: 2900 },
+        { name: "Hot Salmão", size_label: "8 un", price_cents: 3200 },
+      ],
+    },
+    {
+      name: "Temaki", station: "cozinha", description: "Cone de alga",
+      produtos: [
+        { name: "Temaki Salmão", size_label: null, price_cents: 2500 },
+        { name: "Temaki Califórnia", size_label: null, price_cents: 2200 },
+      ],
+    },
+    {
+      name: "Entradas", station: "cozinha", description: "Pra começar",
+      produtos: [
+        { name: "Guioza", size_label: "6 un", price_cents: 2200 },
+        { name: "Sunomono", size_label: null, price_cents: 1800 },
+      ],
+    },
+    {
+      name: "Bebidas", station: "cozinha", description: "Geladas",
+      produtos: [
+        { name: "Refrigerante lata", size_label: "350ml", price_cents: 600 },
+        { name: "Chá gelado", size_label: "copo", price_cents: 800 },
+        { name: "Água mineral", size_label: null, price_cents: 400 },
+      ],
+    },
+  ],
+  hamburgueria: [
+    {
+      name: "Hambúrgueres", station: "cozinha", description: "Artesanais",
+      produtos: [
+        { name: "X-Burger", size_label: null, price_cents: 2200 },
+        { name: "X-Salada", size_label: null, price_cents: 2500 },
+        { name: "X-Bacon", size_label: null, price_cents: 2900 },
+        { name: "X-Tudo", size_label: null, price_cents: 3500 },
+      ],
+    },
+    {
+      name: "Combos", station: "cozinha", description: "Lanche + fritas + bebida",
+      produtos: [
+        { name: "Combo X-Burger", size_label: null, price_cents: 3200 },
+        { name: "Combo X-Bacon", size_label: null, price_cents: 3900 },
+      ],
+    },
+    {
+      name: "Acompanhamentos", station: "cozinha", description: "Pra dividir",
+      produtos: [
+        { name: "Batata frita", size_label: "porção", price_cents: 1800 },
+        { name: "Batata com cheddar e bacon", size_label: "porção", price_cents: 2600 },
+      ],
+    },
+    {
+      name: "Bebidas", station: "cozinha", description: "Geladas",
+      produtos: [
+        { name: "Refrigerante lata", size_label: "350ml", price_cents: 600 },
+        { name: "Milkshake", size_label: "400ml", price_cents: 1600 },
+        { name: "Suco", size_label: "copo", price_cents: 800 },
+      ],
+    },
+  ],
   petiscaria: [
     {
       name: "Petiscos", station: "cozinha", description: "Pra dividir na mesa",

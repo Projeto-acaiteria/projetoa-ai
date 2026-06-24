@@ -7,6 +7,9 @@ export type BusinessType =
   | "sorveteria"
   | "marmitaria"
   | "restaurante"
+  | "pizzaria"
+  | "sushi"
+  | "hamburgueria"
   | "petiscaria"
   | "bar";
 
@@ -44,6 +47,21 @@ export const SEGMENTOS: Record<BusinessType, { label: string; menuTemplate: Menu
     label: "Restaurante",
     menuTemplate: "grid",
     features: { sellsByWeight: false, hasBalcao: false, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: false },
+  },
+  pizzaria: {
+    label: "Pizzaria",
+    menuTemplate: "grid",
+    features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: true },
+  },
+  sushi: {
+    label: "Sushi / Japonês",
+    menuTemplate: "grid",
+    features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: true },
+  },
+  hamburgueria: {
+    label: "Hamburgueria / Lanchonete",
+    menuTemplate: "grid",
+    features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: true, coverEnabled: false, stockDose: false, hasStations: true, loyaltyEnabled: true },
   },
   petiscaria: {
     label: "Petiscaria / Espetinho",

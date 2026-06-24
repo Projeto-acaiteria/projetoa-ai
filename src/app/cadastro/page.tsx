@@ -11,6 +11,9 @@ const SEG_DESC: Record<BusinessType, string> = {
   sorveteria: "Balcão por peso, fidelidade e pedido por link.",
   marmitaria: "Comida a quilo / marmita, cardápio com foto e link.",
   restaurante: "Mesas, comanda e cozinha/bar com pedido roteado.",
+  pizzaria: "Pizzas inteiras ou meio-a-meio, bordas, mesa e delivery.",
+  sushi: "Combinados, temaki e à la carte — mesa e delivery.",
+  hamburgueria: "Lanches, combos e adicionais — balcão, mesa e delivery.",
   petiscaria: "Mesas, balcão e estações — comanda estilo bar.",
   bar: "Comanda, couvert de show, dose/garrafa e estações.",
 };
