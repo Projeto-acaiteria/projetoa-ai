@@ -157,7 +157,7 @@ export default function ConfigClient() {
                   <label className="text-xs font-semibold text-[var(--text-muted)]">Taxa de entrega (única)</label>
                   <div className="mt-1 flex w-40 items-center rounded-lg border border-line bg-bg-base px-3">
                     <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                    <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.deliveryFeeCents / 100} onChange={(e) => setS("deliveryFeeCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
+                    <DecimalInput className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" value={store.deliveryFeeCents / 100} onChange={(n) => setS("deliveryFeeCents", Math.round(n * 100))} />
                   </div>
                 </div>
               ) : (
@@ -175,7 +175,7 @@ export default function ConfigClient() {
                         <input value={z.bairro} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, bairro: e.target.value } : x) } : s)} placeholder="Bairro" className={`${inp} min-w-0 flex-1`} />
                         <div className="flex items-center rounded-lg border border-line bg-bg-base px-3">
                           <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                          <input type="number" min={0} step="0.5" value={z.feeCents / 100} onChange={(e) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, feeCents: Math.round((parseFloat(e.target.value) || 0) * 100) } : x) } : s)} className="w-16 bg-transparent px-2 py-2 text-right text-sm font-bold text-ink outline-none" />
+                          <DecimalInput value={z.feeCents / 100} onChange={(n) => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.map((x, k) => k === i ? { ...x, feeCents: Math.round(n * 100) } : x) } : s)} className="w-16 bg-transparent px-2 py-2 text-right text-sm font-bold text-ink outline-none" />
                         </div>
                         <button onClick={() => setStore((s) => s ? { ...s, deliveryZones: s.deliveryZones.filter((_, k) => k !== i) } : s)} className="rounded-lg border border-line px-2 py-2 text-xs font-bold text-[var(--red-no)]">x</button>
                       </div>
@@ -188,7 +188,7 @@ export default function ConfigClient() {
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Pedido mínimo</label>
                 <div className="mt-1 flex w-40 items-center rounded-lg border border-line bg-bg-base px-3">
                   <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
-                  <input className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" type="number" min={0} step="0.5" value={store.minOrderCents / 100} onChange={(e) => setS("minOrderCents", Math.round((parseFloat(e.target.value) || 0) * 100))} />
+                  <DecimalInput className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-ink outline-none" value={store.minOrderCents / 100} onChange={(n) => setS("minOrderCents", Math.round(n * 100))} />
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--text-faded)]">Retirada no balcão é sempre grátis. A taxa só vale pra entrega.</p>
               </div>
@@ -279,7 +279,7 @@ export default function ConfigClient() {
                 <div className="text-xs text-[var(--text-muted)]">{row.hint}</div>
               </div>
               <div className="flex w-28 items-center rounded-lg border border-line bg-bg-base px-3">
-                <input type="number" min={0} max={100} step="0.1" value={fees[row.k]} onChange={(e) => setF(row.k, e.target.value)} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
+                <DecimalInput max={100} value={fees[row.k]} onChange={(n) => { setFees((f) => (f ? { ...f, [row.k]: n } : f)); setSaved(false); }} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
                 <span className="text-sm font-semibold text-[var(--text-muted)]">%</span>
               </div>
             </div>
@@ -307,7 +307,7 @@ export default function ConfigClient() {
                   <label key={k} className="block">
                     <span className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">{label}</span>
                     <div className="flex items-center rounded-lg border border-line bg-bg-base px-2.5">
-                      <input type="number" min={0} max={100} step="0.1" value={m[k]} onChange={(e) => updMachine(m.id, { [k]: parseFloat(e.target.value) || 0 })} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
+                      <DecimalInput max={100} value={m[k]} onChange={(n) => updMachine(m.id, { [k]: n })} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
                       <span className="text-xs font-semibold text-[var(--text-muted)]">%</span>
                     </div>
                   </label>
@@ -340,6 +340,33 @@ export default function ConfigClient() {
         {saved && <span className="text-sm font-semibold text-lime">Salvo ✓</span>}
       </div>
     </div>
+  );
+}
+
+// Input decimal robusto: segura o TEXTO cru enquanto digita (aceita "," ou ".") e só
+// converte pra número no onChange — sem o parseFloat-por-tecla reordenar dígitos (bug do CIC:
+// digitar 4.99 por cima de 4,6 virava 099). Resync só quando o value externo muda (preset/reload).
+function DecimalInput({ value, onChange, max = 100000, className, placeholder }: { value: number; onChange: (n: number) => void; max?: number; className?: string; placeholder?: string }) {
+  const [txt, setTxt] = useState(value ? String(value) : "");
+  useEffect(() => {
+    const parsed = txt.trim() === "" ? 0 : parseFloat(txt.replace(",", "."));
+    if ((Number.isFinite(parsed) ? parsed : 0) !== value) setTxt(value ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      className={className}
+      value={txt}
+      onChange={(e) => {
+        const t = e.target.value.replace(/[^0-9.,]/g, "");
+        setTxt(t);
+        const n = parseFloat(t.replace(",", "."));
+        onChange(Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0);
+      }}
+    />
   );
 }
 
