@@ -111,6 +111,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
   const [loaded, setLoaded] = useState(false);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
+  const [notifyWhats, setNotifyWhats] = useState(true); // avisar cliente no WhatsApp ao avançar status
   const [soundOn, setSoundOn] = useState(true);
   const seen = useRef<Set<number>>(new Set());
   const first = useRef(true);
@@ -191,6 +192,11 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
   async function advance(o: Order) {
     const next = NEXT[o.status];
     if (!next) return;
+    // semi-auto: avisa o cliente no WhatsApp com a msg do NOVO status. Abre ANTES do await
+    // (senão o popup é bloqueado por perder o gesto do clique). Controlado pelo toggle do topo.
+    if (notifyWhats && o.phone) {
+      window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg({ ...o, status: next }, storeName, trackBase))}`, "_blank", "noopener,noreferrer");
+    }
     setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: next } : x)));
     await fetch(`/api/pedidos/${o.id}`, {
       method: "PATCH",
@@ -219,6 +225,9 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
           ) : (
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>
           )}
+        </button>
+        <button onClick={() => setNotifyWhats((v) => !v)} title={notifyWhats ? "Avisar cliente no WhatsApp ao avançar status (ligado)" : "Aviso ao cliente no WhatsApp desligado"} aria-label="Ligar/desligar aviso ao cliente no WhatsApp" className={`grid h-9 w-9 place-items-center rounded-lg border border-line ${notifyWhats ? "text-[#25D366]" : "text-[var(--text-faded)]"}`}>
+          <IconWhats size={18} />
         </button>
         <button onClick={toggleAuto} aria-label="Ligar/desligar impressão automática" className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoPrint ? "bg-brand-600" : "bg-bg-surface-2"}`}>
           <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${autoPrint ? "left-6" : "left-1"}`} />
