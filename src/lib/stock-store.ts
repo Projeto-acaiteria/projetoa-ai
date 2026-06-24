@@ -4,6 +4,7 @@
 // movimentação (entrada/saída). Baixa automática por ficha técnica = evolução.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getStoreConfig } from "@/lib/auth/store-config";
 
 // Universo de uma açaiteria, em 3 famílias (a cor da UI vem da família):
 export type StockCategory =
@@ -77,8 +78,12 @@ async function readAll(storeId?: string): Promise<StockItem[]> {
   if (error) throw new Error("Erro ao ler estoque: " + error.message); // nunca tratar erro como vazio
   const list = (data ?? []).map((r) => (r as { data: StockItem }).data);
   if (list.length) return list;
-  // query OK e vazia → primeira vez: devolve o seed clonado (comportamento de SEED preservado)
-  return seedClone();
+  // Sem rows (1ª vez): o estoque-demo é de AÇAÍ → só faz sentido em loja template "acai".
+  // bar/grid começam VAZIAS (o dono cadastra os próprios insumos). Senão um bar via insumo de
+  // açaí, e pior: ficha técnica apontava pra item-seed que SUMIA quando entrava a 1ª row real
+  // (vira "insumo removido"). [achado do teste CIC, etapa 3]
+  const cfg = await getStoreConfig(sid);
+  return cfg?.menu_template === "acai" ? seedClone() : [];
 }
 
 export async function listStock(storeId?: string): Promise<StockItem[]> {

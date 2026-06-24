@@ -73,15 +73,21 @@ export default function RecipeManager({ product, onClose, onChanged }: { product
 
         <div className="mt-4 rounded-xl border border-dashed border-line p-3">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Adicionar insumo</p>
-          <div className="flex gap-2">
-            <select value={pick} onChange={(e) => setPick(e.target.value)} className={inputCls}>
-              <option value="">Escolha o insumo…</option>
-              {stock.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
-            </select>
-            <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" placeholder="qtd" className={`${inputCls} w-20`} />
-            <button onClick={add} disabled={busy || !pick} className="rounded-lg brand-gradient px-3 text-sm font-bold text-white disabled:opacity-50">ok</button>
-          </div>
-          <p className="mt-2 text-xs text-[var(--text-faded)]">A quantidade é por unidade vendida, na mesma medida do estoque (dose, kg, un…).</p>
+          {stock.length === 0 ? (
+            <p className="text-sm text-[var(--text-faded)]">Nenhum insumo cadastrado ainda. Cadastre seus insumos em <b className="text-ink">Estoque</b> primeiro — aí eles aparecem aqui pra montar a ficha técnica.</p>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <select value={pick} onChange={(e) => setPick(e.target.value)} className={inputCls}>
+                  <option value="">Escolha o insumo…</option>
+                  {stock.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
+                </select>
+                <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" placeholder="qtd" className={`${inputCls} w-20`} />
+                <button onClick={add} disabled={busy || !pick} className="rounded-lg brand-gradient px-3 text-sm font-bold text-white disabled:opacity-50">ok</button>
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-faded)]">A quantidade é por unidade vendida, na mesma medida do estoque (dose, kg, un…).</p>
+            </>
+          )}
         </div>
       </div>
     </div>
