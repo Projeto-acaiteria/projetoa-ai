@@ -237,7 +237,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       </div>
 
       {weightFor && <WeightModal product={weightFor} onClose={() => setWeightFor(null)} onConfirm={(g) => addWeight(weightFor, g)} />}
-      {customizeFor && <ProductCustomizer product={customizeFor} accent="#7C3AED" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor, r)} />}
+      {customizeFor && <ProductCustomizer product={customizeFor} accent="#4F46E5" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor, r)} />}
     </div>
   );
 }

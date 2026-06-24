@@ -52,7 +52,7 @@ function featureChips(f: Features): string[] {
   return (Object.keys(FEATURE_LABEL) as (keyof Features)[]).filter((k) => f[k]).map((k) => FEATURE_LABEL[k]!);
 }
 
-const inp = "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-white outline-none focus:border-purple-400 placeholder:text-white/30";
+const inp = "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-white outline-none focus:border-indigo-400 placeholder:text-white/30";
 
 export default function CadastroPage() {
   const [step, setStep] = useState(1);
@@ -111,7 +111,7 @@ export default function CadastroPage() {
   const segData = segmento ? SEGMENTOS[segmento] : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2a0f3d] to-[#140820] px-4 py-10 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-[#1e1b4b] to-[#0f172a] px-4 py-10 text-white">
       <div className="mx-auto w-full max-w-xl">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold tracking-wide">ComandaPRO</h1>
@@ -123,8 +123,8 @@ export default function CadastroPage() {
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-3xl">✓</div>
             <h2 className="text-xl font-bold">Loja criada!</h2>
             <p className="mt-2 text-sm text-white/70">Seu cardápio público:</p>
-            <p className="mt-1 break-all font-mono text-sm text-purple-300">{typeof window !== "undefined" ? window.location.origin : ""}/{pronto.slug}</p>
-            <a href="/login" className="mt-6 inline-block rounded-lg bg-purple-600 px-6 py-2.5 font-semibold transition hover:bg-purple-500">Entrar no painel</a>
+            <p className="mt-1 break-all font-mono text-sm text-indigo-300">{typeof window !== "undefined" ? window.location.origin : ""}/{pronto.slug}</p>
+            <a href="/login" className="mt-6 inline-block rounded-lg bg-indigo-600 px-6 py-2.5 font-semibold transition hover:bg-indigo-500">Entrar no painel</a>
             <p className="mt-3 text-xs text-white/40">Use o e-mail e a senha que você acabou de cadastrar.</p>
           </div>
         ) : (
@@ -132,7 +132,7 @@ export default function CadastroPage() {
             {/* progresso */}
             <div className="mb-6 flex gap-2">
               {[1, 2, 3].map((n) => (
-                <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-purple-500" : "bg-white/10"}`} />
+                <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-indigo-500" : "bg-white/10"}`} />
               ))}
             </div>
 
@@ -147,7 +147,7 @@ export default function CadastroPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(SEGMENTOS) as BusinessType[]).map((id) => (
                     <button key={id} onClick={() => setSegmento(id)}
-                      className={`rounded-xl border p-3 text-left transition ${segmento === id ? "border-purple-400 bg-purple-500/20" : "border-white/10 bg-white/5 hover:border-white/25"}`}>
+                      className={`rounded-xl border p-3 text-left transition ${segmento === id ? "border-indigo-400 bg-indigo-500/20" : "border-white/10 bg-white/5 hover:border-white/25"}`}>
                       <div className="text-sm font-bold">{SEGMENTOS[id].label}</div>
                       <div className="mt-0.5 text-[11px] leading-snug text-white/55">{SEG_DESC[id]}</div>
                     </button>
@@ -156,9 +156,9 @@ export default function CadastroPage() {
 
                 {segData && (
                   <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-purple-300">Já vem ligado</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-300">Já vem ligado</div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-semibold">{TEMPLATE_LABEL[segData.menuTemplate]}</span>
+                      <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[11px] font-semibold">{TEMPLATE_LABEL[segData.menuTemplate]}</span>
                       {featureChips(segData.features).map((c) => (
                         <span key={c} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{c}</span>
                       ))}
@@ -167,7 +167,7 @@ export default function CadastroPage() {
                 )}
 
                 <button onClick={() => setStep(2)} disabled={!negocio.trim() || !segmento}
-                  className="mt-6 w-full rounded-lg bg-purple-600 py-2.5 font-semibold transition hover:bg-purple-500 disabled:opacity-40">Continuar</button>
+                  className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 font-semibold transition hover:bg-indigo-500 disabled:opacity-40">Continuar</button>
               </>
             )}
 
@@ -189,7 +189,7 @@ export default function CadastroPage() {
                 </div>
                 {/* preview do link final — o dono vê exatamente o que vai divulgar */}
                 {check?.available && (
-                  <p className="mt-1 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70">Seu cardápio: <b className="text-purple-300">comandapro.net.br/{slugFinal}</b></p>
+                  <p className="mt-1 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70">Seu cardápio: <b className="text-indigo-300">comandapro.net.br/{slugFinal}</b></p>
                 )}
 
                 <label className="mb-1 mt-4 block text-sm text-white/80">WhatsApp da loja</label>
@@ -203,7 +203,7 @@ export default function CadastroPage() {
                 <div className="mt-6 flex gap-2">
                   <button onClick={() => setStep(1)} className="rounded-lg border border-white/15 px-4 py-2.5 font-semibold text-white/80 hover:bg-white/5">Voltar</button>
                   <button onClick={() => setStep(3)} disabled={!check?.available || whatsapp.replace(/\D+/g, "").length < 10}
-                    className="flex-1 rounded-lg bg-purple-600 py-2.5 font-semibold transition hover:bg-purple-500 disabled:opacity-40">Continuar</button>
+                    className="flex-1 rounded-lg bg-indigo-600 py-2.5 font-semibold transition hover:bg-indigo-500 disabled:opacity-40">Continuar</button>
                 </div>
               </>
             )}
@@ -229,7 +229,7 @@ export default function CadastroPage() {
                 <div className="mt-2 flex gap-2">
                   <button onClick={() => setStep(2)} className="rounded-lg border border-white/15 px-4 py-2.5 font-semibold text-white/80 hover:bg-white/5">Voltar</button>
                   <button onClick={enviar} disabled={enviando || !nome.trim() || !emailOk || !senhaOk}
-                    className="flex-1 rounded-lg bg-purple-600 py-2.5 font-semibold transition hover:bg-purple-500 disabled:opacity-40">
+                    className="flex-1 rounded-lg bg-indigo-600 py-2.5 font-semibold transition hover:bg-indigo-500 disabled:opacity-40">
                     {enviando ? "Criando…" : "Criar minha loja"}
                   </button>
                 </div>
@@ -238,7 +238,7 @@ export default function CadastroPage() {
           </div>
         )}
 
-        <p className="mt-6 text-center text-sm text-white/50">Já tem conta? <a href="/login" className="font-semibold text-purple-300 hover:text-purple-200">Entrar</a></p>
+        <p className="mt-6 text-center text-sm text-white/50">Já tem conta? <a href="/login" className="font-semibold text-indigo-300 hover:text-indigo-200">Entrar</a></p>
       </div>
     </div>
   );

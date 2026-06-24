@@ -28,7 +28,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#2a0f3d] to-[#140820] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#1e1b4b] to-[#0f172a] px-4">
       <form
         onSubmit={entrar}
         className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-white backdrop-blur"
@@ -45,7 +45,7 @@ export default function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
           required
-          className="mb-4 w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 outline-none focus:border-purple-400"
+          className="mb-4 w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 outline-none focus:border-indigo-400"
         />
 
         <label className="mb-1 block text-sm text-white/80">Senha</label>
@@ -55,7 +55,7 @@ export default function LoginPage() {
           onChange={(e) => setSenha(e.target.value)}
           autoComplete="current-password"
           required
-          className="mb-4 w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 outline-none focus:border-purple-400"
+          className="mb-4 w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 outline-none focus:border-indigo-400"
         />
 
         {erro && <p className="mb-3 text-sm text-red-300">{erro}</p>}
@@ -63,13 +63,13 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={carregando}
-          className="w-full rounded-lg bg-purple-600 py-2.5 font-semibold transition hover:bg-purple-500 disabled:opacity-60"
+          className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
         >
           {carregando ? "Entrando…" : "Entrar"}
         </button>
 
         <p className="mt-5 text-center text-sm text-white/60">
-          Ainda não tem loja? <a href="/cadastro" className="font-semibold text-purple-300 hover:text-purple-200">Criar grátis</a>
+          Ainda não tem loja? <a href="/cadastro" className="font-semibold text-indigo-300 hover:text-indigo-200">Criar grátis</a>
         </p>
       </form>
     </div>

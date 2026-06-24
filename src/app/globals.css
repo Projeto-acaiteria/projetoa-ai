@@ -7,39 +7,39 @@
 ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Brand · Açaí ── */
-  --brand-900: #2E1065;  /* roxo profundo (quase açaí puro) */
-  --brand-800: #4C1D95;
-  --brand-700: #5B21B6;
-  --brand-600: #6D28D9;  /* primary · CTAs */
-  --brand-500: #7C3AED;
-  --brand-400: #9F67F0;
-  --accent:    #A87B0E;  /* dourado escuro · texto/destaque legível (marca Cantinho) */
-  --accent-2:  #E0A82E;  /* dourado vibrante · fundos/detalhes */
-  --lime:      #65A30D;  /* verde fresco · "grátis", positivo */
-  --gold:      #C2890E;  /* dourado · premium / pago */
+  /* ── Brand · ComandaPRO (índigo premium SaaS — sistema; o cardápio público usa a cor da loja) ── */
+  --brand-900: #312E81;  /* indigo-900 */
+  --brand-800: #3730A3;  /* indigo-800 */
+  --brand-700: #4338CA;  /* indigo-700 */
+  --brand-600: #4F46E5;  /* indigo-600 · primary / CTAs */
+  --brand-500: #6366F1;  /* indigo-500 */
+  --brand-400: #818CF8;  /* indigo-400 */
+  --accent:    #B45309;  /* âmbar escuro · destaque "pago/premium" legível */
+  --accent-2:  #F59E0B;  /* âmbar · status pago / detalhes */
+  --lime:      #16A34A;  /* verde · "grátis" / positivo */
+  --gold:      #B45309;  /* âmbar · premium / pago */
 
-  /* ── Backgrounds ── */
-  --bg-base:      #FBF7FF;  /* creme lilás */
+  /* ── Backgrounds (neutros slate) ── */
+  --bg-base:      #F8FAFC;  /* slate-50 */
   --bg-elevated:  #FFFFFF;
-  --bg-surface-2: #F4ECFF;
+  --bg-surface-2: #F1F5F9;  /* slate-100 */
 
-  /* ── Texto ── */
-  --text-primary:   #1F1235;
-  --text-secondary: #4A3B63;
-  --text-muted:     #7C6E92;
-  --text-faded:     #A89BBC;
+  /* ── Texto (slate) ── */
+  --text-primary:   #0F172A;  /* slate-900 */
+  --text-secondary: #334155;  /* slate-700 */
+  --text-muted:     #64748B;  /* slate-500 */
+  --text-faded:     #94A3B8;  /* slate-400 */
 
   /* ── Linhas / status ── */
-  --line:        #EBE0FA;
+  --line:        #E2E8F0;  /* slate-200 */
   --green-ok:    #16A34A;
   --yellow-warn: #F59E0B;
   --red-no:      #EF4444;
 
-  /* ── Sombras ── */
-  --shadow-card:    0 1px 2px rgba(46, 16, 101, 0.06), 0 8px 24px rgba(46, 16, 101, 0.06);
-  --shadow-pop:     0 12px 40px rgba(46, 16, 101, 0.18);
-  --shadow-brand:   0 10px 30px rgba(109, 40, 217, 0.35);
+  /* ── Sombras (neutras + glow índigo no brand) ── */
+  --shadow-card:    0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-pop:     0 12px 40px rgba(15, 23, 42, 0.18);
+  --shadow-brand:   0 10px 30px rgba(79, 70, 229, 0.30);
 }
 
 @theme inline {
@@ -143,7 +143,7 @@ button {
   background: linear-gradient(135deg, var(--brand-800) 0%, var(--brand-600) 60%, var(--brand-500) 100%);
 }
 .text-gradient {
-  background: linear-gradient(120deg, var(--brand-600), var(--accent-2));
+  background: linear-gradient(120deg, var(--brand-700), var(--brand-400));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

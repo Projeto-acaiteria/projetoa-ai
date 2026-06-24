@@ -24,7 +24,7 @@ const CAT_LABEL: Record<StockCategory, string> = {
 
 type FamilyKey = "venda" | "producao" | "operacao";
 const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: string; soft: string }[] = [
-  { key: "venda", label: "Produtos à venda", cats: ["sorvete", "picole", "bebida", "salgado", "doce"], color: "#6D28D9", soft: "#EFE6FF" },
+  { key: "venda", label: "Produtos à venda", cats: ["sorvete", "picole", "bebida", "salgado", "doce"], color: "#4F46E5", soft: "#EEF2FF" },
   { key: "producao", label: "Insumos de produção", cats: ["polpa", "fruta", "cereal", "cobertura", "adicional"], color: "#0E9488", soft: "#D7F2F0" },
   { key: "operacao", label: "Operação", cats: ["embalagem", "limpeza", "outro"], color: "#7C6E92", soft: "#EFEAF6" },
 ];

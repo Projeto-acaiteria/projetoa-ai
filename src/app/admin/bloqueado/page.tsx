@@ -26,7 +26,7 @@ export default async function BloqueadoPage() {
         : "Sua assinatura está pendente.";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2a0f3d] to-[#140820] px-4 py-12 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-[#1e1b4b] to-[#0f172a] px-4 py-12 text-white">
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-bold">ComandaPRO</h1>
         <p className="mt-2 text-white/70">{aviso} Escolha um plano pra continuar usando o painel:</p>

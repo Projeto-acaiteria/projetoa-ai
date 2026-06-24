@@ -455,7 +455,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
       {/* diferenciais (entre o "+" e o temp): peso e modificadores */}
       {weightFor && <WeightModal product={weightFor} onClose={() => setWeightFor(null)} onConfirm={(g) => addWeight(weightFor, g)} />}
-      {customizeFor && <ProductCustomizer product={customizeFor.product} accent="#7C3AED" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor.product, r)} />}
+      {customizeFor && <ProductCustomizer product={customizeFor.product} accent="#4F46E5" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor.product, r)} />}
     </>
   );
 }

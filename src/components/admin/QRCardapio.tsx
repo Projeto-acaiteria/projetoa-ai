@@ -81,19 +81,19 @@ export default function QRCardapio({ storeName, storeTagline }: { storeName: str
 
       {/* Cartaz imprimível (some na tela, ocupa a folha no print) */}
       <div id="print-cartaz" className="flex-col items-center justify-center bg-white p-12 text-center" style={{ width: "210mm", height: "297mm", display: "flex" }}>
-        <div className="text-[28px] font-extrabold" style={{ color: "#2E1065" }}>
+        <div className="text-[28px] font-extrabold" style={{ color: "#1E1B4B" }}>
           {storeName}
         </div>
-        <div className="mt-2 text-[18px]" style={{ color: "#4A3B63" }}>
+        <div className="mt-2 text-[18px]" style={{ color: "#334155" }}>
           {storeTagline}
         </div>
 
-        <div className="mt-10 rounded-3xl p-6" style={{ border: "3px solid #6D28D9" }}>
-          {url && <QRCode value={url} size={320} fgColor="#2E1065" bgColor="#FFFFFF" />}
+        <div className="mt-10 rounded-3xl p-6" style={{ border: "3px solid #4F46E5" }}>
+          {url && <QRCode value={url} size={320} fgColor="#1E1B4B" bgColor="#FFFFFF" />}
         </div>
 
-        <div className="mt-10 flex items-center gap-2 text-[26px] font-extrabold" style={{ color: "#6D28D9" }}>
-          <IconCheck width={28} height={28} /> Aponte a câmera e monte seu açaí
+        <div className="mt-10 flex items-center gap-2 text-[26px] font-extrabold" style={{ color: "#4F46E5" }}>
+          <IconCheck width={28} height={28} /> Aponte a câmera e faça seu pedido
         </div>
         <div className="mt-3 text-[16px]" style={{ color: "#7C6E92" }}>
           Peça pelo celular · retirada no balcão ou entrega
