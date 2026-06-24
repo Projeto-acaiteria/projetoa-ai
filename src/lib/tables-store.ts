@@ -558,6 +558,7 @@ export async function markTabCallsAttended(tabId: number): Promise<void> {
 
 // ── Receita das mesas para o financeiro/caixa ────────────────────────────────
 export type MesaVenda = {
+  tabId: string; // comanda de origem — pra contar VENDAS distintas (split não infla o contador)
   display: string;
   date: string; // paid_at
   method: string;
@@ -571,16 +572,17 @@ export async function listMesaPayments(): Promise<MesaVenda[]> {
   const sid = await resolveStoreId();
   const { data, error } = await db()
     .from("tab_payments")
-    .select("amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))")
+    .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))")
     .eq("store_id", sid);
   if (error) throw new Error("Erro ao ler pagamentos de mesa: " + error.message);
   return (data ?? []).map((p) => {
     const row = p as {
-      amount_cents: number; method: string; fee_percent: number | null; paid_at: string;
+      tab_id: string | number; amount_cents: number; method: string; fee_percent: number | null; paid_at: string;
       tabs?: { customer_name?: string | null; label?: string | null; tables?: { number?: number } | null } | null;
     };
     const num = row.tabs?.tables?.number;
     return {
+      tabId: String(row.tab_id),
       display: num ? `Mesa ${num}` : row.tabs?.label ?? "Comanda",
       date: row.paid_at,
       method: row.method,

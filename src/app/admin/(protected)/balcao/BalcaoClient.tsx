@@ -22,7 +22,7 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 let seq = 0;
 const uid = () => `l${++seq}`;
 
-export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string }) {
+export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; loyaltyEnabled: boolean }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
@@ -181,7 +181,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
             <span className="text-2xl font-extrabold text-brand-600">{brl(total)}</span>
           </div>
 
-          {/* fidelidade: identifica cliente p/ pontuar + resgatar prêmio (item inteiro, não vira desconto) */}
+          {/* fidelidade: só quando o recurso está ligado (espelha o nav/store_config) */}
+          {loyaltyEnabled && (
           <div className="mt-3 rounded-xl border border-line bg-bg-surface-2 p-2.5">
             <p className="mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Fidelidade (opcional)</p>
             <div className="flex gap-1.5">
@@ -205,6 +206,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
             ) : <p className="mt-2 text-[11px] text-[var(--text-faded)]">Cliente novo — a venda vai cadastrar e pontuar.</p>)}
             {loyMsg && <p className="mt-2 rounded-lg bg-[#E8F6DD] px-2.5 py-1.5 text-[11px] font-semibold text-lime">{loyMsg}</p>}
           </div>
+          )}
 
           <p className="mt-3 mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Pagamento</p>
           <div className="grid grid-cols-4 gap-1.5">

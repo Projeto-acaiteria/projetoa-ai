@@ -4,6 +4,7 @@ import { brl } from "@/lib/format";
 import { dateBR, todayBR } from "@/lib/date-br";
 import { getOpenSession } from "@/lib/cash-store";
 import { listOrders } from "@/lib/orders-store";
+import { listMesaPayments } from "@/lib/tables-store";
 import { listExpenses } from "@/lib/expense-store";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
@@ -21,14 +22,20 @@ export default async function AdminHome() {
   const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
   const orders = await listOrders();
   const expenses = await listExpenses();
-  const [settings, cur] = await Promise.all([getStore(), getCurrentStore()]);
+  const [settings, cur, mesaPagosAll] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments()]);
 
   const vendasHoje = orders.filter((o) => o.status === "entregue" && dateBR(o.createdAt) === today);
-  const brutoHoje = vendasHoje.reduce((s, o) => s + o.totalCents, 0);
-  const liquidoHoje = vendasHoje.reduce((s, o) => s + o.totalCents - (o.cardFeeCents ?? 0), 0);
+  // vendas de MESA também entram no faturamento (vivem em tab_payments, não em orders).
+  // valor = soma dos pagamentos (split soma certo); contagem = comandas DISTINTAS (split não infla).
+  const mesaHoje = mesaPagosAll.filter((m) => dateBR(m.date) === today);
+  const mesaBrutoHoje = mesaHoje.reduce((s, m) => s + m.grossCents, 0);
+  const mesaLiquidoHoje = mesaHoje.reduce((s, m) => s + m.grossCents - m.cardFeeCents, 0);
+  const nVendasHoje = vendasHoje.length + new Set(mesaHoje.map((m) => m.tabId)).size;
+  const brutoHoje = vendasHoje.reduce((s, o) => s + o.totalCents, 0) + mesaBrutoHoje;
+  const liquidoHoje = vendasHoje.reduce((s, o) => s + o.totalCents - (o.cardFeeCents ?? 0), 0) + mesaLiquidoHoje;
   const despHoje = expenses.filter((e) => e.date === today).reduce((s, e) => s + e.amountCents, 0);
   const saldoHoje = liquidoHoje - despHoje;
-  const ticket = vendasHoje.length ? Math.round(brutoHoje / vendasHoje.length) : 0;
+  const ticket = nVendasHoje ? Math.round(brutoHoje / nVendasHoje) : 0;
   const emPreparo = orders.filter((o) => o.status === "preparo").length;
   const recentes = orders.slice(0, 6);
 
@@ -63,7 +70,7 @@ export default async function AdminHome() {
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Faturado hoje" value={brl(brutoHoje)} hint={`${vendasHoje.length} vendas`} Icon={IconWallet} tone="lime" />
+        <StatCard label="Faturado hoje" value={brl(brutoHoje)} hint={`${nVendasHoje} vendas`} Icon={IconWallet} tone="lime" />
         <StatCard label="Ticket médio" value={brl(ticket)} hint="por venda" Icon={IconChart} tone="brand" />
         <StatCard label="Despesas hoje" value={brl(despHoje)} hint="lançadas" Icon={IconReceipt} tone="gold" />
         <StatCard label="Saldo do dia" value={brl(saldoHoje)} hint="líquido - despesas" Icon={IconChart} tone={saldoHoje >= 0 ? "accent" : "accent"} />

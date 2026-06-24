@@ -30,7 +30,9 @@ async function resumo(session: CashSession) {
   const suprimentoCents = session.movements.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);
   const sangriaCents = session.movements.filter((m) => m.type === "sangria").reduce((s, m) => s + m.amountCents, 0);
   const saldoCaixaCents = session.openingFloatCents + salesCashCents + suprimentoCents - sangriaCents;
-  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + mesas.length };
+  // nVendas: balcão (1 order = 1 venda) + comandas DISTINTAS (split em N parciais NÃO conta N vezes)
+  const nMesas = new Set(mesas.map((m) => m.tabId)).size;
+  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas };
 }
 
 export async function GET() {
