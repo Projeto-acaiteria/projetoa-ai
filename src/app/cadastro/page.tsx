@@ -147,7 +147,7 @@ export default function CadastroPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(SEGMENTOS) as BusinessType[]).map((id) => (
                     <button key={id} onClick={() => setSegmento(id)}
-                      className={`rounded-xl border p-3 text-left transition ${segmento === id ? "border-indigo-400 bg-indigo-500/20" : "border-white/10 bg-white/5 hover:border-white/25"}`}>
+                      className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 ${segmento === id ? "border-indigo-400 bg-indigo-500/20" : "border-white/10 bg-white/5 hover:border-indigo-400 hover:bg-white/10"}`}>
                       <div className="text-sm font-bold">{SEGMENTOS[id].label}</div>
                       <div className="mt-0.5 text-[11px] leading-snug text-white/55">{SEG_DESC[id]}</div>
                     </button>

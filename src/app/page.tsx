@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 // Landing do PRODUTO (comandapro.net.br/) — não é loja nenhuma. Apresenta o ComandaPRO e
 // leva pro cadastro (loja nova) ou login (dono). As lojas vivem em /<slug>.
-const SEGMENTOS = ["Açaiteria", "Restaurante", "Marmitaria", "Bar", "Pizzaria", "Hamburgueria", "Sorveteria", "Sushi"];
+const SEGMENTOS = ["Açaiteria", "Restaurante", "Marmitaria", "Bar", "Pizzaria", "Hamburgueria", "Sorveteria", "Sushi", "Petiscaria"];
 const DIFERENCIAIS = [
   { t: "0% de comissão", d: "Pedido pelo seu link, sem o iFood levar quase 30% de cada venda. Você paga só a mensalidade." },
   { t: "Tudo num sistema só", d: "Cardápio digital, comanda, mesa, KDS, delivery, balcão, caixa e estoque — integrados." },
