@@ -70,7 +70,7 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (url: strin
           {IMAGE_BANK.map((cat) => (
             <div key={cat.key} className="mb-2 last:mb-0">
               <p className="mb-1 text-xs font-bold text-[var(--text-muted)]">{cat.label}</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
                 {cat.photos.map((url) => (
                   <button type="button" key={url} onClick={() => { onChange(url); setBankOpen(false); }} className="aspect-square overflow-hidden rounded-lg border border-line transition hover:ring-2 hover:ring-brand-600">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

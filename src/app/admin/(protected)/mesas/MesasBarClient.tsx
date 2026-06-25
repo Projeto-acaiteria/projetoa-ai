@@ -392,9 +392,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     <div className="flex items-center justify-between text-[var(--text-muted)]">
                       <span className="flex items-center gap-2">Couvert
                         <span className="flex items-center gap-1.5">
-                          <button onClick={() => setPeople(people - 1)} disabled={busy || people <= 1} className="grid h-6 w-6 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
+                          <button onClick={() => setPeople(people - 1)} disabled={busy || people <= 1} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
                           <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{people}</span>
-                          <button onClick={() => setPeople(people + 1)} disabled={busy} className="grid h-6 w-6 place-items-center rounded-md brand-gradient text-base leading-none text-white">+</button>
+                          <button onClick={() => setPeople(people + 1)} disabled={busy} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-base leading-none text-white">+</button>
                         </span>
                         <span className="text-xs">pessoas</span>
                       </span>
@@ -413,7 +413,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 </div>
 
                 <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                   {PAYS.map(([id, label]) => <button key={id} onClick={() => setMethod(id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold ${method === id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{label}</button>)}
                 </div>
                 {(method === "debito" || method === "credito") && activeMachines.length > 0 && (
