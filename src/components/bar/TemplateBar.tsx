@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import { fromPrice } from "@/lib/menu-price";
+import { brandVars } from "@/lib/brand-theme";
 
 // TemplateBar — cardápio público modelo BAR (categoria → produto), espelha o Medellín.
 // Tema escuro premium. Suporta montagem guiada (modifiers): produto com grupos abre o ProductCustomizer.
@@ -193,7 +194,7 @@ export default function TemplateBar({
   }
 
   return (
-    <main className="min-h-screen text-white" style={{ background: "radial-gradient(1100px 520px at 50% -8%, rgba(255,59,78,0.16), transparent 60%), #0B0A09" }}>
+    <main className="min-h-screen text-white" style={{ ...brandVars(branding?.primaryColor), background: "radial-gradient(1100px 520px at 50% -8%, rgba(255,59,78,0.16), transparent 60%), #0B0A09" }}>
       <header className="relative flex min-h-[42vh] flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
         {branding?.bannerUrl && (
           <div className="absolute inset-0 z-0" aria-hidden>

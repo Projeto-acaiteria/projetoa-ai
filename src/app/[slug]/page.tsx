@@ -6,6 +6,7 @@ import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
+import { brandVars } from "@/lib/brand-theme";
 import { IconClock, IconStar, IconArrowRight } from "@/components/Icons";
 import AcaiBuilder from "../cardapio/AcaiBuilder";
 import TemplateBar from "@/components/bar/TemplateBar";
@@ -75,7 +76,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
   const aberto = isOpenNow(store.hours);
 
   return (
-    <main className="theme-dark relative min-h-screen">
+    <main className="theme-dark relative min-h-screen" style={brandVars(store.primaryColor)}>
       <div className="aurora-wrap" aria-hidden>
         <div className="aurora-orb" style={{ width: "72vw", height: "72vw", left: "-18vw", top: "-8vh", background: "radial-gradient(circle, #7C3AED 0%, transparent 70%)", opacity: 0.55, animation: "aurora-a 24s ease-in-out infinite" }} />
         <div className="aurora-orb" style={{ width: "66vw", height: "66vw", right: "-22vw", top: "32vh", background: "radial-gradient(circle, #6D28D9 0%, transparent 70%)", opacity: 0.5, animation: "aurora-b 31s ease-in-out infinite" }} />

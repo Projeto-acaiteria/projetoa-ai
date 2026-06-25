@@ -1,33 +1,13 @@
 import { getStore } from "@/lib/settings-store";
+import { brandVars } from "@/lib/brand-theme";
 import { IconStar } from "@/components/Icons";
 import MeusPontosClient from "./MeusPontosClient";
 
 export const dynamic = "force-dynamic";
 
-// clareia (amt>0) ou escurece (amt<0) um hex — pra derivar os tons da cor da loja
-function shade(hex: string, amt: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const f = amt < 0 ? 0 : 255, p = Math.abs(amt);
-  r = Math.round((f - r) * p + r); g = Math.round((f - g) * p + g); b = Math.round((f - b) * p + b);
-  return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-}
-
 export default async function MeusPontosPage() {
   const store = await getStore();
-  // White-label: tematiza a página inteira pra cor da loja (override dos brand tokens).
-  // Vazio = cai no índigo padrão do sistema.
-  const accent = /^#[0-9a-fA-F]{6}$/.test(store.primaryColor) ? store.primaryColor : null;
-  const themeVars = accent
-    ? ({
-        "--brand-800": shade(accent, -0.28),
-        "--brand-700": shade(accent, -0.18),
-        "--brand-600": accent,
-        "--brand-500": shade(accent, 0.1),
-        "--brand-400": shade(accent, 0.35),
-        "--shadow-brand": `0 10px 30px ${accent}4d`,
-      } as React.CSSProperties)
-    : undefined;
+  const themeVars = brandVars(store.primaryColor); // white-label: veste a cor da loja
 
   return (
     <main className="min-h-screen" style={themeVars}>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import { fromPrice } from "@/lib/menu-price";
+import { brandVars } from "@/lib/brand-theme";
 
 // TemplateGrid — cardápio público modelo GRID (foto grande, estilo iFood). Tema claro.
 // Suporta montagem guiada (modifiers): produto com grupos abre o ProductCustomizer.
@@ -187,7 +188,7 @@ export default function TemplateGrid({
   }
 
   return (
-    <main className="min-h-screen bg-[#FAFAF9] text-zinc-900">
+    <main className="min-h-screen bg-[#FAFAF9] text-zinc-900" style={brandVars(branding?.primaryColor)}>
       <header className={`relative overflow-hidden px-6 pb-7 pt-12 text-center ${branding?.bannerUrl ? "text-white" : ""}`}>
         {branding?.bannerUrl && (
           <div className="absolute inset-0 z-0" aria-hidden>
