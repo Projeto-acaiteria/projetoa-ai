@@ -420,7 +420,10 @@ function FechamentoResultado({ s, onNew }: { s: CashSession; onNew: () => void }
             <Row label="Cartão · taxa maquininha" value={`− ${brl(s.cardFeeCents ?? 0)}`} />
             <Row label="Cartão · líquido a receber" value={brl(s.cardNetCents ?? 0)} />
             {s.cardCountedCents != null && (
-              <Row label={(s.cardDiffCents ?? 0) === 0 ? "Cartão · conferido (bateu)" : (s.cardDiffCents ?? 0) > 0 ? "Cartão · sobra" : "Cartão · quebra"} value={brl(Math.abs(s.cardDiffCents ?? 0))} tone={(s.cardDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+              <>
+                <Row label="Cartão · conferido (relatório)" value={brl(s.cardCountedCents)} />
+                <Row label={(s.cardDiffCents ?? 0) === 0 ? "Cartão · diferença" : (s.cardDiffCents ?? 0) > 0 ? "Cartão · sobra" : "Cartão · quebra"} value={brl(Math.abs(s.cardDiffCents ?? 0))} tone={(s.cardDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+              </>
             )}
           </>
         )}
@@ -428,7 +431,10 @@ function FechamentoResultado({ s, onNew }: { s: CashSession; onNew: () => void }
           <>
             <Row label="Pix · esperado" value={brl(s.salesPixCents ?? 0)} />
             {s.pixCountedCents != null && (
-              <Row label={(s.pixDiffCents ?? 0) === 0 ? "Pix · conferido (bateu)" : (s.pixDiffCents ?? 0) > 0 ? "Pix · sobra" : "Pix · quebra"} value={brl(Math.abs(s.pixDiffCents ?? 0))} tone={(s.pixDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+              <>
+                <Row label="Pix · conferido (extrato)" value={brl(s.pixCountedCents)} />
+                <Row label={(s.pixDiffCents ?? 0) === 0 ? "Pix · diferença" : (s.pixDiffCents ?? 0) > 0 ? "Pix · sobra" : "Pix · quebra"} value={brl(Math.abs(s.pixDiffCents ?? 0))} tone={(s.pixDiffCents ?? 0) === 0 ? "ok" : "bad"} />
+              </>
             )}
           </>
         )}
