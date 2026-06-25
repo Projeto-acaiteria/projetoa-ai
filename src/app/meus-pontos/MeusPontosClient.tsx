@@ -5,6 +5,10 @@ import type { Customer } from "@/lib/customers-store";
 import type { Reward } from "@/lib/loyalty";
 import { IconStar, IconCheck, IconArrowRight } from "@/components/Icons";
 
+const IconLock = (p: { width?: number; height?: number; className?: string }) => (
+  <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+);
+
 export default function MeusPontosClient() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,71 +72,57 @@ export default function MeusPontosClient() {
 
       {customer && (
         <>
-          {/* Saldo */}
-          <div className="mt-5 overflow-hidden rounded-3xl brand-gradient p-6 text-white shadow-[var(--shadow-brand)]">
-            <div className="text-sm font-semibold text-white/80">Olá, {customer.name}</div>
-            <div className="mt-1 flex items-end gap-2">
-              <span className="text-5xl font-extrabold leading-none">{points}</span>
-              <span className="mb-1 text-lg font-bold text-white/90">pontos</span>
+          {/* Hero — saldo + progresso pro próximo prêmio (goal-gradient) */}
+          <div className="relative mt-5 overflow-hidden rounded-3xl brand-gradient p-6 text-white shadow-[var(--shadow-brand)]">
+            <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative">
+              <div className="text-sm font-semibold text-white/80">Olá, {customer.name.split(" ")[0]}</div>
+              <div className="mt-1 flex items-end gap-2">
+                <span className="text-6xl font-extrabold leading-none tabular-nums">{points}</span>
+                <span className="mb-1.5 text-base font-bold text-white/85">pontos</span>
+              </div>
+              {next ? (
+                <div className="mt-5">
+                  <div className="mb-1.5 flex items-baseline justify-between text-sm font-bold">
+                    <span>Faltam {missing} pra {next.label}</span>
+                    <span className="text-white/70">{pct}%</span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-white transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3.5 py-1.5 text-sm font-bold">
+                  <IconCheck width={16} height={16} /> Você já pode resgatar o prêmio máximo!
+                </div>
+              )}
             </div>
-            {next ? (
-              <div className="mt-4">
-                <div className="mb-1 flex justify-between text-xs font-semibold text-white/90">
-                  <span>Faltam {missing} pra {next.label}</span>
-                  <span>{pct}%</span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-white/25">
-                  <div className="h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            ) : (
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm font-bold">
-                <IconCheck width={15} height={15} /> Você já pode resgatar o prêmio máximo!
-              </div>
-            )}
           </div>
 
-          {/* Tabela de recompensas */}
-          <h2 className="mb-2 mt-6 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
-            Troque seus pontos
-          </h2>
+          {/* Trilha de prêmios — alcançados coloridos, bloqueados com cadeado */}
+          <h2 className="mb-2.5 mt-7 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Sua trilha de prêmios</h2>
           <div className="space-y-2.5">
             {rewards.map((r) => {
               const ok = points >= r.points;
               return (
-                <div
-                  key={r.points}
-                  className={`flex items-center gap-3 rounded-2xl border p-3.5 ${
-                    ok ? "border-brand-600 bg-bg-surface-2" : "border-line bg-bg-elevated"
-                  }`}
-                >
-                  <span
-                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
-                      ok ? "brand-gradient text-white" : "bg-bg-surface-2 text-[var(--text-faded)]"
-                    }`}
-                  >
-                    <IconStar width={18} height={18} />
+                <div key={r.points} className={`flex items-center gap-3 rounded-2xl border p-3.5 transition ${ok ? "border-brand-600 bg-[#EEF2FF] shadow-[var(--shadow-card)]" : "border-line bg-bg-elevated"}`}>
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${ok ? "brand-gradient text-white" : "bg-bg-surface-2 text-[var(--text-faded)]"}`}>
+                    {ok ? <IconStar width={19} height={19} /> : <IconLock width={17} height={17} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-ink">{r.label}</div>
+                    <div className="text-sm font-extrabold text-ink">{r.label}</div>
                     <div className="text-xs font-semibold text-[var(--text-muted)]">{r.points} pontos</div>
                   </div>
                   {ok ? (
-                    <span className="rounded-full bg-[#E8F6DD] px-2.5 py-1 text-[11px] font-bold text-lime">
-                      disponível
-                    </span>
+                    <span className="shrink-0 rounded-full bg-[#E8F6DD] px-2.5 py-1 text-[11px] font-bold text-lime">disponível</span>
                   ) : (
-                    <span className="text-[11px] font-semibold text-[var(--text-faded)]">
-                      faltam {r.points - points}
-                    </span>
+                    <span className="shrink-0 text-right text-[11px] font-bold leading-tight text-brand-600">faltam<br />{r.points - points}</span>
                   )}
                 </div>
               );
             })}
           </div>
-          <p className="mt-3 text-center text-xs text-[var(--text-faded)]">
-            O resgate é feito no balcão com o atendente. Pontos viram açaí, nunca dinheiro.
-          </p>
+          <p className="mt-3 text-center text-xs text-[var(--text-faded)]">O resgate é no balcão com o atendente. <b className="text-[var(--text-muted)]">Pontos viram açaí, nunca dinheiro.</b></p>
 
           {/* Histórico */}
           {customer.history.length > 0 && (
