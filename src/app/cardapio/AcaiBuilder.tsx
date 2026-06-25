@@ -274,7 +274,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
 
       {/* Teaser do programa de pontos — visível logo no topo */}
       <a
-        href="/meus-pontos"
+        href={brand.slug ? `/${brand.slug}/meus-pontos` : "/meus-pontos"}
         className="mb-6 flex items-center justify-between gap-3 overflow-hidden rounded-2xl px-4 py-3 text-white shadow-[var(--shadow-brand)]"
         style={{ background: "linear-gradient(120deg, var(--brand-700) 0%, var(--brand-500) 70%, var(--accent-2) 160%)" }}
       >
@@ -447,7 +447,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           </div>
 
           <a
-            href="/meus-pontos"
+            href={brand.slug ? `/${brand.slug}/meus-pontos` : "/meus-pontos"}
             className="mt-3.5 flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-extrabold text-[#2E1065] shadow-[0_8px_24px_rgba(224,168,46,0.3)]"
             style={{ background: "linear-gradient(135deg, #F4C95C 0%, #E0A82E 100%)" }}
           >

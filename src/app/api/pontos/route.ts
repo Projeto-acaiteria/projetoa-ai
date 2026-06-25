@@ -9,16 +9,17 @@ export const dynamic = "force-dynamic";
 // GET /api/pontos            -> lista todos (ADMIN — exige login; vaza base de clientes/PII)
 // GET /api/pontos?phone=...  -> saldo de um cliente (PÚBLICO — página meus-pontos)
 export async function GET(req: Request) {
-  const phone = new URL(req.url).searchParams.get("phone");
-  const { rewards } = await getLoyalty();
+  const url = new URL(req.url);
+  const phone = url.searchParams.get("phone");
+  const store = url.searchParams.get("store") || undefined; // storeId — loyalty pública POR-LOJA
   if (phone) {
-    const customer = await getByPhone(phone);
-    return NextResponse.json({ customer, rewards });
+    const [customer, loy] = await Promise.all([getByPhone(phone, store), getLoyalty(store)]);
+    return NextResponse.json({ customer, rewards: loy.rewards });
   }
   // listar TODOS = admin
   if (!(await getCurrentStore())) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const customers = await listCustomers();
-  return NextResponse.json({ customers, rewards });
+  const [customers, loy] = await Promise.all([listCustomers(), getLoyalty()]);
+  return NextResponse.json({ customers, rewards: loy.rewards });
 }
 
 // POST /api/pontos  { phone, rewardPoints }  -> resgate (confirmado pelo operador)

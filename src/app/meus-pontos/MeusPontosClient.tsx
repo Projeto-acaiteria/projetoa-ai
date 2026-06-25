@@ -12,7 +12,7 @@ const IconGift = (p: { width?: number; height?: number; className?: string }) =>
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
 );
 
-export default function MeusPontosClient() {
+export default function MeusPontosClient({ storeId }: { storeId?: string }) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -24,7 +24,7 @@ export default function MeusPontosClient() {
     setLoading(true);
     setSearched(false);
     try {
-      const res = await fetch(`/api/pontos?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+      const res = await fetch(`/api/pontos?phone=${encodeURIComponent(phone)}${storeId ? `&store=${storeId}` : ""}`, { cache: "no-store" });
       const data = await res.json();
       setCustomer(data.customer);
       setRewards(data.rewards ?? []);

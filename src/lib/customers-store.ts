@@ -33,9 +33,9 @@ export async function listCustomers(): Promise<Customer[]> {
   return (await readAll()).sort((a, b) => b.points - a.points);
 }
 
-export async function getByPhone(phone: string): Promise<Customer | null> {
+export async function getByPhone(phone: string, storeId?: string): Promise<Customer | null> {
   const key = normPhone(phone);
-  const sid = await resolveStoreId();
+  const sid = storeId ?? (await resolveStoreId());
   const { data, error } = await db().from("customers").select("data").eq("store_id", sid).eq("phone", key).maybeSingle();
   if (error) throw new Error("Erro ao ler cliente: " + error.message);
   return data ? (data as { data: Customer }).data : null;
