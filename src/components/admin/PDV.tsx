@@ -6,6 +6,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
+import WeightModal from "@/components/admin/WeightModal";
 
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão débito", credito: "Cartão crédito" };
 const nowLabel = () => {
@@ -13,6 +14,10 @@ const nowLabel = () => {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
+let pesoSeq = 0;
+const IconScale = (p: { width?: number; height?: number; className?: string }) => (
+  <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M7 21h10M5 7h14M5 7l-2.5 5a3 3 0 0 0 5 0L5 7zm14 0l-2.5 5a3 3 0 0 0 5 0L19 7z" /></svg>
+);
 
 type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
 type CartLine = { key: string; label: string; note?: string; unitCents: number; qty: number; group: string; stockId?: string; consumes?: Ingredient[] };
@@ -38,9 +43,10 @@ function groupCost(g: ModifierGroup, qty: Qty) {
   return cents;
 }
 
-export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; onSold?: () => void }) {
+export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, pricePerKgCents, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; pricePerKgCents: number; onSold?: () => void }) {
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [tab, setTab] = useState<"acai" | "produtos">("acai");
+  const [tab, setTab] = useState<"peso" | "acai" | "produtos">(pricePerKgCents > 0 ? "peso" : "acai");
+  const [weighing, setWeighing] = useState(false);
   const [customer, setCustomer] = useState<Cust | null>(null);
   const [pay, setPay] = useState(false);
   const [building, setBuilding] = useState<Size | null>(null);
@@ -128,9 +134,21 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
         {/* Catálogo */}
         <div>
           <div className="mb-4 inline-flex rounded-xl border border-line bg-bg-elevated p-1">
-            <TabBtn active={tab === "acai"} onClick={() => setTab("acai")} Icon={IconBowl} label="Açaí" />
+            {pricePerKgCents > 0 && <TabBtn active={tab === "peso"} onClick={() => setTab("peso")} Icon={IconScale} label="Por peso" />}
+            <TabBtn active={tab === "acai"} onClick={() => setTab("acai")} Icon={IconBowl} label="Copo" />
             <TabBtn active={tab === "produtos"} onClick={() => setTab("produtos")} Icon={IconBox} label="Produtos" />
           </div>
+
+          {tab === "peso" && (
+            <div className="mb-4">
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Por peso · R$ {(pricePerKgCents / 100).toFixed(2).replace(".", ",")}/kg</h3>
+              <button onClick={() => setWeighing(true)} className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-brand-400 bg-[#EEF2FF] py-12 text-brand-600 transition hover:border-brand-600">
+                <IconScale width={40} height={40} />
+                <span className="text-lg font-extrabold">Pesar açaí</span>
+                <span className="text-xs font-medium text-[var(--text-muted)]">digite os gramas — ou leia a balança</span>
+              </button>
+            </div>
+          )}
 
           {tab === "acai" && (
             <Section title="Monte o açaí — escolha o tamanho">
@@ -244,6 +262,16 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           onAdd={(line) => {
             addBuilt(line);
             setBuilding(null);
+          }}
+        />
+      )}
+      {weighing && (
+        <WeightModal
+          product={{ name: "Açaí por peso", price_cents: pricePerKgCents, tare_grams: 0 }}
+          onClose={() => setWeighing(false)}
+          onConfirm={(grams) => {
+            addBuilt({ key: `peso-${++pesoSeq}`, label: `Açaí ${grams}g`, unitCents: Math.round((grams / 1000) * pricePerKgCents), group: "acai" });
+            setWeighing(false);
           }}
         />
       )}

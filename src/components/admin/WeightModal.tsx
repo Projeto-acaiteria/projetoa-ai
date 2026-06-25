@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { brl } from "@/lib/format";
-import type { BarProduct } from "@/lib/menu-bar-store";
 import { qzReadScaleGrams, qzListSerialPorts, getScaleConfig, setScaleConfig } from "@/lib/qz";
 
 // Modal de PESO compartilhado (Balcão + Mesas): digita os gramas (ou lê da balança via QZ Tray),
 // desconta a tara, mostra o valor ao vivo. onConfirm devolve o peso BRUTO (gramas).
-export default function WeightModal({ product, onClose, onConfirm }: { product: BarProduct; onClose: () => void; onConfirm: (grams: number) => void }) {
+export default function WeightModal({ product, onClose, onConfirm }: { product: { name: string; price_cents: number; tare_grams: number }; onClose: () => void; onConfirm: (grams: number) => void }) {
   const [grams, setGrams] = useState("");
   const [reading, setReading] = useState(false);
   const [scaleMsg, setScaleMsg] = useState("");

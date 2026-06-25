@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -32,7 +32,7 @@ const FEE_ROWS: { k: keyof Fees; label: string; hint: string }[] = [
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean } | null;
+type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; sells_by_weight: boolean } | null;
 
 export default function ConfigClient() {
   const [fees, setFees] = useState<Fees | null>(null);
@@ -45,7 +45,7 @@ export default function ConfigClient() {
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, sells_by_weight: !!d.config.sells_by_weight } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -112,6 +112,17 @@ export default function ConfigClient() {
             <input className={`${inp} mt-1`} value={store.cnpj} onChange={(e) => setS("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
             <p className="mt-1 text-[11px] text-[var(--text-faded)]">Sai no cabeçalho do cupom. Vazio = não mostra.</p>
           </div>
+          {config?.sells_by_weight && (
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Preço por kg (venda por peso)</label>
+              <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-line bg-bg-base px-3">
+                <span className="text-sm font-bold text-[var(--text-muted)]">R$</span>
+                <DecimalInput value={store.pricePerKgCents / 100} onChange={(n) => setS("pricePerKgCents", Math.round(n * 100))} className="w-full bg-transparent py-2.5 text-sm font-bold text-ink outline-none" />
+                <span className="text-sm text-[var(--text-muted)]">/kg</span>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">Self-service no balcão: pesa e cobra por kg.</p>
+            </div>
+          )}
         </div>
       </Card>
 

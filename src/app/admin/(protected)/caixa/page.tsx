@@ -26,7 +26,7 @@ export default async function CaixaPage() {
   return (
     <>
       <PageHeader title="Caixa" sub="Frente de caixa · abra o caixa e venda" />
-      <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} showPdv={showPdv} />
+      <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} showPdv={showPdv} pricePerKgCents={store.pricePerKgCents} />
     </>
   );
 }
