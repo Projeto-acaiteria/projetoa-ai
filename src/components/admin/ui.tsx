@@ -26,7 +26,7 @@ export function StatCard({
   tone?: "brand" | "lime" | "gold" | "accent";
 }) {
   const toneBg = {
-    brand: "bg-[#EFE6FF] text-brand-600",
+    brand: "bg-[#EEF2FF] text-brand-600",
     lime: "bg-[#E8F6DD] text-lime",
     gold: "bg-[#FBF1DC] text-gold",
     accent: "bg-[#FBF1DC] text-accent",
@@ -47,7 +47,7 @@ export function StatCard({
 
 export function Badge({ children, tone = "brand" }: { children: ReactNode; tone?: "brand" | "lime" | "gold" | "accent" | "muted" }) {
   const map = {
-    brand: "bg-[#EFE6FF] text-brand-600",
+    brand: "bg-[#EEF2FF] text-brand-600",
     lime: "bg-[#E8F6DD] text-lime",
     gold: "bg-[#FBF1DC] text-gold",
     accent: "bg-[#FBF1DC] text-accent",

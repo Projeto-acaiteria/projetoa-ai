@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader, StatCard, Card, Badge } from "@/components/admin/ui";
+import { PageHeader, Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { dateBR, todayBR } from "@/lib/date-br";
 import { getOpenSession } from "@/lib/cash-store";
@@ -9,7 +9,7 @@ import { listExpenses } from "@/lib/expense-store";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
 import SetupChecklist from "@/components/admin/SetupChecklist";
-import { IconWallet, IconReceipt, IconChart, IconMoto, IconBag, IconClock } from "@/components/Icons";
+import { IconWallet, IconMoto, IconBag, IconClock } from "@/components/Icons";
 
 const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregue: "lime" } as const;
 
@@ -69,11 +69,24 @@ export default async function AdminHome() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Faturado hoje" value={brl(brutoHoje)} hint={`${nVendasHoje} vendas`} Icon={IconWallet} tone="lime" />
-        <StatCard label="Ticket médio" value={brl(ticket)} hint="por venda" Icon={IconChart} tone="brand" />
-        <StatCard label="Despesas hoje" value={brl(despHoje)} hint="lançadas" Icon={IconReceipt} tone="gold" />
-        <StatCard label="Saldo do dia" value={brl(saldoHoje)} hint="líquido - despesas" Icon={IconChart} tone={saldoHoje >= 0 ? "accent" : "accent"} />
+      {/* Número-herói: responde "tá tudo ok?" em 2s — tamanho é hierarquia (DESIGN.md) */}
+      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <Card className="flex flex-col justify-between gap-6 p-6">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Faturado hoje</span>
+            <Badge tone="muted">tempo real</Badge>
+          </div>
+          <div>
+            <div className="text-5xl font-semibold tracking-tight text-ink tabular-nums sm:text-6xl">{brl(brutoHoje)}</div>
+            <div className="mt-1.5 text-sm text-[var(--text-muted)]">{nVendasHoje} venda{nVendasHoje === 1 ? "" : "s"} · ticket médio {brl(ticket)}</div>
+          </div>
+        </Card>
+        <div className="grid grid-cols-2 gap-4">
+          <MiniStat label="Líquido" value={brl(liquidoHoje)} />
+          <MiniStat label="Despesas" value={`− ${brl(despHoje)}`} />
+          <MiniStat label="Saldo do dia" value={brl(saldoHoje)} accent={saldoHoje >= 0 ? "ok" : "danger"} />
+          <MiniStat label="Em preparo" value={`${emPreparo}`} />
+        </div>
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -143,6 +156,15 @@ export default async function AdminHome() {
         </Card>
       )}
     </>
+  );
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: string; accent?: "ok" | "danger" }) {
+  return (
+    <div className="card flex flex-col justify-between p-4">
+      <div className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</div>
+      <div className={`mt-2 text-xl font-bold tabular-nums ${accent === "danger" ? "text-[var(--red-no)]" : accent === "ok" ? "text-[var(--green-ok)]" : "text-ink"}`}>{value}</div>
+    </div>
   );
 }
 
