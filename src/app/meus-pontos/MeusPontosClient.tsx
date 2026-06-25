@@ -8,6 +8,9 @@ import { IconStar, IconCheck, IconArrowRight } from "@/components/Icons";
 const IconLock = (p: { width?: number; height?: number; className?: string }) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 );
+const IconGift = (p: { width?: number; height?: number; className?: string }) => (
+  <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+);
 
 export default function MeusPontosClient() {
   const [phone, setPhone] = useState("");
@@ -64,9 +67,9 @@ export default function MeusPontosClient() {
       {/* Resultado */}
       {searched && !customer && (
         <div className="mt-5 card p-6 text-center">
-          <p className="text-sm text-[var(--text-muted)]">
-            Não achamos pontos nesse telefone ainda. Faça um pedido e comece a juntar!
-          </p>
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-bg-surface-2 text-brand-600"><IconStar width={24} height={24} /></div>
+          <p className="text-sm font-bold text-ink">Ainda não achamos pontos nesse telefone</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Faça seu primeiro pedido e já comece a juntar — cada compra te aproxima de um prêmio.</p>
         </div>
       )}
 
@@ -98,6 +101,13 @@ export default function MeusPontosClient() {
               )}
             </div>
           </div>
+
+          {rewards.some((r) => points >= r.points) && (
+            <div className="mt-3 flex items-center gap-3 rounded-2xl border border-brand-400 bg-[#EEF2FF] p-3.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full brand-gradient text-white"><IconGift width={18} height={18} /></span>
+              <p className="text-sm font-bold text-ink">Você já pode resgatar um prêmio! <span className="font-semibold text-[var(--text-muted)]">Mostre este telefone no balcão.</span></p>
+            </div>
+          )}
 
           {/* Trilha de prêmios — alcançados coloridos, bloqueados com cadeado */}
           <h2 className="mb-2.5 mt-7 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Sua trilha de prêmios</h2>
