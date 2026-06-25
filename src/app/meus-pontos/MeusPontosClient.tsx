@@ -145,7 +145,7 @@ export default function MeusPontosClient({ storeId }: { storeId?: string }) {
                   <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <span className="flex items-center gap-2 text-ink-2">
                       <IconArrowRight width={14} height={14} className="text-brand-600" />
-                      {h.type === "earn" ? `Pedido ${h.ref}` : h.ref}
+                      {h.type === "earn" ? `Pedido ${h.ref.replace(/^pedido\s*/i, "")}` : h.ref}
                     </span>
                     <span className={`font-bold ${h.points >= 0 ? "text-lime" : "text-[var(--red-no)]"}`}>
                       {h.points >= 0 ? "+" : ""}
