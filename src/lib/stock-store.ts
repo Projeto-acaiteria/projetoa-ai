@@ -121,20 +121,18 @@ export async function moveStock(id: string, type: "entrada" | "saida", qty: numb
   // storeId explícito é OBRIGATÓRIO no caminho público (pedido pela mesa, sem auth) — senão
   // resolveStoreId cai na loja errada, o item não é achado e a baixa falha em silêncio.
   const sid = storeId ?? (await resolveStoreId());
-  // o item pode ainda não existir no banco (estado seed) — usa readAll p/ achar o seed também
+  // o item pode ainda não existir no banco (estado seed) — readAll acha o seed e dá a base/existência
   const all = await readAll(sid);
   const cur = all.find((x) => x.id === id);
   if (!cur) return null;
-  const delta = type === "entrada" ? Math.abs(qty) : -Math.abs(qty);
-  const item: StockItem = {
-    ...cur,
-    qty: Math.max(0, +(cur.qty + delta).toFixed(3)),
-    updatedAt: at,
-    history: [{ type, qty: Math.abs(qty), reason, at }, ...cur.history],
-  };
-  const { error } = await db().from("stock_items").upsert({ store_id: sid, id, data: item });
+  // baixa ATÔMICA no servidor (RPC move_stock, mt-22): upsert com lock de linha aplica o delta
+  // sobre o valor SEMPRE fresco → não perde vendas simultâneas do mesmo insumo (antes era
+  // read-modify-write num blob). p_base só é usado se a row ainda não existir (estado seed).
+  const { data, error } = await db().rpc("move_stock", {
+    p_store_id: sid, p_id: id, p_type: type, p_qty: Math.abs(qty), p_reason: reason, p_at: at, p_base: cur,
+  });
   if (error) throw new Error("Falha ao movimentar estoque: " + error.message);
-  return item;
+  return data as StockItem;
 }
 
 /** Baixa NÃO-FATAL de estoque pela ficha técnica. A venda/comanda já está commitada quando isto
