@@ -44,10 +44,10 @@ const DEFAULT_FEES: PaymentFees = {
 
 // mensagens padrão genéricas (fallback). {nome} {codigo} {loja}
 export const WA_MSG_DEFAULTS: WaMsgs = {
-  recebido: "Olá {nome}! Recebemos seu pedido {codigo} aqui na {loja}. Já vamos preparar 👍",
+  recebido: "Olá {nome}! Recebemos seu pedido {codigo} aqui na {loja}. Já vamos preparar!",
   preparo: "Oi {nome}, seu pedido {codigo} já está em preparo!",
-  saiu: "{nome}, seu pedido {codigo} saiu para entrega 🛵 chega já!",
-  entregue: "Pedido {codigo} entregue. Obrigado, {nome}! 🙌",
+  saiu: "{nome}, seu pedido {codigo} saiu para entrega — chega já!",
+  entregue: "Pedido {codigo} entregue. Obrigado, {nome}!",
 };
 
 // nicho → como chamar o item + emoji, pra personalizar as mensagens POR NEGÓCIO
@@ -65,13 +65,13 @@ const WA_NOUN: Record<BusinessType, { noun: string; emoji: string }> = {
 
 /** Defaults do WhatsApp JÁ com o tom do nicho (semeado no cadastro; o dono edita depois). */
 export function waMsgsForSegment(seg: BusinessType): WaMsgs {
-  const { noun, emoji } = WA_NOUN[seg] ?? { noun: "seu pedido", emoji: "👍" };
+  const { noun } = WA_NOUN[seg] ?? { noun: "seu pedido" };
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   return {
-    recebido: `Olá {nome}! Recebemos ${noun} {codigo} na {loja}. Já vamos preparar ${emoji}`,
+    recebido: `Olá {nome}! Recebemos ${noun} {codigo} na {loja}. Já vamos preparar!`,
     preparo: `Oi {nome}, ${noun} {codigo} já está sendo preparado!`,
-    saiu: `{nome}, ${noun} {codigo} saiu para entrega 🛵 chega já!`,
-    entregue: `${Noun} {codigo} entregue. Obrigado, {nome}! 🙌`,
+    saiu: `{nome}, ${noun} {codigo} saiu para entrega — chega já!`,
+    entregue: `${Noun} {codigo} entregue. Obrigado, {nome}!`,
   };
 }
 
