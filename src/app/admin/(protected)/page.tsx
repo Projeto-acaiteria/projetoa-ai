@@ -71,16 +71,18 @@ export default async function AdminHome() {
 
       {/* Número-herói: responde "tá tudo ok?" em 2s — tamanho é hierarquia (DESIGN.md) */}
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Card className="flex flex-col justify-between gap-6 p-6">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Faturado hoje</span>
+        <div className="card stagger-item relative flex flex-col justify-between gap-6 overflow-hidden p-6" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 7%, var(--bg-elevated)) 0%, var(--bg-elevated) 55%)" }}>
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: "linear-gradient(90deg, var(--brand-600), transparent)" }} aria-hidden />
+          <span className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full blur-3xl" style={{ background: "color-mix(in srgb, var(--brand-600) 20%, transparent)" }} aria-hidden />
+          <div className="relative flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Faturado hoje</span>
             <Badge tone="muted">tempo real</Badge>
           </div>
-          <div>
+          <div className="relative">
             <div className="text-5xl font-semibold tracking-tight text-ink tabular-nums sm:text-6xl">{brl(brutoHoje)}</div>
             <div className="mt-1.5 text-sm text-[var(--text-muted)]">{nVendasHoje} venda{nVendasHoje === 1 ? "" : "s"} · ticket médio {brl(ticket)}</div>
           </div>
-        </Card>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <MiniStat label="Líquido" value={brl(liquidoHoje)} />
           <MiniStat label="Despesas" value={`− ${brl(despHoje)}`} />
@@ -161,8 +163,8 @@ export default async function AdminHome() {
 
 function MiniStat({ label, value, accent }: { label: string; value: string; accent?: "ok" | "danger" }) {
   return (
-    <div className="card flex flex-col justify-between p-4">
-      <div className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</div>
+    <div className="card stagger-item flex flex-col justify-between p-4">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</div>
       <div className={`mt-2 text-xl font-bold tabular-nums ${accent === "danger" ? "text-[var(--red-no)]" : accent === "ok" ? "text-[var(--green-ok)]" : "text-ink"}`}>{value}</div>
     </div>
   );
