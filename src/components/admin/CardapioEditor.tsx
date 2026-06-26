@@ -27,7 +27,7 @@ function RecipeRow({ recipe, onChange, insumos }: { recipe?: Ingredient[]; onCha
             <input
               type="number" min={0} step={0.01} value={ing.qty}
               onChange={(e) => onChange(rec.map((r, k) => (k === i ? { ...r, qty: Math.max(0, parseFloat(e.target.value) || 0) } : r)))}
-              className="w-12 rounded border border-line bg-bg-base px-1 text-right outline-none"
+              className="w-16 rounded border border-line bg-bg-base px-1.5 text-right outline-none"
             />
             <span className="text-[var(--text-muted)]">{ins?.unit}</span>
             <button onClick={() => onChange(rec.filter((_, k) => k !== i))} className="text-[var(--text-faded)] hover:text-[var(--red-no)]">×</button>

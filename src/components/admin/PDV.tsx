@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { brl } from "@/lib/format";
 import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
@@ -595,6 +595,12 @@ function PayModal({
     : fees[method] || 0;
   const feeCents = Math.round((total * feePct) / 100);
   const netCents = total - feeCents;
+  // Esc fecha o modal de pagamento (achado CIC)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // baixa de estoque agregada: produtos de revenda (1 un) + ficha técnica dos açaís
   function buildConsumes() {
