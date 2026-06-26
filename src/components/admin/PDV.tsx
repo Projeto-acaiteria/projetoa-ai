@@ -52,7 +52,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const [customer, setCustomer] = useState<Cust | null>(null);
   const [pay, setPay] = useState(false);
   const [building, setBuilding] = useState<Size | null>(null);
-  const [result, setResult] = useState<null | { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number }>(null);
+  const [result, setResult] = useState<null | { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string }>(null);
   const [cupomOpen, setCupomOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [discInput, setDiscInput] = useState("");
@@ -127,6 +127,11 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
         {result.pointsAwarded > 0 && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#E8F6DD] px-4 py-2 text-sm font-bold text-lime">
             +{result.pointsAwarded} pontos pro cliente
+          </div>
+        )}
+        {result.stockWarning && (
+          <div className="mx-auto mt-3 max-w-xs rounded-xl bg-[#FEF3C7] px-4 py-2.5 text-sm font-semibold text-[#92400E]">
+            ⚠ {result.stockWarning}
           </div>
         )}
         <button onClick={() => setCupomOpen(true)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand-600 py-3.5 font-bold text-brand-600">
@@ -569,7 +574,7 @@ function PayModal({
   fees: Fees;
   machines: CardMachine[];
   onClose: () => void;
-  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number }) => void;
+  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string }) => void;
 }) {
   const [method, setMethod] = useState<PayMethod>("dinheiro");
   const [received, setReceived] = useState("");
@@ -631,7 +636,7 @@ function PayModal({
         }),
       });
       const data = await res.json();
-      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined });
+      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
     } finally {
       setSending(false);
     }

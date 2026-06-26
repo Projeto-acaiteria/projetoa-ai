@@ -139,7 +139,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao",
       }));
       const pts = d.pointsAwarded ?? 0;
-      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "")); setCart([]); setDiscInput("");
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");
       setPhone(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {

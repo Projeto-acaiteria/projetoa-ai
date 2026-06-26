@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
-import { resolveCardFee } from "@/lib/settings-store";
+import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
 import { applyConsumes } from "@/lib/stock-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
@@ -65,10 +65,11 @@ export async function POST(req: Request) {
     if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
       return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
     }
-    const cardPay = rawPays.find((p) => isCard(p.method));
     const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : method;
-    // taxa: sobre o total (forma única) ou só sobre a parcela no cartão (split)
-    const card = await resolveCardFee(isSplit ? (cardPay?.method ?? "dinheiro") : method, isSplit ? (cardPay?.amountCents ?? 0) : totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+    // taxa: total (forma única) OU soma de TODAS as parcelas no cartão (split — ex: débito + crédito)
+    const card = isSplit
+      ? await resolveSplitCardFee(rawPays.filter((p) => isCard(p.method)), storeId, { machineId: b.machineId, parcelas: b.parcelas })
+      : await resolveCardFee(method, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
 
     // item: peso entra no nome (ex "Comida a quilo 500g"); senão tamanho do produto se houver
     const items: OrderItem[] = resolved.map((it) => ({
@@ -113,7 +114,10 @@ export async function POST(req: Request) {
     // uma falha de baixa não pode virar 500 → operador refaz → pedido duplicado).
     const nowIso = new Date().toISOString();
     const today = nowIso.slice(0, 10);
-    await applyConsumes(consumes, `Venda ${order.display}`, today, storeId);
+    const stock = await applyConsumes(consumes, `Venda ${order.display}`, today, storeId);
+    const stockWarning = stock.failed.length
+      ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
+      : undefined;
 
     // fidelidade: pontua a venda se o operador identificou o cliente pelo telefone (espelha /api/vendas)
     let pointsAwarded = 0;
@@ -133,7 +137,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, order, pointsAwarded }, { status: 201 });
+    return NextResponse.json({ ok: true, order, pointsAwarded, stockWarning }, { status: 201 });
   } catch (e) {
     console.error("balcao-venda:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });

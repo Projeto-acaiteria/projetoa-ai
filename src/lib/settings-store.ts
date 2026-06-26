@@ -268,3 +268,20 @@ export async function resolveCardFee(
   const fees = await getFees(storeId);
   return { feeCents: feeCentsFor(method, totalCents, fees), feePercent: fees[method] || 0, parcelas: 1 };
 }
+
+/** Taxa de cartão num SPLIT: soma a taxa de CADA parcela em cartão (ex: débito + crédito),
+ *  não só a 1ª. Mantém maquininha/percentual do MAIOR pagamento pra exibição no cupom. */
+export async function resolveSplitCardFee(
+  cardPays: { method: PaymentMethod; amountCents: number }[],
+  storeId: string,
+  opts?: { machineId?: string; parcelas?: number },
+): Promise<{ feeCents: number; feePercent: number; machineId?: string; machineName?: string; parcelas: number }> {
+  let feeCents = 0;
+  let dom: { feePercent: number; machineId?: string; machineName?: string; parcelas: number; amt: number } | null = null;
+  for (const cp of cardPays) {
+    const f = await resolveCardFee(cp.method, cp.amountCents, storeId, { machineId: opts?.machineId, parcelas: cp.method === "credito" ? opts?.parcelas : 1 });
+    feeCents += f.feeCents;
+    if (!dom || cp.amountCents > dom.amt) dom = { feePercent: f.feePercent, machineId: f.machineId, machineName: f.machineName, parcelas: f.parcelas, amt: cp.amountCents };
+  }
+  return { feeCents, feePercent: dom?.feePercent ?? 0, machineId: dom?.machineId, machineName: dom?.machineName, parcelas: dom?.parcelas ?? 1 };
+}

@@ -5,7 +5,7 @@ import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { getOpenSession } from "@/lib/cash-store";
-import { resolveCardFee } from "@/lib/settings-store";
+import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
 
@@ -59,11 +59,12 @@ export async function POST(req: Request) {
   if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
     return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
   }
-  const cardPay = rawPays.find((p) => isCard(p.method));
   const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : b.paymentMethod;
-  // taxa do cartão sobre o TOTAL pago (forma única) ou só sobre a parcela no cartão (split)
+  // taxa do cartão sobre o TOTAL pago (forma única) OU soma de TODAS as parcelas no cartão (split)
   const storeId = await resolveStoreId();
-  const card = await resolveCardFee(isSplit ? (cardPay?.method ?? "dinheiro") : b.paymentMethod, isSplit ? (cardPay?.amountCents ?? 0) : totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+  const card = isSplit
+    ? await resolveSplitCardFee(rawPays.filter((p) => isCard(p.method)), storeId, { machineId: b.machineId, parcelas: b.parcelas })
+    : await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
   const orderItems: OrderItem[] = items.map((i) => ({
     group: i.group || "Venda",
     name: i.name,
@@ -97,7 +98,11 @@ export async function POST(req: Request) {
   );
 
   // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
-  await applyConsumes(b.consumes || [], `Venda ${order.display}`, nowIso.slice(0, 10));
+  // Mas NÃO engole o resultado: se alguma baixa falhar, o operador é avisado (stockWarning).
+  const stock = await applyConsumes(b.consumes || [], `Venda ${order.display}`, nowIso.slice(0, 10));
+  const stockWarning = stock.failed.length
+    ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
+    : undefined;
 
   // pontos (só se identificou o cliente por telefone)
   let pointsAwarded = 0;
@@ -133,7 +138,7 @@ export async function POST(req: Request) {
       : 0;
 
   return NextResponse.json(
-    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents },
+    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
     { status: 201 },
   );
 }
