@@ -68,6 +68,8 @@ export default function KdsClient({ stations, loja }: { stations: string[]; loja
     inited.current = true;
   }, [stations]);
   useEffect(() => { if (inited.current) localStorage.setItem("kds:station", sel); }, [sel]);
+  // auto-print é POR-MÁQUINA (igual ao /admin/pedidos) — lembra a escolha desta tela
+  useEffect(() => { setAutoprint(localStorage.getItem("autoprint:kds") === "1"); }, []);
 
   const active = sel === "todas" ? stations : [sel];
 
@@ -124,7 +126,7 @@ export default function KdsClient({ stations, loja }: { stations: string[]; loja
           <span />
         )}
         <button
-          onClick={() => setAutoprint((v) => !v)}
+          onClick={() => setAutoprint((v) => { const next = !v; localStorage.setItem("autoprint:kds", next ? "1" : "0"); return next; })}
           title="Imprime a via na impressora da estação assim que o pedido chega"
           className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${autoprint ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
         >

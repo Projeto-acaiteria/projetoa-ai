@@ -108,8 +108,12 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [printers, setPrinters] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // auto-imprimir cupom ao finalizar venda (balcão/mesa) — POR-MÁQUINA, default ligado
+  const [printOnSale, setPrintOnSale] = useState(true);
 
   useEffect(() => { qzIsActive().then(setActive); }, []);
+  useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
+  const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
 
   async function connect() {
     setBusy(true);
@@ -161,6 +165,24 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             Sem ele, os pedidos ainda imprimem abrindo a janela de impressão do navegador.
           </p>
         )}
+      </Card>
+
+      {/* Auto-imprimir cupom ao finalizar venda (por-máquina) — desligue numa máquina sem impressora */}
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-bold text-ink">Imprimir cupom ao finalizar venda</div>
+            <div className="mt-0.5 text-xs text-[var(--text-muted)]">Vale pro balcão e fechamento de mesa, neste aparelho. Desligue numa máquina sem impressora.</div>
+          </div>
+          <button
+            onClick={togglePrintOnSale}
+            role="switch"
+            aria-checked={printOnSale}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${printOnSale ? "brand-gradient" : "bg-bg-surface-2"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${printOnSale ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
       </Card>
 
       {/* Uma impressora por destino (caixa + estações). Cada aparelho salva a SUA no navegador. */}

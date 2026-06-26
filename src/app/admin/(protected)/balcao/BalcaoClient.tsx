@@ -129,10 +129,10 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
-      // cupom
+      // cupom (auto-impressão é POR-MÁQUINA — desligável na tela de Impressora; default ligado)
       const o = d.order;
       const now = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
-      void printTicket(ticketHtml({
+      if (localStorage.getItem("autoprint:venda") !== "0") void printTicket(ticketHtml({
         loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
