@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Card, StatCard, Badge } from "@/components/admin/ui";
-import { IconStar, IconUsers, IconCheck } from "@/components/Icons";
+import { IconStar, IconUsers, IconCheck, IconTrash } from "@/components/Icons";
 import type { Customer } from "@/lib/customers-store";
 import type { Reward, LoyaltyConfig } from "@/lib/loyalty";
 
@@ -37,6 +37,10 @@ export default function FidelidadeClient() {
   const patch = (p: Partial<LoyaltyConfig>) => setCfg((c) => (c ? { ...c, ...p } : c));
   const setRewardPts = (i: number, points: number) =>
     setCfg((c) => (c ? { ...c, rewards: c.rewards.map((r, idx) => (idx === i ? { ...r, points } : r)) } : c));
+  const setRewardLabel = (i: number, label: string) =>
+    setCfg((c) => (c ? { ...c, rewards: c.rewards.map((r, idx) => (idx === i ? { ...r, label } : r)) } : c));
+  const addReward = () => setCfg((c) => (c ? { ...c, rewards: [...c.rewards, { points: 100, label: "" }] } : c));
+  const removeReward = (i: number) => setCfg((c) => (c ? { ...c, rewards: c.rewards.filter((_, idx) => idx !== i) } : c));
 
   async function saveCfg() {
     if (!cfg) return;
@@ -131,22 +135,28 @@ export default function FidelidadeClient() {
           </div>
 
           <div className="mt-5">
-            <div className="mb-2 text-xs font-bold uppercase text-[var(--text-muted)]">Metas de resgate — pontos pra cada açaí grátis</div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-bold uppercase text-[var(--text-muted)]">Prêmios — o que o cliente troca por pontos</div>
+              <button type="button" onClick={addReward} className="shrink-0 rounded-lg border border-brand-600 px-2.5 py-1.5 text-xs font-bold text-brand-600">+ Adicionar prêmio</button>
+            </div>
             <div className="space-y-2">
               {cfg.rewards.map((r, i) => (
-                <div key={r.sizeId} className="flex items-center gap-3 rounded-xl bg-bg-surface-2 p-3">
+                <div key={i} className="flex items-center gap-2 rounded-xl bg-bg-surface-2 p-2.5">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-white"><IconStar width={15} height={15} /></span>
-                  <span className="flex-1 text-sm font-bold text-ink">{r.label}</span>
+                  <input value={r.label} onChange={(e) => setRewardLabel(i, e.target.value)} placeholder="Ex: Copo 500ml · Cerveja · Pizza pequena"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-bg-elevated px-3 py-2 text-sm font-bold text-ink outline-none focus:border-brand-600" />
                   <input type="number" min="1" value={r.points} onChange={(e) => setRewardPts(i, Number(e.target.value))}
-                    className="w-24 rounded-lg border border-line bg-bg-elevated px-3 py-2 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
-                  <span className="text-xs font-semibold text-[var(--text-muted)]">pts</span>
+                    className="w-20 shrink-0 rounded-lg border border-line bg-bg-elevated px-2 py-2 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
+                  <span className="shrink-0 text-xs font-semibold text-[var(--text-muted)]">pts</span>
+                  <button type="button" onClick={() => removeReward(i)} aria-label="Remover prêmio" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--text-faded)] hover:text-[var(--red-no)]"><IconTrash width={15} height={15} /></button>
                 </div>
               ))}
+              {cfg.rewards.length === 0 && <p className="rounded-xl border border-dashed border-line p-3 text-center text-xs text-[var(--text-muted)]">Nenhum prêmio ainda — adicione o que o cliente pode trocar por pontos.</p>}
             </div>
           </div>
 
           <p className="mt-4 rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
-            Pontos nunca viram dinheiro nem desconto — só troca por açaí inteiro. As alterações valem para as próximas vendas.
+            Pontos nunca viram dinheiro nem desconto — só troca por item inteiro. As alterações valem para as próximas vendas.
           </p>
         </Card>
       )}

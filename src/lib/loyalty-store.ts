@@ -33,8 +33,8 @@ export async function setLoyalty(
   }
   if (Array.isArray(input.rewards)) {
     clean.rewards = (input.rewards as Reward[])
-      .map((r) => ({ points: Math.max(1, Math.round(Number(r.points) || 0)), label: String(r.label || "").slice(0, 60), sizeId: String(r.sizeId || "") }))
-      .filter((r) => r.label && r.sizeId)
+      .map((r) => ({ points: Math.max(1, Math.round(Number(r.points) || 0)), label: String(r.label || "").trim().slice(0, 60), ...(r.sizeId ? { sizeId: String(r.sizeId) } : {}) }))
+      .filter((r) => r.label) // prêmio genérico: basta um nome (sizeId não é mais exigido)
       .sort((a, b) => a.points - b.points);
     if (!clean.rewards.length) clean.rewards = cur.rewards;
   }

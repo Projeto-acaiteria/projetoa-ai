@@ -132,7 +132,7 @@ export default function MeusPontosClient({ storeId }: { storeId?: string }) {
               );
             })}
           </div>
-          <p className="mt-3 text-center text-xs text-[var(--text-faded)]">O resgate é no balcão com o atendente. <b className="text-[var(--text-muted)]">Pontos viram açaí, nunca dinheiro.</b></p>
+          <p className="mt-3 text-center text-xs text-[var(--text-faded)]">O resgate é no balcão com o atendente. <b className="text-[var(--text-muted)]">Pontos viram prêmio, nunca dinheiro.</b></p>
 
           {/* Histórico */}
           {customer.history.length > 0 && (

@@ -1,17 +1,17 @@
-// Regra de fidelidade do Açaí do Vidal: pontos por valor gasto.
+// Fidelidade do ComandaPRO (multi-segmento — vale pra qualquer loja/nicho): pontos por valor gasto.
 // Pontos NUNCA viram dinheiro nem desconto — resgate é troca por item inteiro
 // (regra cravada). Pontua só sobre o valor dos produtos (sem taxa de entrega)
-// e só em pedido pago/entregue.
+// e só em pedido pago/entregue. Os prêmios são definidos pelo DONO (qualquer item).
 
 export const POINTS_PER_BRL = 1; // R$1 gasto = 1 ponto (default)
 export const POINTS_VALIDITY_DAYS = 60;
 
-export type Reward = { points: number; label: string; sizeId: string };
+// Prêmio = o que o cliente troca pelos pontos. label livre (qualquer item do nicho:
+// "Copo 500ml", "Cerveja", "Pizza pequena"…). sizeId é legado/opcional (não exigido).
+export type Reward = { points: number; label: string; sizeId?: string };
 
 export const REWARDS: Reward[] = [
-  { points: 100, label: "Açaí 300ml grátis", sizeId: "s300" },
-  { points: 180, label: "Açaí 500ml grátis", sizeId: "s500" },
-  { points: 260, label: "Açaí 700ml grátis", sizeId: "s700" },
+  { points: 100, label: "Item grátis" },
 ];
 
 // ── Config editável pelo dono (admin) ──
