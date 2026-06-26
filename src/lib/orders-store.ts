@@ -25,6 +25,7 @@ export type Order = {
   subtotalCents: number;
   feeCents: number;
   totalCents: number;
+  discountCents?: number; // desconto aplicado na venda (balcão/PDV)
   status: OrderStatus;
   pointsAwarded?: number; // pontos já creditados (evita duplicar)
   paymentMethod?: PaymentMethod; // venda de balcão

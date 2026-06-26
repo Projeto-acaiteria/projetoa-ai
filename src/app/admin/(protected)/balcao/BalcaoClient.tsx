@@ -32,6 +32,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
   const [pay, setPay] = useState<PaymentMethod>("dinheiro");
+  const [discInput, setDiscInput] = useState("");
+  const [discMode, setDiscMode] = useState<"brl" | "pct">("brl");
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
@@ -46,6 +48,10 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const [loyBusy, setLoyBusy] = useState(false);
 
   const total = cart.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
+  // desconto: % do total ou R$ digitado; clampa em [0, total]
+  const discRaw = parseFloat(discInput.replace(",", ".")) || 0;
+  const discountCents = discMode === "pct" ? Math.round((total * Math.min(discRaw, 100)) / 100) : Math.min(Math.round(discRaw * 100), total);
+  const finalTotal = Math.max(0, total - discountCents);
 
   async function buscarCliente() {
     const p = phone.trim();
@@ -106,7 +112,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
+        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -117,10 +123,10 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number }) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
-        totalCents: o.totalCents, code: o.code, origem: "balcao",
+        totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao",
       }));
       const pts = d.pointsAwarded ?? 0;
-      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "")); setCart([]);
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "")); setCart([]); setDiscInput("");
       setPhone(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {
@@ -229,9 +235,28 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
             </ul>
           )}
 
-          <div className="flex items-center justify-between border-t border-line pt-3">
-            <span className="text-[var(--text-muted)]">Total</span>
-            <span className="text-2xl font-extrabold text-brand-600">{brl(total)}</span>
+          <div className="border-t border-line pt-3">
+            {discountCents > 0 && (
+              <div className="mb-1 flex items-center justify-between text-sm text-[var(--text-muted)]">
+                <span>Subtotal</span><span className="tabular-nums">{brl(total)}</span>
+              </div>
+            )}
+            {discountCents > 0 && (
+              <div className="mb-1 flex items-center justify-between text-sm">
+                <span className="text-[var(--text-muted)]">Desconto</span><span className="font-semibold tabular-nums text-lime">− {brl(discountCents)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-[var(--text-muted)]">Total</span>
+              <span className="text-2xl font-extrabold tabular-nums text-brand-600">{brl(finalTotal)}</span>
+            </div>
+            {/* desconto na venda — R$ ou % */}
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Desconto</span>
+              <input value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
+              <button type="button" onClick={() => setDiscMode("brl")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "brl" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>R$</button>
+              <button type="button" onClick={() => setDiscMode("pct")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "pct" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>%</button>
+            </div>
           </div>
 
           {/* fidelidade: só quando o recurso está ligado (espelha o nav/store_config) */}
@@ -286,7 +311,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
           {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
 
           <button onClick={finalizar} disabled={saving || !cart.length} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
-            {saving ? "Registrando…" : `Finalizar — ${brl(total)}`}
+            {saving ? "Registrando…" : `Finalizar — ${brl(finalTotal)}`}
           </button>
         </div>
       </div>

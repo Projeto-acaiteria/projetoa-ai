@@ -24,6 +24,7 @@ type Body = {
   parcelas?: number; // parcelas no crédito
   customerName?: string;
   customerPhone?: string; // fidelidade: identifica o cliente p/ pontuar a venda
+  discountCents?: number; // desconto do operador (R$ ou % já convertido em centavos)
 };
 
 export async function POST(req: Request) {
@@ -52,8 +53,12 @@ export async function POST(req: Request) {
     const subtotalCents = resolved.reduce((s, it) => s + it.qty * it.unitPriceCents, 0);
     if (subtotalCents <= 0) return NextResponse.json({ error: "Confira os pesos/itens — total zerado." }, { status: 400 });
 
-    // taxa do cartão: usa a MÁQUINA escolhida (snapshot) ou cai na taxa flat por método
-    const card = await resolveCardFee(method, subtotalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+    // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
+    const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
+    const totalCents = subtotalCents - discountCents;
+
+    // taxa do cartão sobre o TOTAL pago (pós-desconto): usa a máquina escolhida ou a taxa flat
+    const card = await resolveCardFee(method, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
 
     // item: peso entra no nome (ex "Comida a quilo 500g"); senão tamanho do produto se houver
     const items: OrderItem[] = resolved.map((it) => ({
@@ -76,7 +81,8 @@ export async function POST(req: Request) {
         items,
         subtotalCents,
         feeCents: 0,
-        totalCents: subtotalCents,
+        totalCents,
+        discountCents,
         consumes,
         paymentMethod: method,
         cardFeeCents: card.feeCents,
@@ -103,7 +109,7 @@ export async function POST(req: Request) {
       const cfg = await getLoyalty(storeId);
       const existing = await getByPhone(phone);
       const isFirstPurchase = !existing || existing.history.length === 0;
-      pointsAwarded = pointsForSale(subtotalCents, cfg, { isFirstPurchase });
+      pointsAwarded = pointsForSale(totalCents, cfg, { isFirstPurchase });
       if (pointsAwarded > 0) {
         await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
         await markPointsAwarded(order.id, pointsAwarded, storeId);
