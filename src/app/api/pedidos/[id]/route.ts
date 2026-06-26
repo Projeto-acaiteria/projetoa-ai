@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { setStatus, markPointsAwarded, markConsumed, type OrderStatus } from "@/lib/orders-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { applyConsumes } from "@/lib/stock-store";
-import { pointsForSale } from "@/lib/loyalty";
+import { pointsForSale, eligibleCents } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -35,7 +35,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const cfg = await getLoyalty();
     const existing = await getByPhone(order.phone);
     const isFirstPurchase = !existing || existing.history.length === 0;
-    awarded = pointsForSale(order.subtotalCents, cfg, { isFirstPurchase });
+    // pontua só sobre categorias que dão pontos (fidelidade por categoria). Itens sem o flag
+    // (pedidos açaí/antigos) contam normal (default). Sem flag em nenhum item = subtotal inteiro.
+    awarded = pointsForSale(eligibleCents(order.items), cfg, { isFirstPurchase });
     if (awarded > 0) {
       await awardPoints(order.phone, order.customerName, awarded, order.display, order.createdAt);
       await markPointsAwarded(order.id, awarded, sid);

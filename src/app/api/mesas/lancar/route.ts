@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     if (!resolved.length) return NextResponse.json({ error: "Itens indisponíveis." }, { status: 400 });
     // obs viaja DENTRO da linha (resolveOrderItems já a carrega de cada sel) — sem casar por índice
     const lines = resolved.map((it) => ({
-      productId: it.productId, name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods, note: it.note ?? null,
+      productId: it.productId, name: it.name, sizeLabel: it.sizeLabel, qty: it.qty, unitPriceCents: it.unitPriceCents, station: it.station, mods: it.mods, note: it.note ?? null, earnsPoints: it.earnsPoints,
     }));
     const note = (b.note ?? "").trim().slice(0, 200) || undefined;
 

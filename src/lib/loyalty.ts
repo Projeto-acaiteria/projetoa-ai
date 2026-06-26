@@ -33,6 +33,12 @@ export const DEFAULT_LOYALTY: LoyaltyConfig = {
   firstPurchaseBonus: 0,
 };
 
+/** Centavos ELEGÍVEIS de uma lista de itens — só os de categoria que pontua.
+ *  earnsPoints ausente/undefined = pontua (default, compat com itens/pedidos antigos). */
+export function eligibleCents(items: { paidCents: number; earnsPoints?: boolean }[]): number {
+  return items.reduce((s, it) => s + (it.earnsPoints === false ? 0 : it.paidCents), 0);
+}
+
 /** pontos-base de um pedido, sobre o valor dos PRODUTOS (sem taxa) */
 export function computePoints(productCents: number, pointsPerBrl: number = POINTS_PER_BRL): number {
   return Math.floor((productCents / 100) * pointsPerBrl);

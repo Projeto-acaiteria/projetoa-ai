@@ -96,6 +96,7 @@ export async function POST(req: Request) {
       name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : ""),
       qty: it.qty,
       paidCents: it.qty * it.unitPriceCents,
+      earnsPoints: it.earnsPoints,
     }));
 
     // ficha técnica agregada → baixa de estoque (mesma lógica do delivery do açaí)

@@ -65,6 +65,7 @@ export type BarCategory = {
   img: string | null;
   sort: number;
   active: boolean;
+  earns_points: boolean; // fidelidade: itens desta categoria pontuam? (default true)
   products: BarProduct[];
 };
 
@@ -91,6 +92,7 @@ const toCategory = (r: Record<string, unknown>, products: BarProduct[]): BarCate
   img: (r.img as string) ?? null,
   sort: num(r.sort),
   active: Boolean(r.active),
+  earns_points: r.earns_points !== false, // ausente/null = pontua (default true)
   products,
 });
 
@@ -165,7 +167,7 @@ export async function readBarMenu(storeId?: string, includeInactive = false): Pr
 /** Resolve itens de um pedido a partir de {productId, qty} — preço, nome, size_label e ESTAÇÃO
  *  vêm do BANCO (nunca do client). station = da categoria do produto. Ignora produto inativo. */
 export type ResolvedMod = { name: string; price_cents: number };
-export type ResolvedItem = { productId: string; name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; mods: ResolvedMod[] | null; recipe: RecipeLine[]; note?: string | null };
+export type ResolvedItem = { productId: string; name: string; sizeLabel: string | null; qty: number; unitPriceCents: number; station: string; earnsPoints: boolean; mods: ResolvedMod[] | null; recipe: RecipeLine[]; note?: string | null };
 
 export async function resolveOrderItems(
   storeId: string,
@@ -176,11 +178,12 @@ export async function resolveOrderItems(
   const d = db();
   const [{ data: prods }, { data: cats }, { data: mods }, { data: groups }] = await Promise.all([
     d.from("menu_products").select("id, name, size_label, price_cents, category_id, recipe, by_weight, tare_grams").eq("store_id", storeId).eq("active", true).in("id", ids),
-    d.from("menu_categories").select("id, station").eq("store_id", storeId),
+    d.from("menu_categories").select("id, station, earns_points").eq("store_id", storeId),
     d.from("menu_modifiers").select("id, group_id, name, price_cents").eq("store_id", storeId).eq("active", true),
     d.from("menu_modifier_groups").select("id, free_up_to, price_mode").eq("store_id", storeId),
   ]);
   const stationByCat = new Map(((cats ?? []) as { id: string; station: string }[]).map((c) => [String(c.id), String(c.station)]));
+  const earnsByCat = new Map(((cats ?? []) as { id: string; earns_points?: boolean }[]).map((c) => [String(c.id), c.earns_points !== false]));
   const pById = new Map(((prods ?? []) as Record<string, unknown>[]).map((p) => [String(p.id), p]));
   const modById = new Map(((mods ?? []) as Record<string, unknown>[]).map((m) => [String(m.id), m]));
   const cfgByGroup = new Map(((groups ?? []) as { id: string; free_up_to: number; price_mode: string }[]).map((g) => [String(g.id), { free: num(g.free_up_to), mode: String(g.price_mode || "sum") }]));
@@ -245,6 +248,7 @@ export async function resolveOrderItems(
       qty,
       unitPriceCents: baseCents + modsTotal,
       station: stationByCat.get(String(p.category_id)) ?? "cozinha",
+      earnsPoints: earnsByCat.get(String(p.category_id)) ?? true,
       mods: modsOut.length ? modsOut : null,
       recipe: toRecipe(p.recipe),
       note: s.note?.trim() ? s.note.trim().slice(0, 200) : null, // obs viaja DENTRO da linha (não casa por índice)
@@ -269,6 +273,7 @@ export type CategoryInput = {
   img?: string | null;
   sort?: number;
   active?: boolean;
+  earns_points?: boolean; // fidelidade: itens desta categoria pontuam? (default true)
 };
 
 export async function createCategory(input: CategoryInput, storeId?: string): Promise<BarCategory> {
@@ -283,6 +288,7 @@ export async function createCategory(input: CategoryInput, storeId?: string): Pr
       img: input.img ?? null,
       sort: input.sort ?? 0,
       active: input.active ?? true,
+      earns_points: input.earns_points ?? true,
     })
     .select("*")
     .single();

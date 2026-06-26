@@ -46,6 +46,7 @@ export type TabItem = {
   consumes: StockConsume[] | null;
   note?: string | null;
   mods?: { name: string; price_cents: number }[] | null;
+  earns_points?: boolean; // fidelidade: a categoria do item pontua? (ausente = sim)
 };
 
 export type TabOrder = {
@@ -98,6 +99,7 @@ export type NewTabItem = {
   station?: string; // estação de preparo (bar). Ausente = 'cozinha' (açaí).
   mods?: { name: string; price_cents: number }[] | null; // personalização escolhida (espelha no KDS/cupom)
   note?: string | null; // observação da LINHA (ex: ponto da carne, sem cebola)
+  earnsPoints?: boolean; // fidelidade: a categoria do item pontua? (ausente = sim)
 };
 
 // ── Mesas ────────────────────────────────────────────────────────────────────
@@ -313,6 +315,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       consumes: it.consumes,
       mods: it.mods ?? null,
       note: it.note ?? null,
+      earns_points: it.earnsPoints !== false, // ausente = pontua (default)
     }));
     const { error: e2 } = await d.from("tab_order_items").insert(rows);
     if (e2) throw e2;
@@ -397,6 +400,7 @@ export type TabFull = {
   orders: (TabOrder & { items: TabItem[] })[];
   payments: TabPayment[];
   consumoCents: number; // soma dos itens — É A BASE DA TAXA DE SERVIÇO (couvert NÃO entra)
+  eligibleCents: number; // consumo só das categorias que pontuam — base da FIDELIDADE
   coverCents: number; // couvert artístico (snapshot) — fora da base da taxa (CDC)
   totalCents: number; // consumo + couvert (sem a taxa, que é opcional no fechamento)
   paidCents: number;
@@ -434,6 +438,11 @@ export async function getTabFull(tabId: number, storeId?: string): Promise<TabFu
     (s, i) => s + num(i.qty) * num(i.unit_price_cents),
     0,
   );
+  // fidelidade por categoria: só os itens cuja categoria pontua (earns_points !== false)
+  const eligibleCents = ((items ?? []) as TabItem[]).reduce(
+    (s, i) => s + (i.earns_points === false ? 0 : num(i.qty) * num(i.unit_price_cents)),
+    0,
+  );
   const coverCents = num((tab as Tab).cover_cents); // couvert NÃO entra na base da taxa de serviço
   const totalCents = consumoCents + coverCents;
   const paidCents = ((payments ?? []) as TabPayment[]).reduce((s, p) => s + num(p.amount_cents), 0);
@@ -443,6 +452,7 @@ export async function getTabFull(tabId: number, storeId?: string): Promise<TabFu
     orders: withItems,
     payments: (payments ?? []) as TabPayment[],
     consumoCents,
+    eligibleCents,
     coverCents,
     totalCents,
     paidCents,
@@ -480,11 +490,11 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
   const d = db();
   const sid = await resolveStoreId();
 
-  // fidelidade pontua só sobre o CONSUMO (produtos) — nunca sobre couvert nem taxa
+  // fidelidade pontua só sobre o CONSUMO das categorias que pontuam — nunca couvert nem taxa
   const full = await getTabFull(tabId, sid);
   // idempotente: comanda já fechada não pontua de novo (anti duplo-clique/retry)
   if (full.tab.status === "fechada") return { pointsAwarded: 0 };
-  const productCents = full.consumoCents;
+  const productCents = full.eligibleCents;
 
   const phone = opts.customerPhone ? normPhone(opts.customerPhone) : "";
   const name = opts.customerName?.trim() || full.tab.customer_name || "";

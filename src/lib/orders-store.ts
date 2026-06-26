@@ -11,6 +11,7 @@ export type OrderItem = {
   qty: number;
   paidCents: number; // total cobrado deste item (0 = grátis)
   note?: string; // observação livre do operador (ex: "sem granola", "pra viagem")
+  earnsPoints?: boolean; // fidelidade: a categoria deste item pontua? (ausente = sim, default)
 };
 
 export type Order = {

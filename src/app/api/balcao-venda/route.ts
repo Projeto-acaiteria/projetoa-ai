@@ -77,6 +77,7 @@ export async function POST(req: Request) {
       qty: it.qty,
       paidCents: it.qty * it.unitPriceCents,
       note: it.note ?? undefined,
+      earnsPoints: it.earnsPoints,
     }));
 
     const consumesMap: Record<string, number> = {};
@@ -121,7 +122,11 @@ export async function POST(req: Request) {
       const cfg = await getLoyalty(storeId);
       const existing = await getByPhone(phone);
       const isFirstPurchase = !existing || existing.history.length === 0;
-      pointsAwarded = pointsForSale(totalCents, cfg, { isFirstPurchase });
+      // pontua só sobre as categorias que dão pontos (fidelidade por categoria).
+      // desconto rateado proporcionalmente sobre a parte elegível.
+      const eligibleSubtotal = resolved.reduce((s, it) => s + (it.earnsPoints === false ? 0 : it.qty * it.unitPriceCents), 0);
+      const eligibleCents = subtotalCents > 0 ? Math.round((eligibleSubtotal * totalCents) / subtotalCents) : 0;
+      pointsAwarded = pointsForSale(eligibleCents, cfg, { isFirstPurchase });
       if (pointsAwarded > 0) {
         await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
         await markPointsAwarded(order.id, pointsAwarded, storeId);
