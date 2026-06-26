@@ -25,6 +25,7 @@ type Body = {
   customerName?: string;
   customerPhone?: string; // fidelidade: identifica o cliente p/ pontuar a venda
   discountCents?: number; // desconto do operador (R$ ou % já convertido em centavos)
+  payments?: { method: PaymentMethod; amountCents: number }[]; // split de pagamento (>1 forma)
 };
 
 export async function POST(req: Request) {
@@ -57,8 +58,17 @@ export async function POST(req: Request) {
     const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
     const totalCents = subtotalCents - discountCents;
 
-    // taxa do cartão sobre o TOTAL pago (pós-desconto): usa a máquina escolhida ou a taxa flat
-    const card = await resolveCardFee(method, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+    // split de pagamento: 2+ formas numa venda. Valida a soma; taxa do cartão só sobre a parte no cartão.
+    const isCard = (m?: string) => m === "debito" || m === "credito";
+    const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && PAYMENTS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
+    const isSplit = rawPays.length >= 2;
+    if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
+      return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
+    }
+    const cardPay = rawPays.find((p) => isCard(p.method));
+    const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : method;
+    // taxa: sobre o total (forma única) ou só sobre a parcela no cartão (split)
+    const card = await resolveCardFee(isSplit ? (cardPay?.method ?? "dinheiro") : method, isSplit ? (cardPay?.amountCents ?? 0) : totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
 
     // item: peso entra no nome (ex "Comida a quilo 500g"); senão tamanho do produto se houver
     const items: OrderItem[] = resolved.map((it) => ({
@@ -85,7 +95,8 @@ export async function POST(req: Request) {
         totalCents,
         discountCents,
         consumes,
-        paymentMethod: method,
+        paymentMethod: effMethod,
+        payments: isSplit ? rawPays : undefined,
         cardFeeCents: card.feeCents,
         cardMachineId: card.machineId,
         cardMachineName: card.machineName,

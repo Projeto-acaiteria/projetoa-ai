@@ -13,18 +13,24 @@ async function resumo(session: CashSession) {
   const mesas = (await listMesaPayments()).filter((m) => m.date >= session.openedAt);
   const mesaCashCents = mesas.filter((m) => m.method === "dinheiro").reduce((s, m) => s + m.grossCents, 0);
   const mesaTotalCents = mesas.reduce((s, m) => s + m.grossCents, 0);
-  const salesCashCents = orders.filter((o) => o.paymentMethod === "dinheiro").reduce((s, o) => s + o.totalCents, 0) + mesaCashCents;
   const salesTotalCents = orders.reduce((s, o) => s + o.totalCents, 0) + mesaTotalCents;
-  // por método (conferência tripla): cartão (débito+crédito) e pix, com a taxa de maquininha
+  // por método (conferência tripla): se a order tem split (payments[]), soma cada forma no seu balde;
+  // senão cai no método único (o.paymentMethod). Backward-compat com vendas antigas.
   const isCard = (m?: string) => m === "debito" || m === "credito";
-  const salesCardCents =
-    orders.filter((o) => isCard(o.paymentMethod)).reduce((s, o) => s + o.totalCents, 0) +
-    mesas.filter((m) => isCard(m.method)).reduce((s, m) => s + m.grossCents, 0);
-  const salesPixCents =
-    orders.filter((o) => o.paymentMethod === "pix").reduce((s, o) => s + o.totalCents, 0) +
-    mesas.filter((m) => m.method === "pix").reduce((s, m) => s + m.grossCents, 0);
+  const bucket = (o: (typeof orders)[number]) => {
+    if (o.payments?.length) {
+      let cash = 0, card = 0, pix = 0;
+      for (const p of o.payments) { if (p.method === "dinheiro") cash += p.amountCents; else if (p.method === "pix") pix += p.amountCents; else card += p.amountCents; }
+      return { cash, card, pix };
+    }
+    return { cash: o.paymentMethod === "dinheiro" ? o.totalCents : 0, card: isCard(o.paymentMethod) ? o.totalCents : 0, pix: o.paymentMethod === "pix" ? o.totalCents : 0 };
+  };
+  const ob = orders.map(bucket);
+  const salesCashCents = ob.reduce((s, b) => s + b.cash, 0) + mesaCashCents;
+  const salesCardCents = ob.reduce((s, b) => s + b.card, 0) + mesas.filter((m) => isCard(m.method)).reduce((s, m) => s + m.grossCents, 0);
+  const salesPixCents = ob.reduce((s, b) => s + b.pix, 0) + mesas.filter((m) => m.method === "pix").reduce((s, m) => s + m.grossCents, 0);
   const cardFeeCents =
-    orders.filter((o) => isCard(o.paymentMethod)).reduce((s, o) => s + (o.cardFeeCents ?? 0), 0) +
+    orders.reduce((s, o) => s + (o.cardFeeCents ?? 0), 0) +
     mesas.filter((m) => isCard(m.method)).reduce((s, m) => s + (m.cardFeeCents ?? 0), 0);
   const cardNetCents = salesCardCents - cardFeeCents;
   const suprimentoCents = session.movements.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);

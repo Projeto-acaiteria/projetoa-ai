@@ -27,6 +27,7 @@ export type Order = {
   feeCents: number;
   totalCents: number;
   discountCents?: number; // desconto aplicado na venda (balcão/PDV)
+  payments?: { method: PaymentMethod; amountCents: number }[]; // split (>1 forma); ausente = forma única em paymentMethod
   status: OrderStatus;
   pointsAwarded?: number; // pontos já creditados (evita duplicar)
   paymentMethod?: PaymentMethod; // venda de balcão

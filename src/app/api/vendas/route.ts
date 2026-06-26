@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     customerPhone?: string;
     customerName?: string;
     discountCents?: number;
+    payments?: { method: PaymentMethod; amountCents: number }[];
   };
   try {
     b = await req.json();
@@ -51,9 +52,18 @@ export async function POST(req: Request) {
   // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
   const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
   const totalCents = subtotalCents - discountCents;
-  // taxa do cartão sobre o TOTAL pago: máquina escolhida (snapshot) ou taxa flat por método
+  // split de pagamento: 2+ formas. Valida a soma; taxa do cartão só sobre a parte no cartão.
+  const isCard = (m?: string) => m === "debito" || m === "credito";
+  const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && METHODS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
+  const isSplit = rawPays.length >= 2;
+  if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
+    return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
+  }
+  const cardPay = rawPays.find((p) => isCard(p.method));
+  const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : b.paymentMethod;
+  // taxa do cartão sobre o TOTAL pago (forma única) ou só sobre a parcela no cartão (split)
   const storeId = await resolveStoreId();
-  const card = await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+  const card = await resolveCardFee(isSplit ? (cardPay?.method ?? "dinheiro") : b.paymentMethod, isSplit ? (cardPay?.amountCents ?? 0) : totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
   const orderItems: OrderItem[] = items.map((i) => ({
     group: i.group || "Venda",
     name: i.name,
@@ -73,7 +83,8 @@ export async function POST(req: Request) {
       feeCents: 0, // sem taxa de entrega no balcão
       totalCents,
       discountCents,
-      paymentMethod: b.paymentMethod,
+      paymentMethod: effMethod,
+      payments: isSplit ? rawPays : undefined,
       cardFeeCents: card.feeCents,
       cardMachineId: card.machineId,
       cardMachineName: card.machineName,
@@ -102,7 +113,7 @@ export async function POST(req: Request) {
   }
 
   const changeCents =
-    b.paymentMethod === "dinheiro" && b.amountPaidCents
+    !isSplit && b.paymentMethod === "dinheiro" && b.amountPaidCents
       ? Math.max(0, b.amountPaidCents - totalCents)
       : 0;
 
