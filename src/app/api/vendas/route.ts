@@ -90,6 +90,7 @@ export async function POST(req: Request) {
       cardMachineName: card.machineName,
       cardFeePercent: card.feePercent,
       parcelas: card.parcelas,
+      consumes: b.consumes || [], // grava a ficha técnica aplicada (rastro de auditoria — espelha /api/balcao-venda)
     },
     nowIso,
     "entregue", // balcão = já entregue/pago
