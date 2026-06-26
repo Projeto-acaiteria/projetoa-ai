@@ -214,7 +214,16 @@ export async function getOrCreateOpenTab(tableId: number, label?: string, storeI
     .insert({ store_id: sid, table_id: tableId, label: label ?? null, status: "aberta", service_fee_cents: 0, cover_cents, people_count })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    // CORRIDA: 2 pedidos simultâneos na mesma mesa (vários QR ao mesmo tempo). O índice parcial
+    // único (mt-21: 1 comanda aberta por mesa) barra o 2º insert → reusa a comanda que venceu.
+    if ((error as { code?: string }).code === "23505") {
+      const { data: tab } = await d
+        .from("tabs").select("*").eq("store_id", sid).eq("table_id", tableId).eq("status", "aberta").maybeSingle();
+      if (tab) return tab as Tab;
+    }
+    throw error;
+  }
   return data as Tab;
 }
 
@@ -245,7 +254,14 @@ export async function getOrCreateTableByNumber(tableNumber: number, storeId?: st
   const { data: ex } = await d.from("tables").select("id").eq("store_id", sid).eq("number", tableNumber).maybeSingle();
   if (ex) return num(ex.id);
   const { data, error } = await d.from("tables").insert({ store_id: sid, number: tableNumber, area: "salao" }).select("id").single();
-  if (error) throw error;
+  if (error) {
+    // CORRIDA: criação simultânea da mesma mesa (UNIQUE store_id+number) → reusa a que venceu
+    if ((error as { code?: string }).code === "23505") {
+      const { data: ex2 } = await d.from("tables").select("id").eq("store_id", sid).eq("number", tableNumber).maybeSingle();
+      if (ex2) return num(ex2.id);
+    }
+    throw error;
+  }
   return num((data as { id: number }).id);
 }
 
