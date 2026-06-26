@@ -109,14 +109,16 @@ function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSe
   const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico">(null);
 
   return (
-    <div className="card overflow-hidden">
-      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="card relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 6%, var(--bg-elevated)) 0%, var(--bg-elevated) 50%)" }}>
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: "linear-gradient(90deg, var(--brand-600), transparent)" }} aria-hidden />
+      <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full blur-3xl" style={{ background: "color-mix(in srgb, var(--brand-600) 18%, transparent)" }} aria-hidden />
+      <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-lime">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-lime">
             <span className="h-2 w-2 rounded-full bg-lime" /> Caixa aberto
             <span className="font-semibold text-[var(--text-muted)]"><IconClock width={12} height={12} className="mb-0.5 inline" /> desde {hhmm(session.openedAt)}</span>
           </div>
-          <div className="mt-1 text-3xl font-extrabold text-ink">{brl(resumo.saldoCaixaCents)}</div>
+          <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink tabular-nums sm:text-5xl">{brl(resumo.saldoCaixaCents)}</div>
           <div className="text-xs font-semibold text-[var(--text-muted)]">em caixa agora</div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -262,8 +264,8 @@ function ConsultaModal({ onClose }: { onClose: () => void }) {
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-bg-elevated px-4 py-3">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</div>
-      <div className="mt-0.5 text-base font-extrabold text-ink">{value}</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</div>
+      <div className="mt-0.5 text-base font-extrabold tabular-nums text-ink">{value}</div>
       {sub && <div className="text-[11px] font-semibold text-[var(--text-faded)]">{sub}</div>}
     </div>
   );
