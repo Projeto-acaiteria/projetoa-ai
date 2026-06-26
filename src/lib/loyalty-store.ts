@@ -38,6 +38,10 @@ export async function setLoyalty(
       .sort((a, b) => a.points - b.points);
     if (!clean.rewards.length) clean.rewards = cur.rewards;
   }
+  if (Array.isArray(input.nonEarningCategories)) {
+    // categorias de revenda que não pontuam (açaí) — normaliza e deduplica
+    clean.nonEarningCategories = [...new Set(input.nonEarningCategories.map((c) => String(c).trim()).filter(Boolean))];
+  }
 
   await db().from("app_loyalty").upsert({ store_id: storeId, data: clean }, { onConflict: "store_id" });
   return clean;

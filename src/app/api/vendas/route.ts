@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addOrder, markPointsAwarded, type OrderItem } from "@/lib/orders-store";
-import { applyConsumes } from "@/lib/stock-store";
+import { applyConsumes, listStock } from "@/lib/stock-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -106,7 +106,21 @@ export async function POST(req: Request) {
     const cfg = await getLoyalty();
     const existing = await getByPhone(phone);
     const isFirstPurchase = !existing || existing.history.length === 0;
-    pointsAwarded = pointsForSale(totalCents, cfg, { isFirstPurchase });
+    // fidelidade por categoria (açaí): a montagem do copo (sem stockId) SEMPRE pontua; a revenda
+    // pontua só se a categoria do estoque não estiver desligada. Lookup server-side (não confia no client).
+    const nonEarning = new Set(cfg.nonEarningCategories ?? []);
+    let eligibleSubtotal = subtotalCents;
+    if (nonEarning.size) {
+      const catById = new Map((await listStock(storeId)).map((s) => [s.id, s.category]));
+      eligibleSubtotal = items.reduce((s, i) => {
+        const cat = i.stockId ? catById.get(i.stockId) : undefined;
+        const earns = !cat || !nonEarning.has(cat); // sem categoria de revenda = montagem = pontua
+        return s + (earns ? i.unitCents * i.qty : 0);
+      }, 0);
+    }
+    // desconto rateado proporcional sobre a parte elegível
+    const eligibleCents = subtotalCents > 0 ? Math.round((eligibleSubtotal * totalCents) / subtotalCents) : 0;
+    pointsAwarded = pointsForSale(eligibleCents, cfg, { isFirstPurchase });
     if (pointsAwarded > 0) {
       await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
       await markPointsAwarded(order.id, pointsAwarded);

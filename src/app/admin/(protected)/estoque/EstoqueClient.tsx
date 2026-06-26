@@ -45,6 +45,8 @@ export default function EstoqueClient() {
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<FamilyKey | "todos">("todos");
   const [modal, setModal] = useState<null | { kind: "add" } | { kind: "inventory" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" }>(null);
+  // fidelidade: categorias de revenda que NÃO pontuam (a montagem do copo sempre pontua). null=carregando.
+  const [nonEarning, setNonEarning] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +59,28 @@ export default function EstoqueClient() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    fetch("/api/loyalty", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setNonEarning(d.config?.nonEarningCategories ?? []))
+      .catch(() => setNonEarning([]));
+  }, []);
+
+  // liga/desliga pontos de uma categoria de revenda (otimista + persiste na config de fidelidade)
+  const toggleEarns = useCallback(async (cat: string) => {
+    setNonEarning((cur) => {
+      if (cur == null) return cur;
+      const next = cur.includes(cat) ? cur.filter((c) => c !== cat) : [...cur, cat];
+      fetch("/api/loyalty", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nonEarningCategories: next }) }).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // categorias de revenda EM USO (têm item com preço de venda) — só essas ganham o toggle de pontos
+  const resaleCats = useMemo(
+    () => FAMILIES[0].cats.filter((c) => items.some((i) => i.category === c && i.sellPriceCents)),
+    [items],
+  );
 
   const low = items.filter((i) => i.qty <= i.minQty);
   const expAlert = items.filter((i) => {
@@ -119,6 +143,32 @@ export default function EstoqueClient() {
       {loaded && items.length === 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-line p-6 text-center text-sm text-[var(--text-muted)]">
           Nenhum item ainda. Clique em &quot;Novo item&quot;.
+        </div>
+      )}
+
+      {/* Fidelidade: a montagem do copo sempre pontua; aqui o dono desliga a revenda que não deve gerar pontos */}
+      {nonEarning != null && resaleCats.length > 0 && (
+        <div className="card mt-5 p-4">
+          <h2 className="text-sm font-extrabold text-ink">Fidelidade — o que dá pontos</h2>
+          <p className="mb-3 mt-0.5 text-xs text-[var(--text-muted)]">
+            A montagem do copo sempre pontua. Desligue a revenda que não deve gerar pontos (ex: refrigerante).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {resaleCats.map((c) => {
+              const on = !nonEarning.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleEarns(c)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    on ? "border-brand-600 bg-bg-base text-brand-600" : "border-line bg-bg-surface-2 text-[var(--text-faded)]"
+                  }`}
+                >
+                  {CAT_LABEL[c]} · {on ? "dá pontos" : "sem pontos"}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -22,6 +22,9 @@ export type LoyaltyConfig = {
   doubleDay: number | null; // 0=dom..6=sáb com pontos multiplicados (null = nenhum)
   doubleMultiplier: number; // multiplicador do dia turbo (ex: 2 = dobro)
   firstPurchaseBonus: number; // pontos extras na 1ª compra do cliente
+  // AÇAÍ/PDV: categorias de REVENDA (stock.category) que NÃO pontuam — a montagem do copo
+  // sempre pontua. (No mundo relacional a regra mora em menu_categories.earns_points.)
+  nonEarningCategories: string[];
 };
 
 export const DEFAULT_LOYALTY: LoyaltyConfig = {
@@ -31,6 +34,7 @@ export const DEFAULT_LOYALTY: LoyaltyConfig = {
   doubleDay: null,
   doubleMultiplier: 2,
   firstPurchaseBonus: 0,
+  nonEarningCategories: [],
 };
 
 /** Centavos ELEGÍVEIS de uma lista de itens — só os de categoria que pontua.
