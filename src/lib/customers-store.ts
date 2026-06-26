@@ -5,8 +5,8 @@ import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 
 export type PointsTx = {
-  type: "earn" | "redeem" | "adjust";
-  points: number; // earn/adjust positivo, redeem negativo
+  type: "earn" | "redeem" | "adjust" | "expire"; // expire = baixa do cron (auditoria); FIFO ignora
+  points: number; // earn/adjust positivo, redeem/expire negativo
   ref: string; // ex: "#1043" ou "Açaí 300ml grátis"
   at: string;
 };

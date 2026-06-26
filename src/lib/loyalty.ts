@@ -64,6 +64,43 @@ export function bestAvailable(points: number, rewards: Reward[] = REWARDS): Rewa
 const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 export const dayLabel = (d: number | null) => (d == null ? "nenhum" : DIAS_SEMANA[d] ?? "?");
 
+/** Saldo VÁLIDO agora: simula o ledger FIFO com expiração (pontos valem validityDays dias).
+ *  Cada ganho vira um lote que expira em validityDays; resgates/ajustes negativos consomem os
+ *  lotes mais ANTIGOS ainda válidos (FIFO). Lançamentos 'expire' são ignorados (só auditoria do
+ *  cron). Como todo lote usa o mesmo prazo e os eventos entram em ordem, o lote da frente é sempre
+ *  o que expira primeiro. É a fonte da verdade pro gate de resgate e pro display do cliente. */
+export function validBalance(
+  history: { type: string; points: number; at: string }[],
+  validityDays: number = POINTS_VALIDITY_DAYS,
+  now: Date = new Date(),
+): number {
+  const ms = Math.max(1, validityDays) * 86400000;
+  const nowMs = now.getTime();
+  const evs = (history ?? [])
+    .filter((tx) => tx.type !== "expire")
+    .map((tx) => ({ points: Number(tx.points) || 0, t: new Date(tx.at).getTime() }))
+    .filter((e) => Number.isFinite(e.t))
+    .sort((a, b) => a.t - b.t);
+  const lots: { remaining: number; expiresAt: number }[] = [];
+  const dropExpired = (t: number) => { while (lots.length && lots[0].expiresAt <= t) lots.shift(); };
+  for (const e of evs) {
+    if (e.points > 0) {
+      lots.push({ remaining: e.points, expiresAt: e.t + ms });
+    } else if (e.points < 0) {
+      dropExpired(e.t); // lote já expirado não pode ser consumido por um resgate posterior
+      let need = -e.points;
+      while (need > 0 && lots.length) {
+        const take = Math.min(lots[0].remaining, need);
+        lots[0].remaining -= take;
+        need -= take;
+        if (lots[0].remaining <= 0) lots.shift();
+      }
+    }
+  }
+  dropExpired(nowMs);
+  return lots.reduce((s, l) => s + l.remaining, 0);
+}
+
 /** pontos finais aplicando dia-turbo + bônus de 1ª compra */
 export function pointsForSale(productCents: number, cfg: LoyaltyConfig, opts: { isFirstPurchase?: boolean; now?: Date } = {}): number {
   const now = opts.now ?? new Date();

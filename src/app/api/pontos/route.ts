@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getByPhone, listCustomers, redeem, normPhone } from "@/lib/customers-store";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { validBalance } from "@/lib/loyalty";
 import { getCurrentStore } from "@/lib/auth/store";
 
 export const runtime = "nodejs";
@@ -14,11 +15,15 @@ export async function GET(req: Request) {
   const store = url.searchParams.get("store") || undefined; // storeId — loyalty pública POR-LOJA
   if (phone) {
     const [customer, loy] = await Promise.all([getByPhone(phone, store), getLoyalty(store)]);
+    // saldo VÁLIDO ao vivo (expiração FIFO) — o cron só sincroniza 1x/dia; a borda mostra o certo
+    if (customer) customer.points = validBalance(customer.history, loy.validityDays);
     return NextResponse.json({ customer, rewards: loy.rewards });
   }
   // listar TODOS = admin
   if (!(await getCurrentStore())) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const [customers, loy] = await Promise.all([listCustomers(), getLoyalty()]);
+  for (const c of customers) c.points = validBalance(c.history, loy.validityDays);
+  customers.sort((a, b) => b.points - a.points); // re-ordena pelo saldo válido (listCustomers ordenou pelo bruto)
   return NextResponse.json({ customers, rewards: loy.rewards });
 }
 
@@ -30,13 +35,14 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const { rewards } = await getLoyalty();
-  const reward = rewards.find((r) => r.points === body.rewardPoints);
+  const loy = await getLoyalty();
+  const reward = loy.rewards.find((r) => r.points === body.rewardPoints);
   if (!body.phone || !reward) {
     return NextResponse.json({ error: "Telefone ou recompensa inválidos" }, { status: 400 });
   }
   const customer = await getByPhone(body.phone);
-  if (!customer || customer.points < reward.points) {
+  // gate por saldo VÁLIDO (não o bruto) — não deixa resgatar com pontos já expirados
+  if (!customer || validBalance(customer.history, loy.validityDays) < reward.points) {
     return NextResponse.json({ error: "Pontos insuficientes" }, { status: 400 });
   }
   const updated = await redeem(normPhone(body.phone), reward.points, reward.label, new Date().toISOString());

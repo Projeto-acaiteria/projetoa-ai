@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { saveCustomer, searchCustomers, getByPhone, listCustomers, normPhone } from "@/lib/customers-store";
 import { listOrders } from "@/lib/orders-store";
+import { getLoyalty } from "@/lib/loyalty-store";
+import { validBalance } from "@/lib/loyalty";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,13 +13,17 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const phone = sp.get("phone");
-  if (phone) return NextResponse.json({ customer: await getByPhone(phone) });
+  if (phone) {
+    const [customer, loy] = await Promise.all([getByPhone(phone), getLoyalty()]);
+    if (customer) customer.points = validBalance(customer.history, loy.validityDays); // saldo válido ao vivo
+    return NextResponse.json({ customer });
+  }
 
   const q = sp.get("q");
   if (q !== null) return NextResponse.json({ customers: await searchCustomers(q) });
 
   // enriquecido: cruza com pedidos pra último pedido + contagem
-  const [customers, orders] = await Promise.all([listCustomers(), listOrders()]);
+  const [customers, orders, loy] = await Promise.all([listCustomers(), listOrders(), getLoyalty()]);
   const byPhone: Record<string, { last: string; count: number }> = {};
   for (const o of orders) {
     const ph = normPhone(o.phone || "");
@@ -29,7 +35,7 @@ export async function GET(req: Request) {
   const enriched = customers.map((c) => ({
     phone: c.phone,
     name: c.name,
-    points: c.points,
+    points: validBalance(c.history, loy.validityDays), // saldo válido (não o bruto)
     birthday: c.birthday ?? null,
     lastOrderDate: byPhone[c.phone]?.last || null,
     orderCount: byPhone[c.phone]?.count || 0,
