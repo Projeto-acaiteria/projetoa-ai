@@ -106,6 +106,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const dec = (u: string) => setCart((c) => c.flatMap((l) => (l.uid === u ? (l.qty > 1 ? [{ ...l, qty: l.qty - 1 }] : []) : [l])));
   const del = (u: string) => setCart((c) => c.filter((l) => l.uid !== u));
   const setNote = (u: string, v: string) => setCart((c) => c.map((l) => (l.uid === u ? { ...l, note: v } : l)));
+  // qtd rápida: digita o número direto (3) em vez de tocar + várias vezes; clampa em [1, 999]
+  const setQty = (u: string, v: string) => { const n = Math.max(1, Math.min(999, parseInt(v.replace(/\D/g, ""), 10) || 1)); setCart((c) => c.map((l) => (l.uid === u ? { ...l, qty: n } : l))); };
 
   async function finalizar() {
     if (saving || !cart.length) return;
@@ -227,7 +229,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
                   {!l.grams && (
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => dec(l.uid)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
-                      <span className="w-4 text-center text-sm font-bold tabular-nums">{l.qty}</span>
+                      <input type="text" inputMode="numeric" value={l.qty} onChange={(e) => setQty(l.uid, e.target.value)} aria-label="Quantidade" className="w-9 rounded-lg border border-line bg-bg-base text-center text-sm font-bold tabular-nums text-ink outline-none focus:border-brand-600" />
                       <button onClick={() => inc(l.uid)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
                     </div>
                   )}
