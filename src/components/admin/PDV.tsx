@@ -55,8 +55,11 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const [result, setResult] = useState<null | { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number }>(null);
   const [cupomOpen, setCupomOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [discInput, setDiscInput] = useState("");
+  const [discMode, setDiscMode] = useState<"brl" | "pct">("brl");
   // qtd rápida: digita o número direto; clampa [1,999]
   const setQty = (key: string, v: string) => { const n = Math.max(1, Math.min(999, parseInt(v.replace(/\D/g, ""), 10) || 1)); setCart((prev) => prev.map((l) => (l.key === key ? { ...l, qty: n } : l))); };
+  const setNote = (key: string, v: string) => setCart((prev) => prev.map((l) => (l.key === key ? { ...l, note: v } : l)));
 
   function montaCupom(): CupomData {
     return {
@@ -69,7 +72,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
       customerName: customer?.name,
       phone: customer?.phone,
       items: cart.map((l) => ({ qty: l.qty, name: l.label, note: l.note, totalCents: l.unitCents * l.qty })),
-      totalCents: total,
+      totalCents: finalTotal,
+      subtotalCents: discountCents > 0 ? total : undefined,
+      discountCents: discountCents > 0 ? discountCents : undefined,
       receivedCents: result!.receivedCents,
       changeCents: result!.changeCents,
       pointsInfo: result!.pointsAwarded > 0 ? `Pontos ganhos: +${result!.pointsAwarded}` : undefined,
@@ -77,6 +82,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   }
 
   const total = cart.reduce((s, l) => s + l.unitCents * l.qty, 0);
+  const discRaw = parseFloat(discInput.replace(",", ".")) || 0;
+  const discountCents = discMode === "pct" ? Math.round((total * Math.min(discRaw, 100)) / 100) : Math.min(Math.round(discRaw * 100), total);
+  const finalTotal = Math.max(0, total - discountCents);
 
   function add(key: string, label: string, unitCents: number, group: string, stockId?: string) {
     setCart((prev) => {
@@ -94,7 +102,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const removeLine = (key: string) => setCart((prev) => prev.filter((l) => l.key !== key));
 
   function reset() {
-    setCart([]);
+    setCart([]); setDiscInput("");
     setCustomer(null);
     setResult(null);
     setPay(false);
@@ -195,7 +203,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               <IconCart width={18} height={18} className="text-brand-600" />
               <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Comanda</h2>
               {cart.length > 0 && (
-                <button onClick={() => setCart([])} className="ml-auto text-xs font-semibold text-[var(--text-faded)] hover:text-[var(--red-no)]">
+                <button onClick={() => { setCart([]); setDiscInput(""); }} className="ml-auto text-xs font-semibold text-[var(--text-faded)] hover:text-[var(--red-no)]">
                   limpar
                 </button>
               )}
@@ -210,7 +218,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
                     <div key={l.key} className="flex items-center gap-2 py-2.5">
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-ink">{l.label}</div>
-                        {l.note && <div className="truncate text-[11px] text-[var(--text-muted)]">{l.note}</div>}
+                        <input value={l.note ?? ""} onChange={(e) => setNote(l.key, e.target.value)} placeholder="Obs…" aria-label="Observação do item" className="mt-0.5 w-full rounded border border-line bg-bg-base px-1.5 py-0.5 text-[11px] text-ink outline-none focus:border-brand-600" />
                         <div className="text-xs text-[var(--text-muted)]">{brl(l.unitCents)}</div>
                       </div>
                       <button onClick={() => dec(l.key)} className="grid h-7 w-7 place-items-center rounded-md border border-line text-ink">
@@ -234,16 +242,32 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               <div className="mb-3">
                 <CustomerBox customer={customer} onChange={setCustomer} />
               </div>
-              <div className="mb-3 flex items-center justify-between">
+              {discountCents > 0 && (
+                <div className="mb-1 flex items-center justify-between text-sm text-[var(--text-muted)]">
+                  <span>Subtotal</span><span className="tabular-nums">{brl(total)}</span>
+                </div>
+              )}
+              {discountCents > 0 && (
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Desconto</span><span className="font-semibold tabular-nums text-lime">− {brl(discountCents)}</span>
+                </div>
+              )}
+              <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold text-[var(--text-muted)]">Total</span>
-                <span className="text-2xl font-extrabold text-ink">{brl(total)}</span>
+                <span className="text-2xl font-extrabold tabular-nums text-ink">{brl(finalTotal)}</span>
+              </div>
+              <div className="mb-3 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-[var(--text-muted)]">Desconto</span>
+                <input value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
+                <button type="button" onClick={() => setDiscMode("brl")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "brl" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>R$</button>
+                <button type="button" onClick={() => setDiscMode("pct")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "pct" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>%</button>
               </div>
               <button
                 onClick={() => setPay(true)}
                 disabled={cart.length === 0}
                 className="w-full rounded-xl brand-gradient py-3.5 font-bold text-white shadow-[var(--shadow-brand)] disabled:bg-none disabled:bg-bg-surface-2 disabled:text-[var(--text-faded)] disabled:shadow-none"
               >
-                Cobrar {brl(total)}
+                Cobrar {brl(finalTotal)}
               </button>
             </div>
           </div>
@@ -252,7 +276,8 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
 
       {pay && (
         <PayModal
-          total={total}
+          total={finalTotal}
+          discountCents={discountCents}
           fees={fees}
           machines={machines}
           onClose={() => setPay(false)}
@@ -529,6 +554,7 @@ function ProdBtn({ label, price, sub, disabled, onClick }: { label: string; pric
 
 function PayModal({
   total,
+  discountCents,
   cart,
   phone,
   onClose,
@@ -537,6 +563,7 @@ function PayModal({
   machines,
 }: {
   total: number;
+  discountCents: number;
   cart: CartLine[];
   phone: string;
   fees: Fees;
@@ -584,6 +611,7 @@ function PayModal({
           parcelas: method === "credito" ? parcelas : 1,
           amountPaidCents: method === "dinheiro" ? recCents : undefined,
           customerPhone: phone.trim() || undefined,
+          discountCents: discountCents || undefined,
         }),
       });
       const data = await res.json();

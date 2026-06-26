@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     amountPaidCents?: number;
     customerPhone?: string;
     customerName?: string;
+    discountCents?: number;
   };
   try {
     b = await req.json();
@@ -47,9 +48,12 @@ export async function POST(req: Request) {
   }
 
   const subtotalCents = items.reduce((s, i) => s + i.unitCents * i.qty, 0);
-  // taxa do cartão: máquina escolhida (snapshot) ou taxa flat por método — resolvido no servidor
+  // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
+  const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
+  const totalCents = subtotalCents - discountCents;
+  // taxa do cartão sobre o TOTAL pago: máquina escolhida (snapshot) ou taxa flat por método
   const storeId = await resolveStoreId();
-  const card = await resolveCardFee(b.paymentMethod, subtotalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+  const card = await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
   const orderItems: OrderItem[] = items.map((i) => ({
     group: i.group || "Venda",
     name: i.name,
@@ -67,7 +71,8 @@ export async function POST(req: Request) {
       items: orderItems,
       subtotalCents,
       feeCents: 0, // sem taxa de entrega no balcão
-      totalCents: subtotalCents,
+      totalCents,
+      discountCents,
       paymentMethod: b.paymentMethod,
       cardFeeCents: card.feeCents,
       cardMachineId: card.machineId,
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
     const cfg = await getLoyalty();
     const existing = await getByPhone(phone);
     const isFirstPurchase = !existing || existing.history.length === 0;
-    pointsAwarded = pointsForSale(subtotalCents, cfg, { isFirstPurchase });
+    pointsAwarded = pointsForSale(totalCents, cfg, { isFirstPurchase });
     if (pointsAwarded > 0) {
       await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
       await markPointsAwarded(order.id, pointsAwarded);
@@ -98,11 +103,11 @@ export async function POST(req: Request) {
 
   const changeCents =
     b.paymentMethod === "dinheiro" && b.amountPaidCents
-      ? Math.max(0, b.amountPaidCents - subtotalCents)
+      ? Math.max(0, b.amountPaidCents - totalCents)
       : 0;
 
   return NextResponse.json(
-    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: subtotalCents - card.feeCents },
+    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents },
     { status: 201 },
   );
 }

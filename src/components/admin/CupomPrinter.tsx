@@ -21,6 +21,8 @@ export type CupomData = {
   address?: string;
   items: CupomItem[];
   totalCents: number;
+  subtotalCents?: number;
+  discountCents?: number;
   receivedCents?: number;
   changeCents?: number;
   pointsInfo?: string;
@@ -73,6 +75,8 @@ export default function CupomPrinter({ data, onClose }: { data: CupomData; onClo
           </div>
         ))}
         {hr}
+        {data.discountCents ? <div style={row}><span>Subtotal</span><span>{brl(data.subtotalCents ?? data.totalCents + data.discountCents)}</span></div> : null}
+        {data.discountCents ? <div style={row}><span>Desconto</span><span>- {brl(data.discountCents)}</span></div> : null}
         <div style={{ ...row, fontWeight: 700, fontSize: "14px" }}><span>TOTAL</span><span>{brl(data.totalCents)}</span></div>
         {data.receivedCents != null && <div style={row}><span>Recebido</span><span>{brl(data.receivedCents)}</span></div>}
         {data.changeCents != null && data.changeCents > 0 && <div style={row}><span>Troco</span><span>{brl(data.changeCents)}</span></div>}
