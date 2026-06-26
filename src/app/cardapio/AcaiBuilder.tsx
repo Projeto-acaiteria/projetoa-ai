@@ -83,7 +83,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const zona = brand.deliveryZones.find((z) => z.bairro === bairro);
   const feeCents = mode === "entrega" ? (usaZonas ? (zona?.feeCents ?? 0) : brand.deliveryFeeCents) : 0;
   const totalCents = size.priceCents + addCents + feeCents;
-  const belowMin = totalCents < brand.minOrderCents;
+  const belowMin = mode === "entrega" && totalCents < brand.minOrderCents; // mínimo só vale p/ entrega
   const productCents = size.priceCents + addCents; // pontua só produto, sem taxa
   const earnPts = computePoints(productCents);
 

@@ -86,7 +86,8 @@ export async function POST(req: Request) {
       }
     }
     const totalCents = subtotalCents + feeCents;
-    if (totalCents < store.minOrderCents) {
+    // pedido mínimo é regra de ENTREGA — não trava retirada
+    if (mode === "entrega" && totalCents < store.minOrderCents) {
       return NextResponse.json({ error: `Pedido mínimo de R$ ${(store.minOrderCents / 100).toFixed(2).replace(".", ",")}` }, { status: 400 });
     }
 

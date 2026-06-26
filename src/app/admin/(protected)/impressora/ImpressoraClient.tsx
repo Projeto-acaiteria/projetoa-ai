@@ -119,13 +119,22 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
     setBusy(true);
     setMsg(null);
     try {
-      await qzConnect();
+      // a 1ª conexão do QZ às vezes demora (cold start do websocket) — corta em 8s com aviso
+      // claro em vez de deixar o botão travado em "..." sem feedback (achado do teste na DELL).
+      await Promise.race([
+        qzConnect(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
+      ]);
       setActive(true);
       setPrinters(await qzListPrinters());
       setMsg("QZ Tray conectado — escolha as impressoras abaixo.");
-    } catch {
+    } catch (e) {
       setActive(false);
-      setMsg("Não encontrei o QZ Tray rodando. Abra o app QZ Tray e clique em Conectar de novo.");
+      setMsg(
+        e instanceof Error && e.message === "timeout"
+          ? "O QZ Tray demorou a responder. Confirme que o app QZ Tray está aberto e clique em Conectar de novo (a 1ª conexão às vezes demora)."
+          : "Não encontrei o QZ Tray rodando. Abra o app QZ Tray e clique em Conectar de novo.",
+      );
     } finally {
       setBusy(false);
     }

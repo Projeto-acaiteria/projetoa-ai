@@ -87,7 +87,8 @@ async function recompute(body: RecvBody, storeId: string): Promise<Calc> {
     }
   }
   const totalCents = subtotalCents + feeCents;
-  if (totalCents < store.minOrderCents) {
+  // pedido mínimo é regra de ENTREGA (compensar a corrida) — não trava retirada no balcão
+  if (body.mode === "entrega" && totalCents < store.minOrderCents) {
     return { error: `Pedido mínimo de R$ ${(store.minOrderCents / 100).toFixed(2).replace(".", ",")}` };
   }
   const consumesArr = Object.entries(consumes).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));

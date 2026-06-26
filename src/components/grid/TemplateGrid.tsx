@@ -149,7 +149,7 @@ export default function TemplateGrid({
       if (!dName.trim() || !dPhone.trim()) { setErrorMsg("Informe nome e telefone."); return; }
       if (dMode === "entrega" && !dAddress.trim()) { setErrorMsg("Informe o endereço para entrega."); return; }
       if (dMode === "entrega" && usaZonas && !dBairro) { setErrorMsg("Escolha o bairro de entrega."); return; }
-      if (total + deliFee < minOrderCents) { setErrorMsg(`Pedido mínimo de ${brl(minOrderCents)}.`); return; }
+      if (dMode === "entrega" && total + deliFee < minOrderCents) { setErrorMsg(`Pedido mínimo de ${brl(minOrderCents)}.`); return; } // mínimo só na entrega
       setSending(true);
       try {
         const r = await fetch("/api/delivery-pedido", {
