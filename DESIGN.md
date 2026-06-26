@@ -119,6 +119,19 @@ Raio: `rounded-lg` (8px) inputs/pills, `rounded-xl` (12px) botões/cards, `round
 
 **thermal-receipt** (cravado): corpo 72mm/80mm, cabeçalho (nome/endereço/Tel/CNPJ), **SEMPRE negrito**, "NÃO É DOCUMENTO FISCAL". Ver `feedback_padrao_cupom_impressao`.
 
+## Card premium (KPI / número-herói — padrão palace)
+
+Aprendido do palace-system (adaptado ao nosso light/índigo). Aplicar em cards de **dashboard** (Início, Caixa, Financeiro) — NÃO em cards de info comuns:
+- **Gradiente sutil** no fundo: `linear-gradient(135deg, color-mix(in srgb, <tom> 6-8%, var(--bg-elevated)) 0%, var(--bg-elevated) 60%)`.
+- **Glow orb** no canto sup-direito: `absolute -right-8 -top-10 rounded-full blur-2xl` com `color-mix(in srgb, <tom> 20%, transparent)`.
+- **Linha de acento** no topo: `absolute inset-x-0 top-0 h-[2px]` com `linear-gradient(90deg, <tom>, transparent)`.
+- **Label** `text-[11px] uppercase tracking-widest`; **valor** com `tabular-nums`. `<tom>` = cor semântica (brand/green/gold).
+- Já encapsulado no `StatCard` (components/admin/ui.tsx) e no hero do Início/Caixa.
+
+## Stagger reveal & hover (globals.css)
+- `.stagger-item` — entra em cascata (fade-up, delays 0/70/140/210ms; respeita `prefers-reduced-motion`). Nos KPIs/listas de uma tela que carrega.
+- `.card-hover` — lift opt-in (`translateY(-3px)` + `--shadow-pop` + borda brand-400) **só** em card CLICÁVEL.
+
 ## Estados vazios
 
 Ícone (SVG) → headline (o que é/por que vazio) → texto curto → **1 CTA** (máx 2). O 1º empty state **É onboarding** — trate como tela de partida ("Criar 1º produto"), não erro. Copy: "duas partes instrução, uma parte simpatia".

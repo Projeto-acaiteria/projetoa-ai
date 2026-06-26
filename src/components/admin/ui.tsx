@@ -31,16 +31,20 @@ export function StatCard({
     gold: "bg-[#FBF1DC] text-gold",
     accent: "bg-[#FBF1DC] text-accent",
   }[tone];
+  // cor do tom pra gradiente/orb/acento (padrão palace adaptado ao light)
+  const toneVar = { brand: "var(--brand-600)", lime: "var(--green-ok)", gold: "var(--gold)", accent: "var(--accent)" }[tone];
   return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+    <div className="card relative overflow-hidden p-4" style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${toneVar} 8%, var(--bg-elevated)) 0%, var(--bg-elevated) 62%)` }}>
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${toneVar}, transparent)` }} aria-hidden />
+      <span className="pointer-events-none absolute -right-7 -top-9 h-24 w-24 rounded-full blur-2xl" style={{ background: `color-mix(in srgb, ${toneVar} 20%, transparent)` }} aria-hidden />
+      <div className="relative flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</span>
         <span className={`grid h-8 w-8 place-items-center rounded-lg ${toneBg}`}>
           <Icon width={17} height={17} />
         </span>
       </div>
-      <div className="mt-2 text-2xl font-extrabold text-ink">{value}</div>
-      {hint && <div className="mt-0.5 text-xs font-medium text-[var(--text-muted)]">{hint}</div>}
+      <div className="relative mt-2 text-2xl font-extrabold tabular-nums text-ink">{value}</div>
+      {hint && <div className="relative mt-0.5 text-xs font-medium text-[var(--text-muted)]">{hint}</div>}
     </div>
   );
 }
