@@ -4,7 +4,7 @@ import { useState } from "react";
 import { brl } from "@/lib/format";
 import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
-import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter } from "@/components/Icons";
+import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter, IconSearch } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
 import WeightModal from "@/components/admin/WeightModal";
 
@@ -15,6 +15,8 @@ const nowLabel = () => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 let pesoSeq = 0;
+// normaliza p/ busca: minúsculo + sem acento (açaí → acai)
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 const IconScale = (p: { width?: number; height?: number; className?: string }) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M7 21h10M5 7h14M5 7l-2.5 5a3 3 0 0 0 5 0L5 7zm14 0l-2.5 5a3 3 0 0 0 5 0L19 7z" /></svg>
 );
@@ -52,6 +54,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const [building, setBuilding] = useState<Size | null>(null);
   const [result, setResult] = useState<null | { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number }>(null);
   const [cupomOpen, setCupomOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // qtd rápida: digita o número direto; clampa [1,999]
+  const setQty = (key: string, v: string) => { const n = Math.max(1, Math.min(999, parseInt(v.replace(/\D/g, ""), 10) || 1)); setCart((prev) => prev.map((l) => (l.key === key ? { ...l, qty: n } : l))); };
 
   function montaCupom(): CupomData {
     return {
@@ -159,19 +164,27 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           )}
 
           {tab === "produtos" && (
-            <Section title="Produtos à venda">
-              {produtos.length === 0 && <p className="text-sm text-[var(--text-muted)]">Cadastre produtos à venda no Estoque (com preço).</p>}
-              {produtos.map((p) => (
-                <ProdBtn
-                  key={p.id}
-                  label={p.name}
-                  price={p.priceCents}
-                  sub={`${p.qty} ${p.unit} em estoque`}
-                  disabled={p.qty <= 0}
-                  onClick={() => add(`prod-${p.id}`, p.name, p.priceCents, "Produto", p.id)}
-                />
-              ))}
-            </Section>
+            <div>
+              {produtos.length > 0 && (
+                <div className="relative mb-3">
+                  <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--text-faded)]" aria-hidden />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} type="search" autoComplete="off" placeholder="Buscar produto pelo nome…" aria-label="Buscar produto" className="h-11 w-full rounded-lg border border-line bg-bg-elevated pl-10 pr-3 text-sm text-ink outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-400/40" />
+                </div>
+              )}
+              <Section title="Produtos à venda">
+                {produtos.length === 0 && <p className="text-sm text-[var(--text-muted)]">Cadastre produtos à venda no Estoque (com preço).</p>}
+                {produtos.filter((p) => !query.trim() || norm(p.name).includes(norm(query.trim()))).map((p) => (
+                  <ProdBtn
+                    key={p.id}
+                    label={p.name}
+                    price={p.priceCents}
+                    sub={`${p.qty} ${p.unit} em estoque`}
+                    disabled={p.qty <= 0}
+                    onClick={() => add(`prod-${p.id}`, p.name, p.priceCents, "Produto", p.id)}
+                  />
+                ))}
+              </Section>
+            </div>
           )}
         </div>
 
@@ -203,7 +216,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
                       <button onClick={() => dec(l.key)} className="grid h-7 w-7 place-items-center rounded-md border border-line text-ink">
                         <IconMinus width={13} height={13} />
                       </button>
-                      <span className="w-5 text-center text-sm font-bold text-ink">{l.qty}</span>
+                      <input type="text" inputMode="numeric" value={l.qty} onChange={(e) => setQty(l.key, e.target.value)} aria-label="Quantidade" className="w-9 rounded-md border border-line bg-bg-base text-center text-sm font-bold text-ink outline-none focus:border-brand-600" />
                       <button onClick={() => add(l.key, l.label, l.unitCents, l.group, l.stockId)} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-white">
                         <IconPlus width={13} height={13} />
                       </button>
