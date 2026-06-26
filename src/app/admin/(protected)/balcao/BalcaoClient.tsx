@@ -9,8 +9,12 @@ import { printTicket } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
+import { IconSearch } from "@/components/Icons";
 
 type Line = { uid: string; productId: string; name: string; qty: number; unitPriceCents: number; grams?: number; modifierIds?: string[] };
+
+// normaliza p/ busca: minúsculo + sem acento (açaí → acai)
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 
 const PAYS: { id: PaymentMethod; label: string }[] = [
   { id: "dinheiro", label: "Dinheiro" },
@@ -24,6 +28,7 @@ const uid = () => `l${++seq}`;
 
 export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; loyaltyEnabled: boolean }) {
   const [cart, setCart] = useState<Line[]>([]);
+  const [query, setQuery] = useState("");
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
   const [pay, setPay] = useState<PaymentMethod>("dinheiro");
@@ -125,12 +130,60 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
 
   const cats = categories.filter((c) => c.products.length);
 
+  // busca por nome (sem acento/caixa). Achata todos os produtos ativos das categorias.
+  const q = norm(query.trim());
+  const results = q
+    ? categories.flatMap((c) => c.products).filter((p) => norm(p.name).includes(q))
+    : [];
+  // adiciona via busca: roteia igual ao grid (peso/grupos/simples) e limpa a busca
+  function pickResult(p: BarProduct) {
+    onProduct(p);
+    if (!p.by_weight && !(p.groups && p.groups.length)) setQuery("");
+  }
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       {/* produtos */}
       <div className="space-y-6">
+        {/* busca por nome — Enter lança o 1º resultado */}
+        <div className="sticky top-0 z-10 -mx-1 bg-bg-base/95 px-1 pb-1 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-bg-base/80">
+          <div className="relative">
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--text-faded)]" aria-hidden />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && results[0]) { e.preventDefault(); pickResult(results[0]); }
+                else if (e.key === "Escape") setQuery("");
+              }}
+              type="search"
+              autoComplete="off"
+              placeholder="Buscar produto pelo nome…"
+              aria-label="Buscar produto"
+              className="h-11 w-full rounded-lg border border-line bg-bg-elevated pl-10 pr-3 text-sm text-ink outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-400/40"
+            />
+          </div>
+        </div>
+
         {cats.length === 0 && <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-[var(--text-muted)]">Sem produtos no cardápio ainda. Cadastre em Cardápio.</p>}
-        {cats.map((cat) => (
+
+        {q ? (
+          results.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-[var(--text-muted)]">Nenhum produto com “{query.trim()}”.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {results.map((p) => (
+                <button key={p.id} onClick={() => pickResult(p)} className="rounded-xl border border-line bg-bg-elevated p-3 text-left transition hover:border-brand-600 active:scale-[0.98]">
+                  <div className="text-sm font-bold leading-tight text-ink">{p.name}</div>
+                  <div className="mt-1 text-sm font-extrabold text-brand-600">
+                    {brl(p.price_cents)}{p.by_weight && <span className="text-[11px] font-medium text-[var(--text-faded)]">/kg</span>}
+                  </div>
+                  {p.by_weight && <span className="mt-1 inline-block rounded-full bg-[#E8F6DD] px-1.5 text-[10px] font-bold text-lime">pesar</span>}
+                </button>
+              ))}
+            </div>
+          )
+        ) : cats.map((cat) => (
           <section key={cat.id}>
             <h2 className="mb-2 text-sm font-extrabold text-ink">{cat.name}</h2>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
