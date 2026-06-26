@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getByPhone, listCustomers, redeem, normPhone } from "@/lib/customers-store";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { validBalance } from "@/lib/loyalty";
+import { catalogItemNames } from "@/lib/catalog";
 import { getCurrentStore } from "@/lib/auth/store";
 
 export const runtime = "nodejs";
@@ -20,11 +21,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ customer, rewards: loy.rewards });
   }
   // listar TODOS = admin
-  if (!(await getCurrentStore())) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const [customers, loy] = await Promise.all([listCustomers(), getLoyalty()]);
+  const currentStore = await getCurrentStore();
+  if (!currentStore) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const [customers, loy, menuItems] = await Promise.all([listCustomers(), getLoyalty(), catalogItemNames(currentStore.id)]);
   for (const c of customers) c.points = validBalance(c.history, loy.validityDays);
   customers.sort((a, b) => b.points - a.points); // re-ordena pelo saldo válido (listCustomers ordenou pelo bruto)
-  return NextResponse.json({ customers, rewards: loy.rewards });
+  return NextResponse.json({ customers, rewards: loy.rewards, menuItems });
 }
 
 // POST /api/pontos  { phone, rewardPoints }  -> resgate (confirmado pelo operador)

@@ -11,6 +11,7 @@ const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sáb
 export default function FidelidadeClient() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [menuItems, setMenuItems] = useState<string[]>([]); // itens do cardápio p/ sugerir prêmio
   const [loaded, setLoaded] = useState(false);
   const [openPhone, setOpenPhone] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -24,6 +25,7 @@ export default function FidelidadeClient() {
       const data = await res.json();
       setCustomers(data.customers ?? []);
       setRewards(data.rewards ?? []);
+      setMenuItems(data.menuItems ?? []);
     } finally {
       setLoaded(true);
     }
@@ -143,7 +145,7 @@ export default function FidelidadeClient() {
               {cfg.rewards.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 rounded-xl bg-bg-surface-2 p-2.5">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-white"><IconStar width={15} height={15} /></span>
-                  <input value={r.label} onChange={(e) => setRewardLabel(i, e.target.value)} placeholder="Ex: Copo 500ml · Cerveja · Pizza pequena"
+                  <input value={r.label} onChange={(e) => setRewardLabel(i, e.target.value)} list="cardapio-itens" placeholder="Escolha do cardápio ou digite (ex: Copo 500ml)"
                     className="min-w-0 flex-1 rounded-lg border border-line bg-bg-elevated px-3 py-2 text-sm font-bold text-ink outline-none focus:border-brand-600" />
                   <input type="number" min="1" value={r.points} onChange={(e) => setRewardPts(i, Number(e.target.value))}
                     className="w-20 shrink-0 rounded-lg border border-line bg-bg-elevated px-2 py-2 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
@@ -153,6 +155,11 @@ export default function FidelidadeClient() {
               ))}
               {cfg.rewards.length === 0 && <p className="rounded-xl border border-dashed border-line p-3 text-center text-xs text-[var(--text-muted)]">Nenhum prêmio ainda — adicione o que o cliente pode trocar por pontos.</p>}
             </div>
+            {/* sugestões = itens reais do cardápio da loja; o dono ainda pode digitar livre */}
+            <datalist id="cardapio-itens">
+              {menuItems.map((n) => <option key={n} value={n} />)}
+            </datalist>
+            {menuItems.length > 0 && <p className="mt-2 text-[11px] text-[var(--text-faded)]">Dica: clique no campo do prêmio pra escolher um item do seu cardápio.</p>}
           </div>
 
           <p className="mt-4 rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
