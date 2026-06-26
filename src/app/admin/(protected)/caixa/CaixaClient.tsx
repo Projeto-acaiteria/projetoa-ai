@@ -25,7 +25,10 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
   const [loaded, setLoaded] = useState(false);
   const [closeResult, setCloseResult] = useState<CashSession | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (data?: { session: CashSession | null; resumo: Resumo | null }) => {
+    // se quem chamou já tem o estado autoritativo (resposta do POST), aplica direto —
+    // sem refetch que pode correr atrás do write (race de read-after-write)
+    if (data) { setSession(data.session); setResumo(data.resumo ?? null); setLoaded(true); return; }
     const r = await fetch("/api/caixa", { cache: "no-store" });
     const d = await r.json();
     setSession(d.session);
@@ -105,7 +108,7 @@ function Abertura({ onOpened }: { onOpened: () => void }) {
 }
 
 /* ---------------- Painel do caixa aberto ---------------- */
-function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSession; resumo: Resumo; onChanged: () => void; onClosed: (s: CashSession) => void }) {
+function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSession; resumo: Resumo; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
   const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico">(null);
 
   return (
@@ -147,8 +150,8 @@ function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSe
         <Stat label="Sangrias / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} />
       </div>
 
-      {modal === "sangria" && <MovModal type="sangria" onClose={() => setModal(null)} onDone={() => { setModal(null); onChanged(); }} />}
-      {modal === "suprimento" && <MovModal type="suprimento" onClose={() => setModal(null)} onDone={() => { setModal(null); onChanged(); }} />}
+      {modal === "sangria" && <MovModal type="sangria" onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "suprimento" && <MovModal type="suprimento" onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
       {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
@@ -272,7 +275,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 /* ---------------- Modais ---------------- */
-function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; onClose: () => void; onDone: () => void }) {
+function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
   const [val, setVal] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -282,12 +285,13 @@ function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; o
     const n = Math.round((parseFloat(val) || 0) * 100);
     if (n <= 0) return;
     setSaving(true);
-    await fetch("/api/caixa", {
+    const r = await fetch("/api/caixa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: type, amountCents: n, reason }),
     });
-    onDone();
+    const d = await r.json().catch(() => null);
+    onDone(d && d.ok ? d : undefined); // aplica o resumo autoritativo do POST (sem refetch que corre atrás do write)
   }
 
   return (
