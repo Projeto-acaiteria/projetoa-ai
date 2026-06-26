@@ -37,6 +37,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitAmt, setSplitAmt] = useState<Record<string, string>>({ dinheiro: "", pix: "", debito: "", credito: "" });
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -52,6 +54,14 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const discRaw = parseFloat(discInput.replace(",", ".")) || 0;
   const discountCents = discMode === "pct" ? Math.round((total * Math.min(discRaw, 100)) / 100) : Math.min(Math.round(discRaw * 100), total);
   const finalTotal = Math.max(0, total - discountCents);
+  // split de pagamento: valor por forma; soma tem que bater o total (pós-desconto)
+  const toCentsS = (s: string) => Math.round((parseFloat((s || "").replace(",", ".")) || 0) * 100);
+  const splitCents = { dinheiro: toCentsS(splitAmt.dinheiro), pix: toCentsS(splitAmt.pix), debito: toCentsS(splitAmt.debito), credito: toCentsS(splitAmt.credito) };
+  const splitSum = splitCents.dinheiro + splitCents.pix + splitCents.debito + splitCents.credito;
+  const splitRemaining = finalTotal - splitSum;
+  const splitCardCents = splitCents.debito + splitCents.credito;
+  const splitPays = (["dinheiro", "pix", "debito", "credito"] as const).map((k) => ({ method: k, amountCents: splitCents[k] })).filter((p) => p.amountCents > 0);
+  const splitDominant = splitPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0]?.method ?? "dinheiro";
 
   async function buscarCliente() {
     const p = phone.trim();
@@ -115,7 +125,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
+        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -293,6 +303,10 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
           )}
 
           <p className="mt-3 mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Pagamento</p>
+          <button type="button" onClick={() => setSplitMode((v) => !v)} className={`mb-2 w-full rounded-lg border-2 py-1.5 text-xs font-bold transition ${splitMode ? "border-brand-600 text-brand-600" : "border-dashed border-line text-[var(--text-muted)]"}`}>
+            {splitMode ? "Dividindo em várias formas" : "Dividir pagamento (2+ formas)"}
+          </button>
+          {!splitMode && (<>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {PAYS.map((m) => (
               <button key={m.id} onClick={() => setPay(m.id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold transition ${pay === m.id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{m.label}</button>
@@ -313,10 +327,34 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
               )}
             </div>
           )}
+          </>)}
+
+          {splitMode && (
+            <div className="space-y-1.5">
+              {PAYS.map((m) => (
+                <div key={m.id} className="flex items-center gap-2">
+                  <span className="w-16 shrink-0 text-xs font-semibold text-ink-2">{m.label}</span>
+                  <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                    <span className="text-xs text-[var(--text-muted)]">R$</span>
+                    <input inputMode="decimal" value={splitAmt[m.id]} onChange={(e) => setSplitAmt((s) => ({ ...s, [m.id]: e.target.value }))} placeholder="0,00" className="w-full bg-transparent px-2 py-1.5 text-right text-sm font-bold text-ink outline-none" />
+                  </div>
+                </div>
+              ))}
+              {splitCardCents > 0 && activeMachines.length > 1 && (
+                <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                  {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              )}
+              <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${splitRemaining === 0 ? "bg-[#E8F6DD]" : "bg-bg-surface-2"}`}>
+                <span className={`text-xs font-semibold ${splitRemaining === 0 ? "text-lime" : "text-[var(--text-muted)]"}`}>{splitRemaining > 0 ? "Falta" : splitRemaining < 0 ? "Passou do total" : "Fechou"}</span>
+                <span className="text-base font-extrabold tabular-nums text-ink">{brl(Math.abs(splitRemaining))}</span>
+              </div>
+            </div>
+          )}
 
           {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
 
-          <button onClick={finalizar} disabled={saving || !cart.length} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
+          <button onClick={finalizar} disabled={saving || !cart.length || (splitMode && splitRemaining !== 0)} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
             {saving ? "Registrando…" : `Finalizar — ${brl(finalTotal)}`}
           </button>
         </div>
