@@ -11,7 +11,7 @@ import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
 import { IconSearch } from "@/components/Icons";
 
-type Line = { uid: string; productId: string; name: string; qty: number; unitPriceCents: number; grams?: number; modifierIds?: string[] };
+type Line = { uid: string; productId: string; name: string; qty: number; unitPriceCents: number; grams?: number; modifierIds?: string[]; note?: string };
 
 // normaliza p/ busca: minúsculo + sem acento (açaí → acai)
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -105,6 +105,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const inc = (u: string) => setCart((c) => c.map((l) => (l.uid === u ? { ...l, qty: l.qty + 1 } : l)));
   const dec = (u: string) => setCart((c) => c.flatMap((l) => (l.uid === u ? (l.qty > 1 ? [{ ...l, qty: l.qty - 1 }] : []) : [l])));
   const del = (u: string) => setCart((c) => c.filter((l) => l.uid !== u));
+  const setNote = (u: string, v: string) => setCart((c) => c.map((l) => (l.uid === u ? { ...l, note: v } : l)));
 
   async function finalizar() {
     if (saving || !cart.length) return;
@@ -112,7 +113,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds })) }),
+        body: JSON.stringify({ paymentMethod: pay, machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined, parcelas: pay === "credito" ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -122,7 +123,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       void printTicket(ticketHtml({
         loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
-        items: o.items.map((it: { qty: number; name: string; paidCents: number }) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
+        items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
         totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao",
       }));
       const pts = d.pointsAwarded ?? 0;
@@ -217,7 +218,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
           ) : (
             <ul className="mb-3 divide-y divide-line">
               {cart.map((l) => (
-                <li key={l.uid} className="flex items-center gap-2 py-2">
+                <li key={l.uid} className="py-2">
+                  <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-ink">{l.name}</div>
                     <div className="text-xs text-[var(--text-muted)]">{brl(l.unitPriceCents)}{l.qty > 1 ? ` × ${l.qty}` : ""}</div>
@@ -230,6 +232,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
                     </div>
                   )}
                   <button onClick={() => del(l.uid)} className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-faded)] hover:text-[var(--red-no)]">✕</button>
+                  </div>
+                  <input value={l.note ?? ""} onChange={(e) => setNote(l.uid, e.target.value)} placeholder="Obs: sem granola, pra viagem…" aria-label="Observação do item" className="mt-1.5 w-full rounded-lg border border-line bg-bg-base px-2.5 py-1.5 text-xs text-ink outline-none focus:border-brand-600" />
                 </li>
               ))}
             </ul>

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const PAYMENTS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
 
 type Body = {
-  items?: { productId: string; qty: number; grams?: number; modifierIds?: string[] }[];
+  items?: { productId: string; qty: number; grams?: number; modifierIds?: string[]; note?: string }[];
   paymentMethod?: string;
   machineId?: string; // máquina do cartão (define a taxa)
   parcelas?: number; // parcelas no crédito
@@ -66,6 +66,7 @@ export async function POST(req: Request) {
       name: it.name + (it.sizeLabel ? ` ${it.sizeLabel}` : "") + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : ""),
       qty: it.qty,
       paidCents: it.qty * it.unitPriceCents,
+      note: it.note ?? undefined,
     }));
 
     const consumesMap: Record<string, number> = {};

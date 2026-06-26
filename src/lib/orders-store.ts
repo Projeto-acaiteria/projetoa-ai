@@ -10,6 +10,7 @@ export type OrderItem = {
   name: string;
   qty: number;
   paidCents: number; // total cobrado deste item (0 = grátis)
+  note?: string; // observação livre do operador (ex: "sem granola", "pra viagem")
 };
 
 export type Order = {
