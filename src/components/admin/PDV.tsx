@@ -577,6 +577,15 @@ function PayModal({
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitAmt, setSplitAmt] = useState<Record<string, string>>({ dinheiro: "", pix: "", debito: "", credito: "" });
+  const toCents2 = (s: string) => Math.round((parseFloat((s || "").replace(",", ".")) || 0) * 100);
+  const splitCents = { dinheiro: toCents2(splitAmt.dinheiro), pix: toCents2(splitAmt.pix), debito: toCents2(splitAmt.debito), credito: toCents2(splitAmt.credito) };
+  const splitSum = splitCents.dinheiro + splitCents.pix + splitCents.debito + splitCents.credito;
+  const splitRemaining = total - splitSum;
+  const splitCardCents = splitCents.debito + splitCents.credito;
+  const splitPays = (["dinheiro", "pix", "debito", "credito"] as const).map((k) => ({ method: k, amountCents: splitCents[k] })).filter((p) => p.amountCents > 0);
+  const splitDominant = splitPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0]?.method ?? "dinheiro";
   const recCents = Math.round((parseFloat(received) || 0) * 100);
   const change = method === "dinheiro" ? Math.max(0, recCents - total) : 0;
   const selMachine = activeMachines.find((m) => m.id === machineId);
@@ -606,16 +615,17 @@ function PayModal({
         body: JSON.stringify({
           items: cart.map((l) => ({ name: l.note ? `${l.label} — ${l.note}` : l.label, qty: l.qty, unitCents: l.unitCents, group: l.group, stockId: l.stockId })),
           consumes: buildConsumes(),
-          paymentMethod: method,
-          machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined,
-          parcelas: method === "credito" ? parcelas : 1,
-          amountPaidCents: method === "dinheiro" ? recCents : undefined,
+          paymentMethod: splitMode ? splitDominant : method,
+          payments: splitMode ? splitPays : undefined,
+          machineId: ((splitMode ? splitCardCents > 0 : method === "debito" || method === "credito") && machineId) ? machineId : undefined,
+          parcelas: (splitMode ? splitCents.credito > 0 : method === "credito") ? parcelas : 1,
+          amountPaidCents: !splitMode && method === "dinheiro" ? recCents : undefined,
           customerPhone: phone.trim() || undefined,
           discountCents: discountCents || undefined,
         }),
       });
       const data = await res.json();
-      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, method, receivedCents: method === "dinheiro" ? recCents : undefined });
+      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined });
     } finally {
       setSending(false);
     }
@@ -638,6 +648,11 @@ function PayModal({
           <span className="text-2xl font-extrabold text-brand-600">{brl(total)}</span>
         </div>
 
+        <button type="button" onClick={() => setSplitMode((v) => !v)} className={`mb-3 w-full rounded-xl border-2 py-2 text-sm font-bold transition ${splitMode ? "border-brand-600 text-brand-600" : "border-dashed border-line text-[var(--text-muted)]"}`}>
+          {splitMode ? "Dividindo em várias formas" : "Dividir pagamento (2+ formas)"}
+        </button>
+
+        {!splitMode && (<>
         <div className="grid grid-cols-2 gap-2">
           {methods.map((m) => (
             <button
@@ -694,10 +709,34 @@ function PayModal({
             </div>
           </div>
         )}
+        </>)}
+
+        {splitMode && (
+          <div className="space-y-2">
+            {methods.map((m) => (
+              <div key={m.k} className="flex items-center gap-2">
+                <span className="w-20 shrink-0 text-sm font-semibold text-ink-2">{m.label}</span>
+                <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                  <span className="text-xs text-[var(--text-muted)]">R$</span>
+                  <input inputMode="decimal" value={splitAmt[m.k]} onChange={(e) => setSplitAmt((s) => ({ ...s, [m.k]: e.target.value }))} placeholder="0,00" className="w-full bg-transparent px-2 py-2 text-right text-sm font-bold text-ink outline-none" />
+                </div>
+              </div>
+            ))}
+            {splitCardCents > 0 && activeMachines.length > 1 && (
+              <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-xl border border-line bg-bg-base px-3 py-2.5 text-sm font-semibold text-ink outline-none">
+                {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            )}
+            <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${splitRemaining === 0 ? "bg-[#E8F6DD]" : "bg-bg-surface-2"}`}>
+              <span className={`text-sm font-semibold ${splitRemaining === 0 ? "text-lime" : "text-[var(--text-muted)]"}`}>{splitRemaining > 0 ? "Falta" : splitRemaining < 0 ? "Passou do total" : "Fechou"}</span>
+              <span className="text-lg font-extrabold tabular-nums text-ink">{brl(Math.abs(splitRemaining))}</span>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={finalize}
-          disabled={sending || (method === "dinheiro" && recCents < total)}
+          disabled={sending || (splitMode ? splitRemaining !== 0 : (method === "dinheiro" && recCents < total))}
           className="mt-5 w-full rounded-2xl brand-gradient py-4 font-bold text-white shadow-[var(--shadow-brand)] disabled:opacity-60"
         >
           {sending ? "Registrando..." : "Finalizar venda"}
