@@ -41,6 +41,15 @@ export async function qzPrintHtml(printer: string, html: string): Promise<void> 
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
 
+// Abre a gaveta de dinheiro: pulso ESC/POS na impressora térmica (a gaveta liga na
+// impressora pela RJ11). Comando ESC p m t1 t2 (m=0 pino, t1=25ms, t2=250ms) — padrão da
+// indústria. ⚠️ HARDWARE: só tem efeito com gaveta física conectada; sem ela, no-op inofensivo.
+export async function qzKickDrawer(printer: string): Promise<void> {
+  const qz = await qzConnect();
+  const cfg = qz.configs.create(printer, { encoding: "ISO-8859-1" });
+  await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: "\x1B\x70\x00\x19\xFA" }]);
+}
+
 export async function qzIsActive(): Promise<boolean> {
   try {
     const qz = await getQz();

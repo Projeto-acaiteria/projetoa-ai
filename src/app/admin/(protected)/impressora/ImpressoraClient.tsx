@@ -112,12 +112,16 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [printOnSale, setPrintOnSale] = useState(true);
   // imprimir 2 vias (cliente + loja) — POR-MÁQUINA, default ligado
   const [duasVias, setDuasVias] = useState(true);
+  // abrir gaveta de dinheiro ao finalizar venda em dinheiro — POR-MÁQUINA, default DESLIGADO (opt-in: só quem tem gaveta)
+  const [drawerAuto, setDrawerAuto] = useState(false);
 
   useEffect(() => { qzIsActive().then(setActive); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
   useEffect(() => { setDuasVias(localStorage.getItem("print:duasvias") !== "0"); }, []);
+  useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
   const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
   const toggleDuasVias = () => setDuasVias((v) => { const n = !v; localStorage.setItem("print:duasvias", n ? "1" : "0"); return n; });
+  const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
 
   async function connect() {
     setBusy(true);
@@ -208,6 +212,20 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${duasVias ? "brand-gradient" : "bg-bg-surface-2"}`}
           >
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${duasVias ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+          <div>
+            <div className="font-bold text-ink">Abrir gaveta ao finalizar (dinheiro)</div>
+            <div className="mt-0.5 text-xs text-[var(--text-muted)]">A gaveta liga na impressora térmica. Abre sozinha na venda em dinheiro. Ligue só se tiver gaveta.</div>
+          </div>
+          <button
+            onClick={toggleDrawer}
+            role="switch"
+            aria-checked={drawerAuto}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${drawerAuto ? "brand-gradient" : "bg-bg-surface-2"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${drawerAuto ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
       </Card>

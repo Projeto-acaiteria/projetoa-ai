@@ -5,7 +5,7 @@ import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
-import { printVias } from "@/lib/print";
+import { printVias, openDrawer } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
@@ -149,6 +149,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
         totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao", via,
       }));
+      // abre a gaveta na venda em dinheiro (se a máquina tiver gaveta ligada)
+      if (localStorage.getItem("drawer:auto") === "1" && (splitMode ? splitCents.dinheiro > 0 : pay === "dinheiro")) void openDrawer("caixa");
       const pts = d.pointsAwarded ?? 0;
       setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");
       setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");

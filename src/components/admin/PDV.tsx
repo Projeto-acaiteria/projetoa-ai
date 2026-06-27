@@ -6,7 +6,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter, IconSearch } from "@/components/Icons";
 import { type CupomData } from "@/components/admin/CupomPrinter";
-import { printVias } from "@/lib/print";
+import { printVias, openDrawer } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import WeightModal from "@/components/admin/WeightModal";
 import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
@@ -314,6 +314,8 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
             onSold?.();
             // auto-impressão POR-MÁQUINA: mesma política do Balcão (respeita o toggle autoprint:venda)
             if (typeof window !== "undefined" && localStorage.getItem("autoprint:venda") !== "0") printCupom(r);
+            // abre a gaveta na venda em dinheiro (se a máquina tiver gaveta ligada)
+            if (typeof window !== "undefined" && localStorage.getItem("drawer:auto") === "1" && r.method === "dinheiro") void openDrawer("caixa");
           }}
           cart={cart}
           phone={customer?.phone || ""}

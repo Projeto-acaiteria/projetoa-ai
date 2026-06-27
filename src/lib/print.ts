@@ -2,7 +2,7 @@
 // Imprime o cupom: tenta QZ Tray (silencioso, impressora do caixa); se não há
 // impressora configurada ou o QZ não responde, cai no iframe escondido (imprime
 // só o cupom, não a página inteira). Nunca lança — impressão não pode travar a venda.
-import { qzPrintHtml, getStationPrinter } from "./qz";
+import { qzPrintHtml, getStationPrinter, qzKickDrawer } from "./qz";
 
 export async function printTicket(html: string, station = "caixa"): Promise<"qz" | "iframe" | "erro"> {
   const printer = getStationPrinter(station);
@@ -30,6 +30,14 @@ export async function printTicket(html: string, station = "caixa"): Promise<"qz"
   } catch {
     return "erro";
   }
+}
+
+// Abre a gaveta de dinheiro ao finalizar (só via QZ — precisa do hardware). Sem impressora
+// configurada na máquina = no-op silencioso. Nunca lança: abrir gaveta não pode travar a venda.
+export async function openDrawer(station = "caixa"): Promise<void> {
+  const printer = getStationPrinter(station);
+  if (!printer) return;
+  try { await qzKickDrawer(printer); } catch { /* QZ caiu / sem gaveta — ignora */ }
 }
 
 // Imprime o cupom de VENDA em 1 ou 2 vias (cliente + loja), conforme a preferência POR-MÁQUINA
