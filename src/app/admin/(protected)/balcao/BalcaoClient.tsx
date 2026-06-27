@@ -5,8 +5,8 @@ import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
-import { printVias, openDrawer } from "@/lib/print";
-import { ticketHtml } from "@/lib/ticket";
+import { printVias, openDrawer, printTicket } from "@/lib/print";
+import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
 import { IconSearch } from "@/components/Icons";
@@ -151,6 +151,25 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       }));
       // abre a gaveta na venda em dinheiro (se a máquina tiver gaveta ligada)
       if (localStorage.getItem("drawer:auto") === "1" && (splitMode ? splitCents.dinheiro > 0 : pay === "dinheiro")) void openDrawer("caixa");
+      // vias de PREPARO por estação (cozinha/bar) — como nas mesas. Gated por toggle (default off);
+      // imprime só nas estações que têm impressora configurada (açaí sem estação = nada sai).
+      if (localStorage.getItem("autoprint:preparo") === "1" && Array.isArray(d.prep) && d.prep.length) {
+        const now2 = new Date();
+        const byStation = new Map<string, { qty: number; name: string; sizeLabel?: string | null; mods?: { name: string; price_cents: number }[] | null; note?: string | null }[]>();
+        for (const it of d.prep as { station: string; qty: number; name: string; sizeLabel?: string | null; mods?: { name: string; price_cents: number }[] | null; note?: string | null }[]) {
+          const st = it.station || "cozinha";
+          if (!byStation.has(st)) byStation.set(st, []);
+          byStation.get(st)!.push(it);
+        }
+        for (const [st, its] of byStation) {
+          void printTicket(stationTicketHtml({
+            loja: storeName, station: st, tableLabel: "BALCÃO",
+            dateLabel: `${String(now2.getHours()).padStart(2, "0")}:${String(now2.getMinutes()).padStart(2, "0")}`,
+            orderId: Number(String(o.display).replace(/\D/g, "")) || 0,
+            items: its.map((it) => ({ qty: it.qty, name: it.name, sizeLabel: it.sizeLabel, mods: it.mods, note: it.note })),
+          }), st);
+        }
+      }
       const pts = d.pointsAwarded ?? 0;
       setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");
       setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");

@@ -85,6 +85,10 @@ export async function POST(req: Request) {
     for (const it of resolved) for (const r of it.recipe) consumesMap[r.stockId] = (consumesMap[r.stockId] ?? 0) + r.qty * it.qty;
     const consumes = Object.entries(consumesMap).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));
 
+    // vias de PREPARO por estação (cozinha/bar/copa) — pro balcão imprimir como nas mesas.
+    // station vem da CATEGORIA (resolveOrderItems). O cliente agrupa por estação e imprime sem preço.
+    const prep = resolved.map((it) => ({ station: it.station || "cozinha", qty: it.qty, name: it.name, sizeLabel: it.sizeLabel, mods: it.mods, note: it.note ?? null }));
+
     const order = await addOrder(
       {
         customerName: b.customerName?.trim() || "Balcão",
@@ -137,7 +141,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, order, pointsAwarded, stockWarning }, { status: 201 });
+    return NextResponse.json({ ok: true, order, pointsAwarded, stockWarning, prep }, { status: 201 });
   } catch (e) {
     console.error("balcao-venda:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });
