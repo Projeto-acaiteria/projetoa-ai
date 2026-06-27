@@ -5,7 +5,9 @@ import { brl } from "@/lib/format";
 import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter, IconSearch } from "@/components/Icons";
-import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
+import { type CupomData } from "@/components/admin/CupomPrinter";
+import { printVias } from "@/lib/print";
+import { ticketHtml } from "@/lib/ticket";
 import WeightModal from "@/components/admin/WeightModal";
 import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
@@ -28,6 +30,7 @@ type PayMethod = "dinheiro" | "pix" | "debito" | "credito";
 export type Fees = Record<PayMethod, number>;
 type Qty = Record<string, number>;
 type Cust = { phone: string; name: string; points: number };
+type SaleResult = { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string };
 
 function groupUnits(g: ModifierGroup, qty: Qty) {
   return g.items.reduce((n, it) => n + (qty[it.id] || 0), 0);
@@ -53,8 +56,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const [customer, setCustomer] = useState<Cust | null>(null);
   const [pay, setPay] = useState(false);
   const [building, setBuilding] = useState<Size | null>(null);
-  const [result, setResult] = useState<null | { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string }>(null);
-  const [cupomOpen, setCupomOpen] = useState(false);
+  const [result, setResult] = useState<SaleResult | null>(null);
   const [query, setQuery] = useState("");
   const [discInput, setDiscInput] = useState("");
   const [discMode, setDiscMode] = useState<"brl" | "pct">("brl");
@@ -65,24 +67,30 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const setQty = (key: string, v: string) => { const n = Math.max(1, Math.min(999, parseInt(v.replace(/\D/g, ""), 10) || 1)); setCart((prev) => prev.map((l) => (l.key === key ? { ...l, qty: n } : l))); };
   const setNote = (key: string, v: string) => setCart((prev) => prev.map((l) => (l.key === key ? { ...l, note: v } : l)));
 
-  function montaCupom(): CupomData {
+  // monta o cupom a partir do resultado da venda (recebe `r` em vez de ler o state —
+  // evita corrida com o setResult na hora de imprimir no fim da venda)
+  function buildCupom(r: SaleResult): CupomData {
     return {
       loja: storeName,
       endereco, cnpj, tel,
-      display: result!.display,
+      display: r.display,
       dateLabel: nowLabel(),
       modeLabel: "Balcão",
-      paymentLabel: PAY_LABEL[result!.method],
+      paymentLabel: PAY_LABEL[r.method],
       customerName: customer?.name,
       phone: customer?.phone,
       items: cart.map((l) => ({ qty: l.qty, name: l.label, note: l.note, totalCents: l.unitCents * l.qty })),
       totalCents: finalTotal,
       subtotalCents: discountCents > 0 ? total : undefined,
       discountCents: discountCents > 0 ? discountCents : undefined,
-      receivedCents: result!.receivedCents,
-      changeCents: result!.changeCents,
-      pointsInfo: result!.pointsAwarded > 0 ? `Pontos ganhos: +${result!.pointsAwarded}` : undefined,
+      receivedCents: r.receivedCents,
+      changeCents: r.changeCents,
+      pointsInfo: r.pointsAwarded > 0 ? `Pontos ganhos: +${r.pointsAwarded}` : undefined,
     };
+  }
+  // imprime o cupom (1 ou 2 vias, mesma política do Balcão — respeita print:duasvias)
+  function printCupom(r: SaleResult) {
+    void printVias((via) => ticketHtml({ ...buildCupom(r), origem: "balcao", via }));
   }
 
   const total = cart.reduce((s, l) => s + l.unitCents * l.qty, 0);
@@ -110,7 +118,6 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
     setCustomer(null);
     setResult(null);
     setPay(false);
-    setCupomOpen(false);
   }
 
   // atalhos de teclado (caixa em PC fixo) — inativos na tela de sucesso/modais
@@ -148,14 +155,12 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
             ⚠ {result.stockWarning}
           </div>
         )}
-        <button onClick={() => setCupomOpen(true)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand-600 py-3.5 font-bold text-brand-600">
+        <button onClick={() => printCupom(result)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand-600 py-3.5 font-bold text-brand-600">
           <IconPrinter width={20} height={20} /> Imprimir cupom
         </button>
         <button onClick={reset} className="mt-2 w-full rounded-2xl brand-gradient py-4 font-bold text-white shadow-[var(--shadow-brand)]">
           Nova venda
         </button>
-
-        {cupomOpen && <CupomPrinter data={montaCupom()} onClose={() => setCupomOpen(false)} />}
       </div>
     );
   }
@@ -307,7 +312,8 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
             setPay(false);
             setResult(r);
             onSold?.();
-            setCupomOpen(true); // imprime o cupom automaticamente
+            // auto-impressão POR-MÁQUINA: mesma política do Balcão (respeita o toggle autoprint:venda)
+            if (typeof window !== "undefined" && localStorage.getItem("autoprint:venda") !== "0") printCupom(r);
           }}
           cart={cart}
           phone={customer?.phone || ""}
@@ -439,9 +445,27 @@ function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: 
   const [name, setName] = useState("");
   const [bday, setBday] = useState("");
   const [busy, setBusy] = useState(false);
+  // fidelidade: prêmios resgatáveis do cliente identificado (mesmo fluxo do Balcão)
+  const [rewards, setRewards] = useState<{ label: string; points: number }[]>([]);
+  const [loyBusy, setLoyBusy] = useState(false);
+  const [loyMsg, setLoyMsg] = useState("");
+
+  async function resgatar(rw: { label: string; points: number }) {
+    if (loyBusy || !customer) return;
+    setLoyBusy(true); setLoyMsg("");
+    try {
+      const r = await fetch("/api/pontos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: customer.phone, rewardPoints: rw.points }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha no resgate.");
+      onChange({ ...customer, points: d.customer?.points ?? customer.points });
+      setLoyMsg(`Resgatado: ${rw.label} ✓ (entregue ao cliente)`);
+    } catch (e) { setLoyMsg(e instanceof Error ? e.message : "Falha no resgate."); }
+    finally { setLoyBusy(false); }
+  }
 
   // cliente identificado
   if (customer) {
+    const redeemable = rewards.filter((rw) => customer.points >= rw.points);
     return (
       <div className="rounded-xl border border-lime/40 bg-[#F3FAEC] p-3">
         <div className="flex items-center justify-between">
@@ -451,10 +475,21 @@ function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: 
             </div>
             <div className="text-xs font-semibold text-lime">{customer.points} pontos · vai pontuar nesta venda</div>
           </div>
-          <button onClick={() => onChange(null)} className="shrink-0 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--red-no)]">
+          <button onClick={() => { onChange(null); setRewards([]); setLoyMsg(""); }} className="shrink-0 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--red-no)]">
             trocar
           </button>
         </div>
+        {redeemable.length > 0 && (
+          <div className="mt-2 space-y-1 border-t border-lime/30 pt-2">
+            <p className="text-[11px] font-bold uppercase text-[var(--text-muted)]">Resgatar prêmio</p>
+            {redeemable.map((rw) => (
+              <button key={rw.points} onClick={() => resgatar(rw)} disabled={loyBusy} className="flex w-full items-center justify-between rounded-lg border border-brand-400 bg-white px-2.5 py-1.5 text-xs font-bold text-brand-600 disabled:opacity-40">
+                <span className="truncate">{rw.label}</span><span className="shrink-0">−{rw.points} pts</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {loyMsg && <p className="mt-2 rounded-lg bg-[#E8F6DD] px-2.5 py-1.5 text-[11px] font-semibold text-lime">{loyMsg}</p>}
       </div>
     );
   }
@@ -463,8 +498,10 @@ function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: 
     if (!phone.trim()) return;
     setBusy(true);
     setNotfound(false);
-    const d = await fetch(`/api/clientes?phone=${encodeURIComponent(phone)}`, { cache: "no-store" }).then((r) => r.json());
+    // /api/pontos devolve cliente + prêmios da loja (saldo já é o VÁLIDO, com expiração)
+    const d = await fetch(`/api/pontos?phone=${encodeURIComponent(phone)}`, { cache: "no-store" }).then((r) => r.json());
     setBusy(false);
+    setRewards(Array.isArray(d.rewards) ? d.rewards : []);
     if (d.customer) onChange({ phone: d.customer.phone, name: d.customer.name, points: d.customer.points });
     else setNotfound(true);
   }
