@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { brl } from "@/lib/format";
 import type { CardMachine } from "@/lib/settings-store";
 import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter, IconSearch } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
 import WeightModal from "@/components/admin/WeightModal";
+import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão débito", credito: "Cartão crédito" };
 const nowLabel = () => {
@@ -57,6 +58,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   const [query, setQuery] = useState("");
   const [discInput, setDiscInput] = useState("");
   const [discMode, setDiscMode] = useState<"brl" | "pct">("brl");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const discRef = useRef<HTMLInputElement>(null);
   // qtd rápida: digita o número direto; clampa [1,999]
   const setQty = (key: string, v: string) => { const n = Math.max(1, Math.min(999, parseInt(v.replace(/\D/g, ""), 10) || 1)); setCart((prev) => prev.map((l) => (l.key === key ? { ...l, qty: n } : l))); };
   const setNote = (key: string, v: string) => setCart((prev) => prev.map((l) => (l.key === key ? { ...l, note: v } : l)));
@@ -108,6 +112,16 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
     setPay(false);
     setCupomOpen(false);
   }
+
+  // atalhos de teclado (caixa em PC fixo) — inativos na tela de sucesso/modais
+  usePdvHotkeys({
+    onHelp: () => setHelpOpen((v) => !v),
+    onSearch: () => { if (result) return; setTab("produtos"); setTimeout(() => searchRef.current?.focus(), 30); },
+    onCharge: () => { if (!result && !pay && !building && !weighing && cart.length > 0) setPay(true); },
+    onDiscount: () => { if (!result) { setTimeout(() => discRef.current?.focus(), 0); } },
+    onClear: () => { if (!result) { setCart([]); setDiscInput(""); } },
+    onEscape: () => setHelpOpen(false),
+  });
 
   /* ---- tela de sucesso ---- */
   if (result) {
@@ -181,7 +195,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               {produtos.length > 0 && (
                 <div className="relative mb-3">
                   <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--text-faded)]" aria-hidden />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} type="search" autoComplete="off" placeholder="Buscar produto pelo nome…" aria-label="Buscar produto" className="h-11 w-full rounded-lg border border-line bg-bg-elevated pl-10 pr-3 text-sm text-ink outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-400/40" />
+                  <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} type="search" autoComplete="off" placeholder="Buscar produto pelo nome…" aria-label="Buscar produto" className="h-11 w-full rounded-lg border border-line bg-bg-elevated pl-10 pr-3 text-sm text-ink outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-400/40" />
                 </div>
               )}
               <Section title="Produtos à venda">
@@ -263,7 +277,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               </div>
               <div className="mb-3 flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-[var(--text-muted)]">Desconto</span>
-                <input value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
+                <input ref={discRef} value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
                 <button type="button" onClick={() => setDiscMode("brl")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "brl" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>R$</button>
                 <button type="button" onClick={() => setDiscMode("pct")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "pct" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>%</button>
               </div>
@@ -274,10 +288,13 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               >
                 Cobrar {brl(finalTotal)}
               </button>
+              <ShortcutsHint onClick={() => setHelpOpen(true)} />
             </div>
           </div>
         </div>
       </div>
+
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
 
       {pay && (
         <PayModal

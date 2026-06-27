@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 import type { CardMachine } from "@/lib/settings-store";
@@ -10,6 +10,7 @@ import { ticketHtml } from "@/lib/ticket";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
 import { IconSearch } from "@/components/Icons";
+import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
 type Line = { uid: string; productId: string; name: string; qty: number; unitPriceCents: number; grams?: number; modifierIds?: string[]; note?: string };
 
@@ -29,6 +30,9 @@ const uid = () => `l${++seq}`;
 export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; loyaltyEnabled: boolean }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [query, setQuery] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const discRef = useRef<HTMLInputElement>(null);
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<BarProduct | null>(null);
   const [pay, setPay] = useState<PaymentMethod>("dinheiro");
@@ -167,6 +171,16 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     if (!p.by_weight && !(p.groups && p.groups.length)) setQuery("");
   }
 
+  // atalhos de teclado (caixa em PC fixo)
+  usePdvHotkeys({
+    onHelp: () => setHelpOpen((v) => !v),
+    onSearch: () => searchRef.current?.focus(),
+    onCharge: () => { void finalizar(); },
+    onDiscount: () => discRef.current?.focus(),
+    onClear: () => { setCart([]); setDiscInput(""); },
+    onEscape: () => setHelpOpen(false),
+  });
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       {/* produtos */}
@@ -176,6 +190,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
           <div className="relative">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--text-faded)]" aria-hidden />
             <input
+              ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -276,7 +291,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
             {/* desconto na venda — R$ ou % */}
             <div className="mt-2 flex items-center gap-1.5">
               <span className="text-xs font-semibold text-[var(--text-muted)]">Desconto</span>
-              <input value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
+              <input ref={discRef} value={discInput} onChange={(e) => setDiscInput(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Desconto na venda" className="ml-auto w-16 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right text-sm tabular-nums text-ink outline-none focus:border-brand-600" />
               <button type="button" onClick={() => setDiscMode("brl")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "brl" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>R$</button>
               <button type="button" onClick={() => setDiscMode("pct")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "pct" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>%</button>
             </div>
@@ -385,8 +400,11 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
           <button onClick={finalizar} disabled={saving || !cart.length || (splitMode && splitRemaining !== 0)} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">
             {saving ? "Registrando…" : `Finalizar — ${brl(finalTotal)}`}
           </button>
+          <ShortcutsHint onClick={() => setHelpOpen(true)} />
         </div>
       </div>
+
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
 
       {weightFor && <WeightModal product={weightFor} onClose={() => setWeightFor(null)} onConfirm={(g) => addWeight(weightFor, g)} />}
       {customizeFor && <ProductCustomizer product={customizeFor} accent="#4F46E5" onClose={() => setCustomizeFor(null)} onConfirm={(r) => addCustom(customizeFor, r)} />}
