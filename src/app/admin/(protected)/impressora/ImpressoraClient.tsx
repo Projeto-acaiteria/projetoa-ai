@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { IconPrinter, IconCheck } from "@/components/Icons";
-import { qzConnect, qzIsActive, qzListPrinters, qzPrintHtml, getStationPrinter, setStationPrinter } from "@/lib/qz";
+import { qzConnect, qzIsActive, qzListPrinters, qzPrintHtml, qzKickDrawer, getStationPrinter, setStationPrinter } from "@/lib/qz";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 
 function caixaTest(loja: string) {
@@ -127,6 +127,19 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
   const togglePrep = () => setPrepAuto((v) => { const n = !v; localStorage.setItem("autoprint:preparo", n ? "1" : "0"); return n; });
 
+  // dispara o pulso da gaveta isolado (sem fazer venda) — pra testar o hardware
+  async function testDrawer() {
+    const printer = getStationPrinter("caixa");
+    if (!printer) { setMsg("Escolha a impressora do caixa (logo abaixo) antes de testar a gaveta."); return; }
+    setMsg(null);
+    try {
+      await qzKickDrawer(printer);
+      setMsg("Pulso enviado pra gaveta. Se ela não abriu: confira o cabo RJ11 atrás da impressora e se o QZ Tray está conectado.");
+    } catch (e) {
+      setMsg("Falha ao abrir a gaveta: " + (e instanceof Error ? e.message : "erro") + ". Conecte o QZ Tray primeiro (botão acima).");
+    }
+  }
+
   async function connect() {
     setBusy(true);
     setMsg(null);
@@ -218,18 +231,23 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${duasVias ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-          <div>
-            <div className="font-bold text-ink">Abrir gaveta ao finalizar (dinheiro)</div>
-            <div className="mt-0.5 text-xs text-[var(--text-muted)]">A gaveta liga na impressora térmica. Abre sozinha na venda em dinheiro. Ligue só se tiver gaveta.</div>
+        <div className="mt-3 border-t border-line pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-bold text-ink">Abrir gaveta ao finalizar (dinheiro)</div>
+              <div className="mt-0.5 text-xs text-[var(--text-muted)]">A gaveta liga na impressora térmica (cabo RJ11). Abre sozinha na venda em dinheiro. Ligue só se tiver gaveta.</div>
+            </div>
+            <button
+              onClick={toggleDrawer}
+              role="switch"
+              aria-checked={drawerAuto}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition ${drawerAuto ? "brand-gradient" : "bg-bg-surface-2"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${drawerAuto ? "left-[22px]" : "left-0.5"}`} />
+            </button>
           </div>
-          <button
-            onClick={toggleDrawer}
-            role="switch"
-            aria-checked={drawerAuto}
-            className={`relative h-7 w-12 shrink-0 rounded-full transition ${drawerAuto ? "brand-gradient" : "bg-bg-surface-2"}`}
-          >
-            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${drawerAuto ? "left-[22px]" : "left-0.5"}`} />
+          <button onClick={testDrawer} className="mt-2 rounded-lg border-2 border-brand-600 px-4 py-2 text-xs font-bold text-brand-600">
+            Testar gaveta agora
           </button>
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
