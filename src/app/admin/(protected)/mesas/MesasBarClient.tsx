@@ -167,8 +167,18 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (n < 1) return;
     setBusy(true);
     try {
+      const before = tables.length;
       await fetch("/api/mesas/adicionar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n }) });
-      setAddOpen(false); setAddN(""); loadTables();
+      setAddOpen(false); setAddN("");
+      // refetch com retry curto: o pooler do Supabase tem read-after-write lag (mesmo padrão do
+      // getCurrentStore) — sem isso as mesas só apareciam após F5 (achado do teste na DELL).
+      for (const d of [0, 250, 600]) {
+        if (d) await new Promise((r) => setTimeout(r, d));
+        const r = await fetch("/api/mesas", { cache: "no-store" });
+        const got = (await r.json()).tables ?? [];
+        setTables(got);
+        if (got.length > before || got.length >= n) break;
+      }
     } finally { setBusy(false); }
   }
 

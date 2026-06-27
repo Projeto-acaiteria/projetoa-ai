@@ -44,6 +44,8 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const [err, setErr] = useState("");
   // fidelidade: identifica o cliente pelo telefone p/ pontuar a venda e resgatar prêmio (item inteiro)
   const [phone, setPhone] = useState("");
+  const [custName, setCustName] = useState(""); // nome do cliente NOVO (sem cadastro) — pra nomear na hora
+  const [recebido, setRecebido] = useState(""); // valor recebido em dinheiro → calcula troco
   const [customer, setCustomer] = useState<{ name: string; points: number; found: boolean } | null>(null);
   const [rewards, setRewards] = useState<{ label: string; points: number }[]>([]);
   const [loyMsg, setLoyMsg] = useState("");
@@ -125,7 +127,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: customer?.found ? customer.name : undefined, discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
+        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: custName.trim() || (customer?.found ? customer.name : undefined), discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -140,7 +142,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       }));
       const pts = d.pointsAwarded ?? 0;
       setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");
-      setPhone(""); setCustomer(null); setRewards([]); setLoyMsg("");
+      setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Falha ao registrar a venda.");
@@ -283,6 +285,9 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
               <input value={phone} onChange={(e) => { setPhone(e.target.value); setCustomer(null); setLoyMsg(""); }} onKeyDown={(e) => { if (e.key === "Enter") buscarCliente(); }} inputMode="tel" placeholder="telefone do cliente" className="min-w-0 flex-1 rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm text-ink outline-none focus:border-brand-600" />
               <button onClick={buscarCliente} disabled={loyBusy || !phone.trim()} className="rounded-lg border border-line px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-40">Buscar</button>
             </div>
+            {phone.trim() && (!customer || !customer.found) && (
+              <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="nome do cliente (novo)" className="mt-1.5 w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm text-ink outline-none focus:border-brand-600" />
+            )}
             {customer && (customer.found ? (
               <div className="mt-2">
                 <p className="text-sm text-ink"><b>{customer.name}</b> · <span className="font-bold text-brand-600">{customer.points} pts</span></p>
@@ -312,6 +317,24 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
               <button key={m.id} onClick={() => setPay(m.id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold transition ${pay === m.id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{m.label}</button>
             ))}
           </div>
+
+          {pay === "dinheiro" && (
+            <div className="mt-2">
+              <div className="flex items-center gap-2">
+                <span className="w-20 shrink-0 text-xs font-semibold text-ink-2">Recebido</span>
+                <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                  <span className="text-xs text-[var(--text-muted)]">R$</span>
+                  <input inputMode="decimal" value={recebido} onChange={(e) => setRecebido(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-1.5 text-right text-sm font-bold text-ink outline-none" />
+                </div>
+              </div>
+              {toCentsS(recebido) > 0 && (
+                <div className="mt-1.5 flex items-center justify-between rounded-lg bg-bg-surface-2 px-3 py-2">
+                  <span className="text-xs font-semibold text-[var(--text-muted)]">Troco</span>
+                  <span className="text-base font-extrabold tabular-nums text-ink">{brl(Math.max(0, toCentsS(recebido) - finalTotal))}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {(pay === "debito" || pay === "credito") && activeMachines.length > 0 && (
             <div className="mt-2 space-y-1.5 rounded-lg border border-line bg-bg-surface-2 p-2.5">
