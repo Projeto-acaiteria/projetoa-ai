@@ -11,7 +11,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
-import { printTicket } from "@/lib/print";
+import { printVias } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null; contaCalled: boolean };
@@ -212,8 +212,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
       // auto-impressão por-máquina (desligável na tela de Impressora; default ligado)
-      if (localStorage.getItem("autoprint:venda") !== "0") void printTicket(ticketHtml({
-        loja: storeName, endereco, cnpj, tel, display: dest,
+      if (localStorage.getItem("autoprint:venda") !== "0") void printVias((via) => ticketHtml({
+        loja: storeName, endereco, cnpj, tel, display: dest, via,
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
         items: [

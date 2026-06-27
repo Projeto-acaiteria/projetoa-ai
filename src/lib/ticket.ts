@@ -31,6 +31,7 @@ export type TicketData = {
   origem?: "balcao" | "link"; // pedido do link ganha destaque "NOVO PEDIDO ONLINE"
   code?: string; // código de rastreio (delivery) — sai destacado pro cliente acompanhar
   collectCents?: number; // valor a RECEBER do cliente na entrega/retirada (não processamos pagamento)
+  via?: string; // rótulo da via quando imprime 2 ("VIA DO CLIENTE" / "VIA DA LOJA")
 };
 
 const esc = (s: unknown) =>
@@ -118,22 +119,23 @@ export function ticketHtml(d: TicketData): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     *{font-family:'Courier New',monospace;color:#000;margin:0}
-    body{width:72mm;padding:2mm;font-size:13px;line-height:1.4;font-weight:700}
+    body{width:72mm;padding:2mm;font-size:14px;line-height:1.45;font-weight:700}
     .c{text-align:center}.b{font-weight:700}
     .dash{border-top:1px dashed #000;margin:5px 0}
     .lead{display:flex;align-items:baseline}
     .lead .dots{flex:1;border-bottom:1px dotted #000;margin:0 4px 3px}
     .tag{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin-bottom:4px;font-size:13px;letter-spacing:1px}
-    .brand{text-align:center;font-weight:700;font-size:18px;letter-spacing:1px}
-    .sub{text-align:center;font-size:11px}
+    .brand{text-align:center;font-weight:700;font-size:19px;letter-spacing:1px}
+    .sub{text-align:center;font-size:12px}
+    .info{text-align:center;font-size:13px;line-height:1.55}
     .dest{text-align:center;font-weight:700;font-size:22px;margin:5px 0 2px}
     .box{border:2px solid #000;padding:4px 6px;margin:4px 0;font-size:13px;line-height:1.5}
     .it{margin-bottom:3px}
     .it .ln{display:flex;gap:6px;align-items:baseline}
     .it .q{font-weight:700;min-width:26px}
-    .it .n{flex:1;font-size:13px;font-weight:700}
+    .it .n{flex:1;font-size:14px;font-weight:700}
     .it .v{font-weight:700}
-    .it .note{padding-left:32px;font-size:11px}
+    .it .note{padding-left:32px;font-size:12px}
     .total{font-size:16px}
     .track{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin:4px 0;letter-spacing:3px;font-size:15px}
     .collect{border:3px solid #000;text-align:center;font-weight:700;padding:5px;margin:5px 0;font-size:15px;line-height:1.3}
@@ -142,9 +144,9 @@ export function ticketHtml(d: TicketData): string {
     ${isLink ? `<div class="tag">NOVO PEDIDO ONLINE</div>` : ""}
     <div class="brand">${esc(d.loja).toUpperCase()}</div>
     ${d.tagline ? `<div class="sub">${esc(d.tagline)}</div>` : ""}
-    ${d.endereco ? `<div class="sub">${esc(d.endereco)}</div>` : ""}
-    ${d.tel ? `<div class="sub">Tel: ${esc(d.tel)}</div>` : ""}
-    ${d.cnpj ? `<div class="sub">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
+    ${d.endereco ? `<div class="info">${esc(d.endereco)}</div>` : ""}
+    ${d.tel ? `<div class="info">Tel: ${esc(d.tel)}</div>` : ""}
+    ${d.cnpj ? `<div class="info">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
     <div class="dash"></div>
     <div class="c b" style="font-size:13px;letter-spacing:1px">COMPROVANTE NÃO FISCAL</div>
     <div class="dash"></div>
@@ -165,6 +167,7 @@ export function ticketHtml(d: TicketData): string {
     ${d.changeCents != null && d.changeCents > 0 ? lead("Troco", brl(d.changeCents)) : ""}
     ${d.pointsInfo ? `<div class="c" style="margin-top:4px">${esc(d.pointsInfo)}</div>` : ""}
     <div class="dash"></div>
+    ${d.via ? `<div class="c b" style="font-size:13px;margin-bottom:2px">— ${esc(d.via)} —</div>` : ""}
     <div class="c b">NÃO É DOCUMENTO FISCAL</div>
     <div class="c" style="margin-top:3px">Obrigado! Volte sempre :)</div>
     <div class="c" style="font-size:10px;margin-top:6px">. . . . . . . .</div>

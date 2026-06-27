@@ -5,7 +5,7 @@ import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
-import { printTicket } from "@/lib/print";
+import { printVias } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
@@ -134,11 +134,11 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       // cupom (auto-impressão é POR-MÁQUINA — desligável na tela de Impressora; default ligado)
       const o = d.order;
       const now = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
-      if (localStorage.getItem("autoprint:venda") !== "0") void printTicket(ticketHtml({
+      if (localStorage.getItem("autoprint:venda") !== "0") void printVias((via) => ticketHtml({
         loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
-        totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao",
+        totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao", via,
       }));
       const pts = d.pointsAwarded ?? 0;
       setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");

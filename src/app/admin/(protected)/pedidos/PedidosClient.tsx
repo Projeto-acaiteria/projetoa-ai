@@ -5,7 +5,7 @@ import { Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { IconMoto, IconBag, IconArrowRight, IconPrinter, IconCheck } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
-import { printTicket } from "@/lib/print";
+import { printVias } from "@/lib/print";
 import { ticketHtml, type TicketData } from "@/lib/ticket";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import type { WaMsgs } from "@/lib/settings-store";
@@ -173,7 +173,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
         const novosLink = novos.filter((o) => o.mode !== "balcao");
         if (soundOn && novosLink.length) beep();
         if (autoPrint) {
-          for (const o of novosLink) void printTicket(ticketHtml(ticketFromOrder(o, storeName, { endereco, cnpj, tel })));
+          for (const o of novosLink) void printVias((via) => ticketHtml({ ...ticketFromOrder(o, storeName, { endereco, cnpj, tel }), via }));
         }
       }
     } catch {

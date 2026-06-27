@@ -31,3 +31,16 @@ export async function printTicket(html: string, station = "caixa"): Promise<"qz"
     return "erro";
   }
 }
+
+// Imprime o cupom de VENDA em 1 ou 2 vias (cliente + loja), conforme a preferência POR-MÁQUINA
+// `print:duasvias` (default LIGADO). makeHtml recebe o rótulo da via e devolve o HTML do cupom
+// (ex: (via) => ticketHtml({ ...dados, via })). Imprime sequencial pra não embaralhar na térmica.
+export async function printVias(makeHtml: (via?: string) => string, station = "caixa"): Promise<void> {
+  const duas = typeof window !== "undefined" && localStorage.getItem("print:duasvias") !== "0";
+  if (duas) {
+    await printTicket(makeHtml("VIA DO CLIENTE"), station);
+    await printTicket(makeHtml("VIA DA LOJA"), station);
+  } else {
+    await printTicket(makeHtml(), station);
+  }
+}

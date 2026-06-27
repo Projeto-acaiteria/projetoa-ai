@@ -110,10 +110,14 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [msg, setMsg] = useState<string | null>(null);
   // auto-imprimir cupom ao finalizar venda (balcão/mesa) — POR-MÁQUINA, default ligado
   const [printOnSale, setPrintOnSale] = useState(true);
+  // imprimir 2 vias (cliente + loja) — POR-MÁQUINA, default ligado
+  const [duasVias, setDuasVias] = useState(true);
 
   useEffect(() => { qzIsActive().then(setActive); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
+  useEffect(() => { setDuasVias(localStorage.getItem("print:duasvias") !== "0"); }, []);
   const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
+  const toggleDuasVias = () => setDuasVias((v) => { const n = !v; localStorage.setItem("print:duasvias", n ? "1" : "0"); return n; });
 
   async function connect() {
     setBusy(true);
@@ -190,6 +194,20 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${printOnSale ? "brand-gradient" : "bg-bg-surface-2"}`}
           >
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${printOnSale ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+          <div>
+            <div className="font-bold text-ink">Imprimir 2 vias (cliente + loja)</div>
+            <div className="mt-0.5 text-xs text-[var(--text-muted)]">Sai uma via pro cliente e uma pra loja, cada uma rotulada. Vale pra venda, mesa e delivery.</div>
+          </div>
+          <button
+            onClick={toggleDuasVias}
+            role="switch"
+            aria-checked={duasVias}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${duasVias ? "brand-gradient" : "bg-bg-surface-2"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${duasVias ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
       </Card>

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { brl } from "@/lib/format";
 import { IconPrinter, IconCheck } from "@/components/Icons";
-import { printTicket } from "@/lib/print";
+import { printVias } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 
 export type CupomItem = { qty: number; name: string; note?: string; totalCents: number };
@@ -34,7 +34,7 @@ const hr = <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />;
 
 export default function CupomPrinter({ data, onClose }: { data: CupomData; onClose: () => void }) {
   useEffect(() => {
-    void printTicket(ticketHtml({ ...data, origem: "balcao" }));
+    void printVias((via) => ticketHtml({ ...data, origem: "balcao", via }));
   }, [data]);
 
   return (
@@ -49,7 +49,7 @@ export default function CupomPrinter({ data, onClose }: { data: CupomData; onClo
           <h2 className="text-base font-extrabold text-ink">Cupom enviado pra impressão</h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Se nada saiu, confira a impressora no computador.</p>
           <div className="mt-4 flex gap-2">
-            <button onClick={() => void printTicket(ticketHtml({ ...data, origem: "balcao" }))} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line py-2.5 text-sm font-bold text-ink">
+            <button onClick={() => void printVias((via) => ticketHtml({ ...data, origem: "balcao", via }))} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line py-2.5 text-sm font-bold text-ink">
               <IconPrinter width={15} height={15} /> Imprimir de novo
             </button>
             <button onClick={onClose} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl brand-gradient py-2.5 text-sm font-bold text-white">
