@@ -123,6 +123,11 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
 
   async function finalizar() {
     if (saving || !cart.length) return;
+    // pra pontuar precisa de nome + telefone do cliente NOVO (cliente já cadastrado já tem nome)
+    if (phone.trim() && !customer?.found && !custName.trim()) {
+      setErr("Pra pontuar, informe o nome do cliente (ou remova o telefone).");
+      return;
+    }
     setSaving(true); setErr("");
     try {
       const r = await fetch("/api/balcao-venda", {

@@ -475,7 +475,7 @@ function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: 
           <input type="date" value={bday} onChange={(e) => setBday(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm outline-none focus:border-brand-600" />
         </div>
         <div className="flex gap-2">
-          <button onClick={cadastrar} disabled={busy || !phone.trim()} className="flex-1 rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-60">
+          <button onClick={cadastrar} disabled={busy || !phone.trim() || !name.trim()} className="flex-1 rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-60">
             {busy ? "..." : "Cadastrar e pontuar"}
           </button>
           <button onClick={() => setRegistering(false)} className="rounded-lg border border-line px-3 text-sm font-semibold text-[var(--text-muted)]">
