@@ -96,6 +96,83 @@ export function stationTicketHtml(d: StationTicketData): string {
   </body></html>`;
 }
 
+// ── LEITURA X (relatório parcial do caixa, NÃO zera, pode tirar N vezes) ───────
+// Imprime o resumo() do caixa aberto: recebimentos por método + conferência da
+// gaveta de dinheiro. Espelha o cabeçalho do cupom (white-label). É o "espelho"
+// que o operador tira durante o dia sem fechar o caixa (Z = fechamento que zera).
+export type LeituraXData = {
+  loja: string;
+  tagline?: string;
+  endereco?: string;
+  cnpj?: string;
+  tel?: string;
+  dateLabel: string; // momento da leitura
+  openedLabel: string; // hora de abertura do caixa
+  operator?: string;
+  seq?: number; // nº da leitura X nessa sessão (1ª, 2ª...)
+  nVendas: number;
+  salesCashCents: number;
+  salesCardCents: number;
+  cardFeeCents: number;
+  cardNetCents: number;
+  salesPixCents: number;
+  salesTotalCents: number;
+  openingFloatCents: number;
+  suprimentoCents: number;
+  sangriaCents: number;
+  saldoCaixaCents: number;
+};
+
+export function leituraXHtml(d: LeituraXData): string {
+  const card = d.salesCardCents > 0;
+  const pix = d.salesPixCents > 0;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    body{width:72mm;padding:2mm;font-size:14px;line-height:1.45;font-weight:700}
+    .c{text-align:center}.b{font-weight:700}
+    .dash{border-top:1px dashed #000;margin:5px 0}
+    .lead{display:flex;align-items:baseline}
+    .lead .dots{flex:1;border-bottom:1px dotted #000;margin:0 4px 3px}
+    .brand{text-align:center;font-weight:700;font-size:19px;letter-spacing:1px}
+    .sub{text-align:center;font-size:12px}
+    .info{text-align:center;font-size:13px;line-height:1.55}
+    .tag{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin:4px 0;font-size:15px;letter-spacing:2px}
+    .sec{font-size:12px;font-weight:700;margin-top:6px;text-transform:uppercase;letter-spacing:1px}
+    .total{font-size:16px}
+  </style></head><body>
+    <div class="brand">${esc(d.loja).toUpperCase()}</div>
+    ${d.tagline ? `<div class="sub">${esc(d.tagline)}</div>` : ""}
+    ${d.endereco ? `<div class="info">${esc(d.endereco)}</div>` : ""}
+    ${d.tel ? `<div class="info">Tel: ${esc(d.tel)}</div>` : ""}
+    ${d.cnpj ? `<div class="info">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
+    <div class="dash"></div>
+    <div class="tag">LEITURA X${d.seq ? ` Nº ${d.seq}` : ""}</div>
+    ${lead("Caixa aberto", esc(d.openedLabel))}
+    ${lead("Leitura", esc(d.dateLabel))}
+    ${d.operator ? lead("Operador", esc(d.operator)) : ""}
+    ${lead("Vendas", String(d.nVendas))}
+    <div class="dash"></div>
+    <div class="sec">Recebimentos</div>
+    ${lead("Dinheiro", brl(d.salesCashCents))}
+    ${card ? lead("Cartão (bruto)", brl(d.salesCardCents)) : ""}
+    ${card ? lead("Taxa maquininha", "- " + brl(d.cardFeeCents)) : ""}
+    ${card ? lead("Cartão (líquido)", brl(d.cardNetCents)) : ""}
+    ${pix ? lead("Pix", brl(d.salesPixCents)) : ""}
+    ${lead("TOTAL VENDIDO", brl(d.salesTotalCents), "b total")}
+    <div class="dash"></div>
+    <div class="sec">Gaveta (dinheiro)</div>
+    ${lead("Fundo de troco", brl(d.openingFloatCents))}
+    ${lead("Vendas em dinheiro", brl(d.salesCashCents))}
+    ${lead("Suprimentos", "+ " + brl(d.suprimentoCents))}
+    ${lead("Sangrias", "- " + brl(d.sangriaCents))}
+    ${lead("SALDO EM CAIXA", brl(d.saldoCaixaCents), "b total")}
+    <div class="dash"></div>
+    <div class="c b">LEITURA X — NÃO ZERA O CAIXA</div>
+    <div class="c">NÃO É DOCUMENTO FISCAL</div>
+    <div class="c" style="font-size:10px;margin-top:6px">. . . . . . . .</div>
+  </body></html>`;
+}
+
 export function ticketHtml(d: TicketData): string {
   const isLink = d.origem === "link";
 

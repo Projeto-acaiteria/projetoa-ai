@@ -8,7 +8,12 @@ import type { Customer } from "@/lib/customers-store";
 import { nextReward } from "@/lib/loyalty";
 import PDV, { type Fees } from "@/components/admin/PDV";
 import type { CardMachine } from "@/lib/settings-store";
-import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar } from "@/components/Icons";
+import { printTicket } from "@/lib/print";
+import { leituraXHtml } from "@/lib/ticket";
+import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter } from "@/components/Icons";
+
+type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
+const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
 type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number };
@@ -49,7 +54,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
 
   return (
     <div className="space-y-5">
-      <PainelCaixa session={session} resumo={resumo!} onChanged={load} onClosed={(s) => setCloseResult(s)} />
+      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} onChanged={load} onClosed={(s) => setCloseResult(s)} />
       {showPdv && <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} pricePerKgCents={pricePerKgCents} onSold={load} />}
       {!showPdv && <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>}
     </div>
@@ -108,8 +113,8 @@ function Abertura({ onOpened }: { onOpened: () => void }) {
 }
 
 /* ---------------- Painel do caixa aberto ---------------- */
-function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSession; resumo: Resumo; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
-  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico">(null);
+function PainelCaixa({ session, resumo, store, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
+  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax">(null);
 
   return (
     <div className="card relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 6%, var(--bg-elevated)) 0%, var(--bg-elevated) 50%)" }}>
@@ -130,6 +135,9 @@ function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSe
           </button>
           <button onClick={() => setModal("historico")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
             <IconClock width={15} height={15} /> Histórico
+          </button>
+          <button onClick={() => setModal("leiturax")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
+            <IconPrinter width={15} height={15} /> Leitura X
           </button>
           <button onClick={() => setModal("suprimento")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
             <IconPlus width={15} height={15} /> Suprimento
@@ -155,6 +163,7 @@ function PainelCaixa({ session, resumo, onChanged, onClosed }: { session: CashSe
       {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
+      {modal === "leiturax" && <LeituraXModal store={store} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -259,6 +268,76 @@ function ConsultaModal({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      )}
+    </Overlay>
+  );
+}
+
+/* ---------------- Leitura X (relatório parcial, não fecha o caixa) ---------------- */
+function LeituraXModal({ store, onClose }: { store: StoreHeader; onClose: () => void }) {
+  // prova-na-fonte: lê o estado autoritativo do servidor no momento da leitura
+  // (vendas podem ter rolado no PDV desde o último refresh do painel).
+  const [data, setData] = useState<{ session: CashSession; resumo: Resumo } | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/caixa", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d.session) setData({ session: d.session, resumo: d.resumo }); });
+  }, []);
+
+  async function imprimir() {
+    if (!data) return;
+    setPrinting(true);
+    // nº da leitura X por sessão (1ª, 2ª...) — local à máquina do caixa
+    const key = `leituraX:${data.session.id}`;
+    const seq = (parseInt(localStorage.getItem(key) || "0", 10) || 0) + 1;
+    const { session, resumo } = data;
+    const html = leituraXHtml({
+      loja: store.name, endereco: store.endereco, cnpj: store.cnpj, tel: store.tel,
+      dateLabel: dmyhm(new Date().toISOString()),
+      openedLabel: dmyhm(session.openedAt),
+      operator: session.operator,
+      seq,
+      nVendas: resumo.nVendas,
+      salesCashCents: resumo.salesCashCents,
+      salesCardCents: resumo.salesCardCents,
+      cardFeeCents: resumo.cardFeeCents,
+      cardNetCents: resumo.cardNetCents,
+      salesPixCents: resumo.salesPixCents,
+      salesTotalCents: resumo.salesTotalCents,
+      openingFloatCents: session.openingFloatCents,
+      suprimentoCents: resumo.suprimentoCents,
+      sangriaCents: resumo.sangriaCents,
+      saldoCaixaCents: resumo.saldoCaixaCents,
+    });
+    const r = await printTicket(html, "caixa");
+    localStorage.setItem(key, String(seq));
+    setPrinting(false);
+    setMsg(r === "erro" ? "Não consegui imprimir. Confira a impressora em /admin/impressora." : "Leitura X enviada pra impressora.");
+  }
+
+  return (
+    <Overlay title="Leitura X" onClose={onClose}>
+      <p className="text-sm text-[var(--text-muted)]">Espelho do caixa agora. Imprime quantas vezes quiser — <b className="text-ink">não fecha nem zera</b> o caixa (isso é o fechamento).</p>
+      {!data ? (
+        <p className="text-sm text-[var(--text-muted)]">Carregando...</p>
+      ) : (
+        <>
+          <div className="card divide-y divide-[var(--line)] text-left">
+            <Row label="Vendas no caixa" value={`${data.resumo.nVendas} venda${data.resumo.nVendas === 1 ? "" : "s"}`} />
+            <Row label="Dinheiro" value={brl(data.resumo.salesCashCents)} />
+            {data.resumo.salesCardCents > 0 && <Row label="Cartão (líquido)" value={brl(data.resumo.cardNetCents)} />}
+            {data.resumo.salesPixCents > 0 && <Row label="Pix" value={brl(data.resumo.salesPixCents)} />}
+            <Row label="Total vendido" value={brl(data.resumo.salesTotalCents)} strong />
+            <Row label="Saldo em caixa (gaveta)" value={brl(data.resumo.saldoCaixaCents)} strong tone="ok" />
+          </div>
+          <button onClick={imprimir} disabled={printing} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
+            <IconPrinter width={17} height={17} /> {printing ? "Imprimindo..." : "Imprimir Leitura X"}
+          </button>
+          {msg && <p className="text-center text-xs font-semibold text-[var(--text-muted)]">{msg}</p>}
+        </>
       )}
     </Overlay>
   );
