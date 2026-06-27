@@ -24,7 +24,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, showPdv, pricePerKgCents }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; showPdv: boolean; pricePerKgCents: number }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, showPdv, pricePerKgCents, cashPinSet }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -54,7 +54,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
 
   return (
     <div className="space-y-5">
-      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} onChanged={load} onClosed={(s) => setCloseResult(s)} />
+      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
       {showPdv && <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} pricePerKgCents={pricePerKgCents} onSold={load} />}
       {!showPdv && <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>}
     </div>
@@ -113,8 +113,8 @@ function Abertura({ onOpened }: { onOpened: () => void }) {
 }
 
 /* ---------------- Painel do caixa aberto ---------------- */
-function PainelCaixa({ session, resumo, store, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
-  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax">(null);
+function PainelCaixa({ session, resumo, store, cashPinSet, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; cashPinSet: boolean; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
+  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax" | "movimentos">(null);
 
   return (
     <div className="card relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 6%, var(--bg-elevated)) 0%, var(--bg-elevated) 50%)" }}>
@@ -155,11 +155,12 @@ function PainelCaixa({ session, resumo, store, onChanged, onClosed }: { session:
         <Stat label="Vendas (dinheiro)" value={brl(resumo.salesCashCents)} />
         <Stat label="Total vendido" value={brl(resumo.salesTotalCents)} sub={`${resumo.nVendas} venda${resumo.nVendas === 1 ? "" : "s"}`} />
         <Stat label="Fundo de troco" value={brl(session.openingFloatCents)} />
-        <Stat label="Sangrias / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} />
+        <Stat label="Sangrias / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? `${session.movements.length} mov. · ver trilha` : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
       </div>
 
-      {modal === "sangria" && <MovModal type="sangria" onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
-      {modal === "suprimento" && <MovModal type="suprimento" onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "sangria" && <MovModal type="sangria" cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "suprimento" && <MovModal type="suprimento" cashPinSet={false} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "movimentos" && <MovimentosModal movements={session.movements} onClose={() => setModal(null)} />}
       {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
@@ -343,34 +344,44 @@ function LeituraXModal({ store, onClose }: { store: StoreHeader; onClose: () => 
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-bg-elevated px-4 py-3">
+function Stat({ label, value, sub, onClick }: { label: string; value: string; sub?: string; onClick?: () => void }) {
+  const inner = (
+    <>
       <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</div>
       <div className="mt-0.5 text-base font-extrabold tabular-nums text-ink">{value}</div>
-      {sub && <div className="text-[11px] font-semibold text-[var(--text-faded)]">{sub}</div>}
-    </div>
+      {sub && <div className={`text-[11px] font-semibold ${onClick ? "text-brand-600" : "text-[var(--text-faded)]"}`}>{sub}</div>}
+    </>
   );
+  if (onClick) return <button onClick={onClick} className="bg-bg-elevated px-4 py-3 text-left transition hover:bg-bg-surface-2">{inner}</button>;
+  return <div className="bg-bg-elevated px-4 py-3">{inner}</div>;
 }
 
 /* ---------------- Modais ---------------- */
-function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
+function MovModal({ type, cashPinSet, onClose, onDone }: { type: "sangria" | "suprimento"; cashPinSet: boolean; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
   const [val, setVal] = useState("");
   const [reason, setReason] = useState("");
+  const [operator, setOperator] = useState("");
+  const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
   const isSangria = type === "sangria";
+  const needsPin = isSangria && cashPinSet;
 
   async function save() {
     const n = Math.round((parseFloat(val) || 0) * 100);
-    if (n <= 0) return;
-    setSaving(true);
+    if (n <= 0) { setErr("Informe um valor."); return; }
+    if (isSangria && !operator.trim()) { setErr("Diga quem está retirando."); return; }
+    if (needsPin && pin.trim().length < 4) { setErr("Digite o PIN do caixa."); return; }
+    setSaving(true); setErr("");
     const r = await fetch("/api/caixa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: type, amountCents: n, reason }),
+      body: JSON.stringify({ action: type, amountCents: n, reason, operator: operator.trim() || undefined, pin: needsPin ? pin.trim() : undefined }),
     });
     const d = await r.json().catch(() => null);
-    onDone(d && d.ok ? d : undefined); // aplica o resumo autoritativo do POST (sem refetch que corre atrás do write)
+    if (d && d.ok) { onDone(d); return; } // aplica o resumo autoritativo do POST (sem refetch que corre atrás do write)
+    setSaving(false);
+    setErr(d?.error || "Não consegui registrar.");
   }
 
   return (
@@ -382,10 +393,52 @@ function MovModal({ type, onClose, onDone }: { type: "sangria" | "suprimento"; o
         <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
         <input type="number" min={0} step="0.5" value={val} onChange={(e) => setVal(e.target.value)} placeholder="0,00" autoFocus className="w-full bg-transparent px-2 py-3 text-xl font-extrabold text-ink outline-none" />
       </div>
+      <input value={operator} onChange={(e) => setOperator(e.target.value)} placeholder={isSangria ? "Quem está retirando" : "Quem está fazendo (opcional)"} className="w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm outline-none focus:border-brand-600" />
       <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (ex: depósito, compra)" className="w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm outline-none focus:border-brand-600" />
+      {needsPin && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">PIN do caixa</label>
+          <input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••" className="mt-1 w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-center text-lg font-bold tracking-[0.3em] outline-none focus:border-brand-600" />
+        </div>
+      )}
+      {err && <p className="rounded-lg bg-[#FEECEC] px-3 py-2 text-center text-sm font-semibold text-[var(--red-no)]">{err}</p>}
       <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Salvando..." : isSangria ? "Registrar sangria" : "Registrar suprimento"}
       </button>
+    </Overlay>
+  );
+}
+
+// Trilha de auditoria do caixa aberto: cada sangria/suprimento com operador, motivo e hora.
+function MovimentosModal({ movements, onClose }: { movements: CashSession["movements"]; onClose: () => void }) {
+  const hm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return (
+    <Overlay title="Movimentos do caixa" onClose={onClose}>
+      {movements.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">Nenhuma sangria ou suprimento ainda.</p>
+      ) : (
+        <div className="max-h-80 space-y-2 overflow-y-auto">
+          {movements.map((m, i) => {
+            const sangria = m.type === "sangria";
+            return (
+              <div key={i} className="flex items-center gap-3 rounded-xl border border-line p-3">
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${sangria ? "bg-[#FEECEC] text-[var(--red-no)]" : "bg-[#E8F6DD] text-lime"}`}>
+                  {sangria ? <IconMinus width={15} height={15} /> : <IconPlus width={15} height={15} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-ink">{sangria ? "Sangria" : "Suprimento"}</span>
+                    <span className={`text-sm font-extrabold tabular-nums ${sangria ? "text-[var(--red-no)]" : "text-lime"}`}>{sangria ? "− " : "+ "}{brl(m.amountCents)}</span>
+                  </div>
+                  <div className="text-[11px] text-[var(--text-muted)]">
+                    {hm(m.at)}{m.by ? ` · ${m.by}` : ""}{m.reason ? ` · ${m.reason}` : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Overlay>
   );
 }

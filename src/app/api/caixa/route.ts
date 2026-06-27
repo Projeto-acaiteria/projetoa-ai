@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenSession, openCash, addMovement, closeCash, type CashSession } from "@/lib/cash-store";
+import { getCashPin } from "@/lib/settings-store";
 import { getCurrentUser } from "@/lib/auth/store";
 import { listOrders } from "@/lib/orders-store";
 import { listMesaPayments } from "@/lib/tables-store";
@@ -48,7 +49,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let b: { action?: string; floatCents?: number; amountCents?: number; reason?: string; countedCents?: number; cardCountedCents?: number; pixCountedCents?: number; operator?: string };
+  let b: { action?: string; floatCents?: number; amountCents?: number; reason?: string; countedCents?: number; cardCountedCents?: number; pixCountedCents?: number; operator?: string; pin?: string };
   try {
     b = await req.json();
   } catch {
@@ -67,7 +68,12 @@ export async function POST(req: Request) {
 
   if (b.action === "sangria" || b.action === "suprimento") {
     if (!b.amountCents || b.amountCents <= 0) return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
-    const session = await addMovement(b.action, b.amountCents, (b.reason || "").trim(), nowIso);
+    // sangria exige PIN do caixa (se configurado) — gate de autorização validado no servidor
+    if (b.action === "sangria") {
+      const pin = await getCashPin();
+      if (pin && (b.pin || "").trim() !== pin) return NextResponse.json({ error: "PIN incorreto" }, { status: 403 });
+    }
+    const session = await addMovement(b.action, b.amountCents, (b.reason || "").trim(), nowIso, b.operator);
     if (!session) return NextResponse.json({ error: "Nenhum caixa aberto" }, { status: 409 });
     return NextResponse.json({ ok: true, session, resumo: await resumo(session) });
   }

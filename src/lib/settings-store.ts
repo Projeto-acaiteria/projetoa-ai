@@ -106,7 +106,9 @@ export type CardMachine = {
   active: boolean;
 };
 
-type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings>; machines?: CardMachine[] };
+// cashPin: chave IRMÃ de `store` (NÃO entra no StoreSettings). Crítico: `getStore()` só
+// expõe `raw.store` → o cardápio público nunca recebe o PIN. Validação é 100% server-side.
+type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings>; machines?: CardMachine[]; cashPin?: string };
 
 async function readSettings(storeId: string): Promise<SettingsBlob> {
   const { data } = await db().from("app_settings").select("data").eq("store_id", storeId).maybeSingle();
@@ -209,6 +211,27 @@ export async function setFees(
 
 export function feeCentsFor(method: PaymentMethod, totalCents: number, fees: PaymentFees): number {
   return Math.round((totalCents * (fees[method] || 0)) / 100);
+}
+
+// PIN do caixa (autoriza sangria). SERVER-ONLY: nunca devolvido a nenhum client —
+// o caixa manda o PIN digitado e o servidor compara. Vazio = sem trava (só registra operador).
+export async function getCashPin(storeId?: string): Promise<string> {
+  const raw = await readSettings(storeId ?? (await resolveStoreId()));
+  return typeof raw.cashPin === "string" ? raw.cashPin : "";
+}
+
+export async function hasCashPin(storeId?: string): Promise<boolean> {
+  return (await getCashPin(storeId)).length > 0;
+}
+
+// Define/limpa o PIN. Só dígitos, 4–6; string vazia limpa (volta a não travar).
+export async function setCashPin(pin: string, storeId?: string): Promise<boolean> {
+  storeId = storeId ?? (await resolveStoreId());
+  const raw = await readSettings(storeId);
+  const clean = String(pin ?? "").replace(/\D+/g, "").slice(0, 6);
+  const next = clean.length >= 4 ? clean : ""; // <4 dígitos = limpa
+  await writeSettings(storeId, { ...raw, cashPin: next });
+  return next.length > 0;
 }
 
 function sanitizeMachine(m: Partial<CardMachine>): CardMachine {

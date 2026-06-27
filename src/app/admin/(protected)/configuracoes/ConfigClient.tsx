@@ -39,13 +39,16 @@ export default function ConfigClient() {
   const [store, setStore] = useState<Store | null>(null);
   const [config, setConfig] = useState<Config>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [hasPin, setHasPin] = useState(false);
+  const [pinInput, setPinInput] = useState(""); // novo PIN sendo digitado (vazio = não mexe)
+  const [pinDirty, setPinDirty] = useState(false); // só manda cashPin no PUT se o dono tocou
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, sells_by_weight: !!d.config.sells_by_weight } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, sells_by_weight: !!d.config.sells_by_weight } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -72,9 +75,15 @@ export default function ConfigClient() {
     const r = await fetch("/api/configuracoes", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fees, store, config: config ?? undefined, machines }),
+      // cashPin só vai quando o dono mexeu (string vazia/<4 dígitos limpa no servidor)
+      body: JSON.stringify({ fees, store, config: config ?? undefined, machines, cashPin: pinDirty ? pinInput : undefined }),
     });
-    if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+    if (r.ok) {
+      const d = await r.json().catch(() => null);
+      if (d) setHasPin(!!d.hasCashPin);
+      setPinInput(""); setPinDirty(false);
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    }
     setSaving(false);
   }
 
@@ -220,6 +229,30 @@ export default function ConfigClient() {
           </div>
         </Card>
       )}
+
+      {/* Segurança do caixa — PIN pra autorizar sangria */}
+      <Card className="p-5 sm:p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-brand-600">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <h2 className="text-base font-extrabold text-ink">Segurança do caixa</h2>
+        </div>
+        <p className="mb-4 text-sm text-[var(--text-muted)]">PIN de 4 a 6 dígitos pra autorizar <b className="text-ink">sangria</b> (retirada de dinheiro do caixa). Quem não tem o PIN não consegue tirar. Suprimento e venda não pedem PIN.</p>
+        <div className="mb-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${hasPin ? "bg-[#E8F6DD] text-lime" : "bg-bg-surface-2 text-[var(--text-muted)]"}`}>
+            {hasPin ? "PIN configurado" : "Sem PIN — sangria liberada"}
+          </span>
+        </div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">{hasPin ? "Trocar PIN" : "Definir PIN"}</label>
+        <div className="mt-1 flex items-center gap-2">
+          <input type="password" inputMode="numeric" autoComplete="off" value={pinInput} onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6)); setPinDirty(true); setSaved(false); }} placeholder={hasPin ? "novo PIN" : "4 a 6 dígitos"} className={`${inp} max-w-[180px] text-center font-bold tracking-[0.3em]`} />
+          {hasPin && <button type="button" onClick={() => { setPinInput(""); setPinDirty(true); setSaved(false); }} className="rounded-lg border border-line px-3 py-2.5 text-xs font-bold text-[var(--red-no)]">Remover PIN</button>}
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--text-faded)]">
+          {pinDirty && !pinInput ? "O PIN será REMOVIDO ao salvar." : "Salve as configurações pra aplicar. Menos de 4 dígitos remove o PIN."}
+        </p>
+      </Card>
 
       {/* Identidade visual (cardápio público) */}
       <Card className="p-5 sm:p-6">

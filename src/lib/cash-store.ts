@@ -8,6 +8,7 @@ export type CashMovement = {
   amountCents: number;
   reason: string;
   at: string;
+  by?: string; // operador que fez (trilha de auditoria) — nome digitado no caixa
 };
 
 export type CashSession = {
@@ -85,12 +86,12 @@ export async function openCash(floatCents: number, at: string, operator?: string
   return session;
 }
 
-export async function addMovement(type: "sangria" | "suprimento", amountCents: number, reason: string, at: string): Promise<CashSession | null> {
+export async function addMovement(type: "sangria" | "suprimento", amountCents: number, reason: string, at: string, by?: string): Promise<CashSession | null> {
   const open = await getOpenSession();
   if (!open) return null;
   return patchSession(open.id, (s) => ({
     ...s,
-    movements: [{ type, amountCents: Math.max(0, Math.round(amountCents)), reason, at }, ...s.movements],
+    movements: [{ type, amountCents: Math.max(0, Math.round(amountCents)), reason, at, by: by?.trim() || undefined }, ...s.movements],
   }));
 }
 
