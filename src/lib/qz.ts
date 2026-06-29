@@ -36,11 +36,11 @@ export async function qzConnect(): Promise<QZ> {
 
 export async function qzPrintHtml(printer: string, html: string): Promise<void> {
   const qz = await qzConnect();
-  // Papel 80mm tem ~72mm imprimíveis CENTRALIZADOS (~4mm de zona morta de cada lado). 72mm sozinho
-  // colava o corpo na esquerda e a 1ª letra caía na zona morta. Fix: corpo = 80mm (= papel) com o
-  // conteúdo no MEIO via padding lateral (6mm no ticket.ts) → cai dentro dos 72mm com folga, sem
-  // depender de offset da impressora. size=80 + corpo=80 = mapa 1:1 (sem ampliar). (29/06)
-  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 80 } });
+  // size 72 = página casa com a cabeça imprimível (~72mm). O conteúdo é estreitado e CENTRALIZADO
+  // via padding lateral (4mm no ticket.ts → texto de 64mm no meio), mesmo envelope do texto
+  // centralizado que comprovadamente cabe — assim as linhas alinhadas não vazam por NENHUM lado.
+  // (corpo de 80mm vazava dos dois lados; corpo de 72mm colado vazava à esquerda). (29/06 v2)
+  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 72 } });
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
 
