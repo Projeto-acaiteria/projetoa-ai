@@ -36,10 +36,11 @@ export async function qzConnect(): Promise<QZ> {
 
 export async function qzPrintHtml(printer: string, html: string): Promise<void> {
   const qz = await qzConnect();
-  // size DEVE ser 72mm = largura imprimível real da térmica 80mm. Com scaleContent, usar 80
-  // AMPLIA o corpo de 72mm p/ 80mm (~1,11x) e estoura a área imprimível pela esquerda — come o
-  // 1º caractere de cada linha (provado na foto do cupom do Cantinho, 29/06). 72 = mapeia 1:1.
-  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 72 } });
+  // Papel 80mm tem ~72mm imprimíveis CENTRALIZADOS (~4mm de zona morta de cada lado). 72mm sozinho
+  // colava o corpo na esquerda e a 1ª letra caía na zona morta. Fix: corpo = 80mm (= papel) com o
+  // conteúdo no MEIO via padding lateral (6mm no ticket.ts) → cai dentro dos 72mm com folga, sem
+  // depender de offset da impressora. size=80 + corpo=80 = mapa 1:1 (sem ampliar). (29/06)
+  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 80 } });
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
 
