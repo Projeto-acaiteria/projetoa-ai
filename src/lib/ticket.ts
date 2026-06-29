@@ -243,7 +243,7 @@ export function ticketHtml(d: TicketData): string {
     ${d.collectCents != null ? `<div class="collect">RECEBER ${d.paymentLabel ? `EM ${esc(d.paymentLabel).toUpperCase()}` : "DO CLIENTE"}<br><span class="v">${brl(d.collectCents)}</span></div>` : (d.paymentLabel ? `<div class="c">Pagamento: ${esc(d.paymentLabel)}</div>` : "")}
     ${d.receivedCents != null ? lead("Recebido", brl(d.receivedCents)) : ""}
     ${d.changeCents != null && d.changeCents > 0 ? lead("Troco", brl(d.changeCents)) : ""}
-    ${d.pointsInfo ? `<div class="c" style="margin-top:4px">${esc(d.pointsInfo)}</div>` : ""}
+    ${d.pointsInfo ? `<div class="box c" style="font-size:13px;line-height:1.4">${esc(d.pointsInfo).replace(/\n/g, "<br>")}</div>` : ""}
     <div class="dash"></div>
     ${d.via ? `<div class="c b" style="font-size:13px;margin-bottom:2px">— ${esc(d.via)} —</div>` : ""}
     <div class="c b">NÃO É DOCUMENTO FISCAL</div>

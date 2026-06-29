@@ -30,7 +30,7 @@ type PayMethod = "dinheiro" | "pix" | "debito" | "credito";
 export type Fees = Record<PayMethod, number>;
 type Qty = Record<string, number>;
 type Cust = { phone: string; name: string; points: number };
-type SaleResult = { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string };
+type SaleResult = { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string };
 
 function groupUnits(g: ModifierGroup, qty: Qty) {
   return g.items.reduce((n, it) => n + (qty[it.id] || 0), 0);
@@ -86,7 +86,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
       discountCents: discountCents > 0 ? discountCents : undefined,
       receivedCents: r.receivedCents,
       changeCents: r.changeCents,
-      pointsInfo: r.pointsAwarded > 0 ? `Pontos ganhos: +${r.pointsAwarded}` : undefined,
+      pointsInfo: r.pointsInfo,
     };
   }
   // imprime o cupom (1 ou 2 vias, mesma política do Balcão — respeita print:duasvias)
@@ -631,7 +631,7 @@ function PayModal({
   fees: Fees;
   machines: CardMachine[];
   onClose: () => void;
-  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; method: string; receivedCents?: number; stockWarning?: string }) => void;
+  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string }) => void;
 }) {
   const [method, setMethod] = useState<PayMethod>("dinheiro");
   const [received, setReceived] = useState("");
@@ -693,7 +693,7 @@ function PayModal({
         }),
       });
       const data = await res.json();
-      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
+      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, pointsInfo: data.pointsInfo, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
     } finally {
       setSending(false);
     }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { addOrder, markPointsAwarded, type OrderItem } from "@/lib/orders-store";
 import { applyConsumes, listStock } from "@/lib/stock-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
-import { pointsForSale } from "@/lib/loyalty";
+import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
@@ -106,6 +106,7 @@ export async function POST(req: Request) {
 
   // pontos (só se identificou o cliente por telefone)
   let pointsAwarded = 0;
+  let pointsInfo: string | undefined;
   if (b.customerPhone?.trim()) {
     const phone = b.customerPhone.trim();
     const cfg = await getLoyalty();
@@ -130,6 +131,8 @@ export async function POST(req: Request) {
       await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
       await markPointsAwarded(order.id, pointsAwarded);
     }
+    const balanceAfter = validBalance(existing?.history ?? [], cfg.validityDays) + pointsAwarded;
+    if (balanceAfter > 0) pointsInfo = loyaltyReceiptInfo(pointsAwarded, balanceAfter, cfg.rewards);
   }
 
   const changeCents =
@@ -138,7 +141,7 @@ export async function POST(req: Request) {
       : 0;
 
   return NextResponse.json(
-    { ok: true, order, pointsAwarded, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
+    { ok: true, order, pointsAwarded, pointsInfo, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
     { status: 201 },
   );
 }

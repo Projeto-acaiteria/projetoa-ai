@@ -148,7 +148,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
-        totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao", via,
+        totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, pointsInfo: d.pointsInfo, origem: "balcao", via,
       }));
       // abre a gaveta na venda em dinheiro (se a máquina tiver gaveta ligada)
       if (localStorage.getItem("drawer:auto") === "1" && (splitMode ? splitCents.dinheiro > 0 : pay === "dinheiro")) void openDrawer("caixa");

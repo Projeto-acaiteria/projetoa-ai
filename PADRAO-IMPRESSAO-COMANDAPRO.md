@@ -94,7 +94,7 @@ Cabeçalho (logo+dados) e mensagem de rodapé **configuráveis pelo lojista**; l
 | 1 | **Largura 72mm** (Achado #2) — feito, confirmar no papel | — | ✅ feito (falta foto) |
 | 2 | **Indicador de status do QZ no front** ("Impressora pronta / QZ Tray fechado / Escolha a impressora", com religar) — componente `QzStatus` no Caixa, Balcão e Mesas | baixo | ✅ feito (29/06) |
 | 3 | **Rodapé configurável** (`cupomRodape` em Ajustes → última linha do cupom de venda/delivery; vazio = "Obrigado! Volte sempre :)") | baixo | ✅ feito (29/06) |
-| 4 | **Fidelidade no cupom** ("faltam X pts") garantida e destacada — diferencial | baixo | Média |
+| 4 | **Fidelidade no cupom** — box destacado "Você ganhou +X · Saldo Y · Faltam Z pra [prêmio]" no cupom de venda (balcão + PDV açaí). Helper `loyaltyReceiptInfo`; APIs retornam `pointsInfo` enriquecido. Diferencial (nenhum concorrente imprime). | baixo | ✅ feito (29/06) |
 | 5 | **Via de delivery** completa (endereço+ref destaque, TROCO PARA, JÁ PAGO) — verificar/fechar | médio | Média (quando módulo delivery amadurecer) |
 | 6 | **Comprovante de sangria/suprimento** (Achado #1) — toggle por-máquina | baixo | Backlog |
 | 7 | **Perfil 58mm** — toggle largura por loja + template próprio | médio | Backlog (sob demanda) |

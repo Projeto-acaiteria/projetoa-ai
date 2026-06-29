@@ -6,7 +6,7 @@ import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
 import { applyConsumes } from "@/lib/stock-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
-import { pointsForSale } from "@/lib/loyalty";
+import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 
 export const runtime = "nodejs";
@@ -125,6 +125,7 @@ export async function POST(req: Request) {
 
     // fidelidade: pontua a venda se o operador identificou o cliente pelo telefone (espelha /api/vendas)
     let pointsAwarded = 0;
+    let pointsInfo: string | undefined;
     const phone = b.customerPhone?.trim();
     if (phone) {
       const cfg = await getLoyalty(storeId);
@@ -139,9 +140,11 @@ export async function POST(req: Request) {
         await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
         await markPointsAwarded(order.id, pointsAwarded, storeId);
       }
+      const balanceAfter = validBalance(existing?.history ?? [], cfg.validityDays) + pointsAwarded;
+      if (balanceAfter > 0) pointsInfo = loyaltyReceiptInfo(pointsAwarded, balanceAfter, cfg.rewards);
     }
 
-    return NextResponse.json({ ok: true, order, pointsAwarded, stockWarning, prep }, { status: 201 });
+    return NextResponse.json({ ok: true, order, pointsAwarded, pointsInfo, stockWarning, prep }, { status: 201 });
   } catch (e) {
     console.error("balcao-venda:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });

@@ -61,6 +61,22 @@ export function bestAvailable(points: number, rewards: Reward[] = REWARDS): Rewa
   return ok.length ? ok[ok.length - 1] : null;
 }
 
+/** Bloco de fidelidade pro cupom (gatilho de retorno): ganho + saldo + quanto falta pro
+ *  próximo prêmio. Diferencial — concorrentes não imprimem isso. Multi-linha (\n → <br> no cupom). */
+export function loyaltyReceiptInfo(earned: number, balance: number, rewards: Reward[] = REWARDS): string {
+  const pt = (n: number) => `${n} ${n === 1 ? "ponto" : "pontos"}`;
+  const lines: string[] = [];
+  if (earned > 0) lines.push(`Você ganhou +${pt(earned)}`);
+  lines.push(`Saldo: ${pt(balance)}`);
+  const nx = nextReward(balance, rewards);
+  if (nx) lines.push(`Faltam ${nx.missing} pra ${nx.reward.label}`);
+  else {
+    const b = bestAvailable(balance, rewards);
+    if (b) lines.push(`Você já pode trocar por ${b.label}!`);
+  }
+  return lines.join("\n");
+}
+
 const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 export const dayLabel = (d: number | null) => (d == null ? "nenhum" : DIAS_SEMANA[d] ?? "?");
 

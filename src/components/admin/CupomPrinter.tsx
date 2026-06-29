@@ -81,7 +81,7 @@ export default function CupomPrinter({ data, onClose }: { data: CupomData; onClo
         <div style={{ ...row, fontWeight: 700, fontSize: "14px" }}><span>TOTAL</span><span>{brl(data.totalCents)}</span></div>
         {data.receivedCents != null && <div style={row}><span>Recebido</span><span>{brl(data.receivedCents)}</span></div>}
         {data.changeCents != null && data.changeCents > 0 && <div style={row}><span>Troco</span><span>{brl(data.changeCents)}</span></div>}
-        {data.pointsInfo && <><div style={{ marginTop: "4px", textAlign: "center" }}>{data.pointsInfo}</div></>}
+        {data.pointsInfo && <div style={{ marginTop: "4px", textAlign: "center", border: "2px solid #000", padding: "4px" }}>{data.pointsInfo.split("\n").map((l, i) => <div key={i}>{l}</div>)}</div>}
         {hr}
         <div style={{ textAlign: "center" }}>{data.rodape && data.rodape.trim() ? data.rodape : "Obrigado! Volte sempre :)"}</div>
       </div>
