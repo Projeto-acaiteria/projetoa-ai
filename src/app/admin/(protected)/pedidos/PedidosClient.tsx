@@ -21,11 +21,11 @@ const WA_FALLBACK: WaMsgs = {
   entregue: "Pedido {codigo} entregue. Obrigado, {nome}!",
 };
 
-function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; cnpj: string; tel: string }): CupomData {
+function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; cnpj: string; tel: string; rodape?: string }): CupomData {
   const d = new Date(o.createdAt);
   const p = (n: number) => String(n).padStart(2, "0");
   return {
-    loja: storeName, endereco: head.endereco, cnpj: head.cnpj, tel: head.tel,
+    loja: storeName, endereco: head.endereco, cnpj: head.cnpj, tel: head.tel, rodape: head.rodape,
     display: o.display,
     dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
     modeLabel: MODE_LABEL[o.mode] ?? o.mode,
@@ -40,11 +40,11 @@ function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; c
 }
 
 // cupom térmico (auto-impressão) — tamanho em destaque + acompanhamentos
-function ticketFromOrder(o: Order, storeName: string, head: { endereco: string; cnpj: string; tel: string }): TicketData {
+function ticketFromOrder(o: Order, storeName: string, head: { endereco: string; cnpj: string; tel: string; rodape?: string }): TicketData {
   const d = new Date(o.createdAt);
   const p = (n: number) => String(n).padStart(2, "0");
   return {
-    loja: storeName, endereco: head.endereco, cnpj: head.cnpj, tel: head.tel,
+    loja: storeName, endereco: head.endereco, cnpj: head.cnpj, tel: head.tel, rodape: head.rodape,
     display: o.display,
     dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
     modeLabel: MODE_LABEL[o.mode] ?? o.mode,
@@ -114,7 +114,7 @@ const IconWhats = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 0 0 1.51 5.26l-.999 3.648 3.978-1.607z"/></svg>
 );
 
-export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, tel }: { storeName: string; storeSlug: string; endereco: string; cnpj: string; tel: string }) {
+export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, tel, cupomRodape }: { storeName: string; storeSlug: string; endereco: string; cnpj: string; tel: string; cupomRodape: string }) {
   // base do link de rastreio (origem do navegador + slug da loja) p/ anexar na mensagem do WhatsApp
   const trackBase = typeof window !== "undefined" && storeSlug ? `${window.location.origin}/${storeSlug}` : "";
   const [waMsgs, setWaMsgs] = useState<WaMsgs>(WA_FALLBACK);
@@ -173,7 +173,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
         const novosLink = novos.filter((o) => o.mode !== "balcao");
         if (soundOn && novosLink.length) beep();
         if (autoPrint) {
-          for (const o of novosLink) void printVias((via) => ticketHtml({ ...ticketFromOrder(o, storeName, { endereco, cnpj, tel }), via }));
+          for (const o of novosLink) void printVias((via) => ticketHtml({ ...ticketFromOrder(o, storeName, { endereco, cnpj, tel, rodape: cupomRodape }), via }));
         }
       }
     } catch {
@@ -334,7 +334,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
           </div>
         );
       })}
-      {printOrder && <CupomPrinter data={cupomFromOrder(printOrder, storeName, { endereco, cnpj, tel })} onClose={() => setPrintOrder(null)} />}
+      {printOrder && <CupomPrinter data={cupomFromOrder(printOrder, storeName, { endereco, cnpj, tel, rodape: cupomRodape })} onClose={() => setPrintOrder(null)} />}
     </div>
     </>
   );

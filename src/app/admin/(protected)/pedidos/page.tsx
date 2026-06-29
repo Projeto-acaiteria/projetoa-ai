@@ -14,7 +14,7 @@ export default async function PedidosPage() {
         sub="Pedidos do cardápio público caem aqui em tempo real"
         action={<Badge tone="lime">atualiza sozinho</Badge>}
       />
-      <PedidosClient storeName={store.name} storeSlug={cur?.slug ?? ""} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} />
+      <PedidosClient storeName={store.name} storeSlug={cur?.slug ?? ""} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
     </>
   );
 }

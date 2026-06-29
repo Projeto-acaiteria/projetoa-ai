@@ -26,6 +26,7 @@ export type CupomData = {
   receivedCents?: number;
   changeCents?: number;
   pointsInfo?: string;
+  rodape?: string; // mensagem do rodapé do cupom (config da loja)
 };
 
 const mono = { fontFamily: "'Courier New', monospace", color: "#000", background: "#fff" } as const;
@@ -82,7 +83,7 @@ export default function CupomPrinter({ data, onClose }: { data: CupomData; onClo
         {data.changeCents != null && data.changeCents > 0 && <div style={row}><span>Troco</span><span>{brl(data.changeCents)}</span></div>}
         {data.pointsInfo && <><div style={{ marginTop: "4px", textAlign: "center" }}>{data.pointsInfo}</div></>}
         {hr}
-        <div style={{ textAlign: "center" }}>Obrigado! Volte sempre :)</div>
+        <div style={{ textAlign: "center" }}>{data.rodape && data.rodape.trim() ? data.rodape : "Obrigado! Volte sempre :)"}</div>
       </div>
     </>
   );

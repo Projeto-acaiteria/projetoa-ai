@@ -32,6 +32,7 @@ export type TicketData = {
   code?: string; // código de rastreio (delivery) — sai destacado pro cliente acompanhar
   collectCents?: number; // valor a RECEBER do cliente na entrega/retirada (não processamos pagamento)
   via?: string; // rótulo da via quando imprime 2 ("VIA DO CLIENTE" / "VIA DA LOJA")
+  rodape?: string; // mensagem do rodapé (config da loja); vazio = "Obrigado! Volte sempre :)"
 };
 
 const esc = (s: unknown) =>
@@ -246,7 +247,7 @@ export function ticketHtml(d: TicketData): string {
     <div class="dash"></div>
     ${d.via ? `<div class="c b" style="font-size:13px;margin-bottom:2px">— ${esc(d.via)} —</div>` : ""}
     <div class="c b">NÃO É DOCUMENTO FISCAL</div>
-    <div class="c" style="margin-top:3px">Obrigado! Volte sempre :)</div>
+    <div class="c" style="margin-top:3px">${esc(d.rodape && d.rodape.trim() ? d.rodape : "Obrigado! Volte sempre :)")}</div>
     <div class="c" style="font-size:10px;margin-top:6px">. . . . . . . .</div>
   </body></html>`;
 }

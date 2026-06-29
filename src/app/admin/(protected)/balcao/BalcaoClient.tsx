@@ -28,7 +28,7 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 let seq = 0;
 const uid = () => `l${++seq}`;
 
-export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; loyaltyEnabled: boolean }) {
+export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, cupomRodape, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; loyaltyEnabled: boolean }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [query, setQuery] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -145,7 +145,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
       const o = d.order;
       const now = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       if (localStorage.getItem("autoprint:venda") !== "0") void printVias((via) => ticketHtml({
-        loja: storeName, endereco, cnpj, tel, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
+        loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: o.display, dateLabel: `${p2(now.getDate())}/${p2(now.getMonth() + 1)} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
         modeLabel: "Balcão", paymentLabel: PAYS.find((x) => x.id === pay)?.label,
         items: o.items.map((it: { qty: number; name: string; paidCents: number; note?: string }) => ({ qty: it.qty, name: it.name, note: it.note, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
         totalCents: o.totalCents, subtotalCents: o.discountCents ? o.subtotalCents : undefined, discountCents: o.discountCents || undefined, code: o.code, origem: "balcao", via,

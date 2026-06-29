@@ -49,7 +49,7 @@ function groupCost(g: ModifierGroup, qty: Qty) {
   return cents;
 }
 
-export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, pricePerKgCents, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; pricePerKgCents: number; onSold?: () => void }) {
+export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, pricePerKgCents, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; pricePerKgCents: number; onSold?: () => void }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [tab, setTab] = useState<"peso" | "acai" | "produtos">(pricePerKgCents > 0 ? "peso" : "acai");
   const [weighing, setWeighing] = useState(false);
@@ -73,6 +73,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
     return {
       loja: storeName,
       endereco, cnpj, tel,
+      rodape: cupomRodape,
       display: r.display,
       dateLabel: nowLabel(),
       modeLabel: "Balcão",

@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -120,6 +120,11 @@ export default function ConfigClient() {
             <label className="text-xs font-semibold text-[var(--text-muted)]">CNPJ ou CPF (cupom)</label>
             <input className={`${inp} mt-1`} value={store.cnpj} onChange={(e) => setS("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
             <p className="mt-1 text-[11px] text-[var(--text-faded)]">Sai no cabeçalho do cupom. Vazio = não mostra.</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Mensagem do rodapé (cupom)</label>
+            <input className={`${inp} mt-1`} value={store.cupomRodape} onChange={(e) => setS("cupomRodape", e.target.value)} placeholder="Obrigado! Volte sempre :)" maxLength={120} />
+            <p className="mt-1 text-[11px] text-[var(--text-faded)]">Última linha do cupom (ex: agradecimento, @instagram). Vazio = “Obrigado! Volte sempre :)”.</p>
           </div>
           {config?.sells_by_weight && (
             <div>

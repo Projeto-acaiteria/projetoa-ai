@@ -26,7 +26,7 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -35,6 +35,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   endereco: string;
   cnpj: string;
   tel: string;
+  cupomRodape: string;
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -214,7 +215,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
       // auto-impressão por-máquina (desligável na tela de Impressora; default ligado)
       if (localStorage.getItem("autoprint:venda") !== "0") void printVias((via) => ticketHtml({
-        loja: storeName, endereco, cnpj, tel, display: dest, via,
+        loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: dest, via,
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
         items: [

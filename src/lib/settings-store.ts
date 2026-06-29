@@ -31,6 +31,7 @@ export type StoreSettings = {
   // dados do cabeçalho do cupom (impressão térmica) — cada loja preenche os seus
   endereco: string; // endereço completo (ex: "Quadra Arse 14, Alameda 17 - Palmas/TO")
   cnpj: string; // CNPJ ou CPF do negócio (sai no cabeçalho do cupom)
+  cupomRodape: string; // mensagem do rodapé do cupom (vazio = "Obrigado! Volte sempre :)")
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
 };
 
@@ -90,6 +91,7 @@ const DEFAULT_STORE: StoreSettings = {
   primaryColor: "",
   endereco: "",
   cnpj: "",
+  cupomRodape: "",
   waMsgs: WA_MSG_DEFAULTS,
 };
 
@@ -142,6 +144,7 @@ export async function setStore(
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
   if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);
   if (typeof store.cnpj === "string") clean.cnpj = store.cnpj.trim().slice(0, 24);
+  if (typeof store.cupomRodape === "string") clean.cupomRodape = store.cupomRodape.trim().slice(0, 120);
   if (store.waMsgs && typeof store.waMsgs === "object") {
     const m = store.waMsgs as Partial<WaMsgs>;
     const pick = (v: unknown, def: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 280) : def);

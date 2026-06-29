@@ -14,7 +14,7 @@ export default async function BalcaoPage() {
   return (
     <>
       <PageHeader title="Balcão" sub="Pese, lance e receba — venda rápida no balcão" action={<Badge tone="lime">bar / a quilo</Badge>} />
-      <BalcaoClient categories={categories} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} loyaltyEnabled={!!cfg?.loyalty_enabled} />
+      <BalcaoClient categories={categories} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} loyaltyEnabled={!!cfg?.loyalty_enabled} />
     </>
   );
 }
