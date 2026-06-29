@@ -36,11 +36,12 @@ export async function qzConnect(): Promise<QZ> {
 
 export async function qzPrintHtml(printer: string, html: string): Promise<void> {
   const qz = await qzConnect();
-  // size 72 = página casa com a cabeça imprimível (~72mm). A área imprimível desta classe de
-  // térmica é DESLOCADA pra esquerda (esquerda ~4mm, direita corta ~6-7mm antes da borda), então o
-  // padding do ticket.ts é ASSIMÉTRICO (esq 4mm / dir 12mm → conteúdo ~56mm puxado pra esquerda),
-  // calibrado nas fotos do Cantinho/EPSON: linha alinhada não vaza por nenhum lado. (29/06 v3)
-  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 72 } });
+  // IMPORTANTE: scaleContent re-estica o conteúdo pra encher o `size`, então PADDING no HTML é
+  // inútil pra cortar borda (o QZ cancela). A alavanca real é o `size` (largura do output) + `margins`
+  // (deslocamento), que o scaleContent respeita. Esta TM-T20X imprime ~64mm (512 dots), não 72mm, e
+  // tem ~3-4mm de zona morta à esquerda. Então: size 58mm de output, deslocado 4mm pra direita →
+  // conteúdo cai em ~4-62mm, dentro da área imprimível, sem cortar nenhum lado. (29/06 v4 — size-lever)
+  const cfg = qz.configs.create(printer, { scaleContent: true, units: "mm", size: { width: 58 }, margins: { top: 0, right: 0, bottom: 0, left: 4 } });
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
 
