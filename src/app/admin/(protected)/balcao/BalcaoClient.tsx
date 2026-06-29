@@ -7,6 +7,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
+import QzStatus from "@/components/admin/QzStatus";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
 import { IconSearch } from "@/components/Icons";
@@ -206,6 +207,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       {/* produtos */}
       <div className="space-y-6">
+        <div className="flex justify-end"><QzStatus /></div>
         {/* busca por nome — Enter lança o 1º resultado */}
         <div className="sticky top-0 z-10 -mx-1 bg-bg-base/95 px-1 pb-1 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-bg-base/80">
           <div className="relative">

@@ -92,7 +92,7 @@ Cabeçalho (logo+dados) e mensagem de rodapé **configuráveis pelo lojista**; l
 | # | Ação | Esforço | Prioridade |
 |---|------|---------|-----------|
 | 1 | **Largura 72mm** (Achado #2) — feito, confirmar no papel | — | ✅ feito (falta foto) |
-| 2 | **Indicador de status do QZ no front** ("conectado / abra o QZ Tray") — mata o ponto de falha nº1 e a confusão do operador | baixo | Alta (quick win) |
+| 2 | **Indicador de status do QZ no front** ("Impressora pronta / QZ Tray fechado / Escolha a impressora", com religar) — componente `QzStatus` no Caixa, Balcão e Mesas | baixo | ✅ feito (29/06) |
 | 3 | **Rodapé configurável** (mensagem + redes + QR) pelo lojista, além do cabeçalho que já existe | baixo | Média |
 | 4 | **Fidelidade no cupom** ("faltam X pts") garantida e destacada — diferencial | baixo | Média |
 | 5 | **Via de delivery** completa (endereço+ref destaque, TROCO PARA, JÁ PAGO) — verificar/fechar | médio | Média (quando módulo delivery amadurecer) |

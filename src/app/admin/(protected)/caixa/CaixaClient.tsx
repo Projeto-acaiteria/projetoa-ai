@@ -9,6 +9,7 @@ import { nextReward } from "@/lib/loyalty";
 import PDV, { type Fees } from "@/components/admin/PDV";
 import type { CardMachine } from "@/lib/settings-store";
 import { printTicket } from "@/lib/print";
+import QzStatus from "@/components/admin/QzStatus";
 import { leituraXHtml } from "@/lib/ticket";
 import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter } from "@/components/Icons";
 
@@ -128,6 +129,7 @@ function PainelCaixa({ session, resumo, store, cashPinSet, onChanged, onClosed }
           </div>
           <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink tabular-nums sm:text-5xl">{brl(resumo.saldoCaixaCents)}</div>
           <div className="text-xs font-semibold text-[var(--text-muted)]">em caixa agora</div>
+          <QzStatus className="mt-2" />
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setModal("consulta")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-brand-600">
