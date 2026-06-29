@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
+import OrderWatcher from "@/components/admin/OrderWatcher";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
 import { getSubscription, isBlocked } from "@/lib/auth/subscription";
@@ -26,5 +27,11 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     hasStations: !!cfg?.has_stations,
     loyaltyEnabled: !!cfg?.loyalty_enabled,
   };
-  return <AdminShell storeName={store.name} nav={nav}>{children}</AdminShell>;
+  return (
+    <AdminShell storeName={store.name} nav={nav}>
+      {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
+      <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
+      {children}
+    </AdminShell>
+  );
 }

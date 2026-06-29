@@ -123,7 +123,7 @@ export async function POST(req: Request) {
         paymentMethod, // só registro — não processamos pagamento
       },
       new Date().toISOString(),
-      "recebido",
+      "preparo", // já entra em preparo (sem etapa "recebido" manual); próxima ação = "saiu p/ entrega"
       storeId,
     );
 

@@ -61,6 +61,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [complemento, setComplemento] = useState("");
   const [bairro, setBairro] = useState("");
   const usaZonas = brand.deliveryZones.length > 0;
   const [sending, setSending] = useState(false);
@@ -134,7 +135,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
       L.push(`  - ${it.qty}x ${it.name}${tag}`);
     }
     L.push(`\n*Entrega:* ${mode === "entrega" ? `Delivery (+${brl(feeCents)})` : "Retirada no balcão"}`);
-    if (mode === "entrega" && address) L.push(`*Endereço:* ${address}`);
+    if (mode === "entrega" && address) L.push(`*Endereço:* ${address}${complemento.trim() ? ` — ${complemento.trim()}` : ""}`);
     L.push(`*Total: ${brl(totalCents)}*`);
     return encodeURIComponent(L.join("\n"));
   }
@@ -162,7 +163,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           slug: brand.slug,
           customerName: name.trim(),
           phone: phone.trim(),
-          address: address.trim() || undefined,
+          address: [address.trim(), complemento.trim()].filter(Boolean).join(" — ") || undefined,
           mode,
           sizeLabel: size.label,
           items: buildItems(),
@@ -533,12 +534,20 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
                 </select>
               )}
               {mode === "entrega" && (
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Endereço de entrega"
-                  className="w-full rounded-xl border border-line bg-bg-base px-4 py-3 text-ink outline-none focus:border-brand-600"
-                />
+                <>
+                  <input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Endereço de entrega"
+                    className="w-full rounded-xl border border-line bg-bg-base px-4 py-3 text-ink outline-none focus:border-brand-600"
+                  />
+                  <input
+                    value={complemento}
+                    onChange={(e) => setComplemento(e.target.value)}
+                    placeholder="Complemento (apto, bloco, ponto de referência…)"
+                    className="w-full rounded-xl border border-line bg-bg-base px-4 py-3 text-ink outline-none focus:border-brand-600"
+                  />
+                </>
               )}
             </div>
 

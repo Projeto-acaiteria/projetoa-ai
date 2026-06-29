@@ -5,8 +5,6 @@ import { Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { IconMoto, IconBag, IconArrowRight, IconPrinter, IconCheck } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
-import { printVias } from "@/lib/print";
-import { ticketHtml, type TicketData } from "@/lib/ticket";
 import type { Order, OrderStatus } from "@/lib/orders-store";
 import type { WaMsgs } from "@/lib/settings-store";
 
@@ -39,37 +37,8 @@ function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; c
   };
 }
 
-// cupom térmico (auto-impressão) — tamanho em destaque + acompanhamentos
-function ticketFromOrder(o: Order, storeName: string, head: { endereco: string; cnpj: string; tel: string; rodape?: string }): TicketData {
-  const d = new Date(o.createdAt);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return {
-    loja: storeName, endereco: head.endereco, cnpj: head.cnpj, tel: head.tel, rodape: head.rodape,
-    display: o.display,
-    dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
-    modeLabel: MODE_LABEL[o.mode] ?? o.mode,
-    paymentLabel: o.paymentMethod ? PAY_LABEL[o.paymentMethod] : undefined,
-    customerName: o.customerName,
-    phone: o.phone || undefined,
-    address: o.address,
-    bairro: o.bairro,
-    feeCents: o.feeCents || undefined,
-    // sizeLabel "Delivery"/"Retirada" é só marcador de tipo (já vai no modeLabel) — não vira item
-    items: [
-      ...(o.sizeLabel && o.sizeLabel !== "Delivery" && o.sizeLabel !== "Retirada" ? [{ qty: 1, name: o.sizeLabel }] : []),
-      ...o.items.map((it) => ({ qty: it.qty, name: it.name, totalCents: it.paidCents > 0 ? it.paidCents : undefined })),
-    ],
-    totalCents: o.totalCents,
-    code: o.code,
-    // não processamos pagamento: em pedido do link (entrega/retirada) o entregador/balcão RECEBE o total
-    collectCents: o.mode !== "balcao" ? o.totalCents : undefined,
-    pointsInfo: o.pointsAwarded ? `Pontos ganhos: +${o.pointsAwarded}` : undefined,
-    origem: o.mode === "balcao" ? "balcao" : "link",
-  };
-}
-
+// pedido do link já nasce "preparo" (sem etapa "recebido" manual) — board: preparo → saiu → entregue
 const COLS: { key: OrderStatus; label: string; tone: "accent" | "gold" | "brand" | "lime" }[] = [
-  { key: "recebido", label: "Recebido", tone: "accent" },
   { key: "preparo", label: "Em preparo", tone: "gold" },
   { key: "saiu", label: "Saiu p/ entrega", tone: "brand" },
   { key: "entregue", label: "Entregue", tone: "lime" },
@@ -124,8 +93,6 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
   const [autoPrint, setAutoPrint] = useState(true);
   const [notifyWhats, setNotifyWhats] = useState(true); // avisar cliente no WhatsApp ao avançar status
   const [soundOn, setSoundOn] = useState(true);
-  const seen = useRef<Set<number>>(new Set());
-  const first = useRef(true);
   const audioCtx = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -161,27 +128,14 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
     try {
       const res = await fetch("/api/pedidos", { cache: "no-store" });
       const data = await res.json();
-      const list: Order[] = data.orders ?? [];
-      setOrders(list);
-      // auto-impressão: 1ª carga só marca os existentes; depois imprime os pedidos NOVOS do link
-      if (first.current) {
-        list.forEach((o) => seen.current.add(o.id));
-        first.current = false;
-      } else {
-        const novos = list.filter((o) => !seen.current.has(o.id));
-        novos.forEach((o) => seen.current.add(o.id));
-        const novosLink = novos.filter((o) => o.mode !== "balcao");
-        if (soundOn && novosLink.length) beep();
-        if (autoPrint) {
-          for (const o of novosLink) void printVias((via) => ticketHtml({ ...ticketFromOrder(o, storeName, { endereco, cnpj, tel, rodape: cupomRodape }), via }));
-        }
-      }
+      setOrders(data.orders ?? []);
+      // apito + auto-impressão de pedido novo agora é do OrderWatcher (vigia global, em qualquer tela)
     } catch {
       /* mantém estado anterior */
     } finally {
       setLoaded(true);
     }
-  }, [autoPrint, soundOn, beep, storeName]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -250,7 +204,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
         </button>
       </div>
     </div>
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {COLS.map((col) => {
         const list = orders.filter((o) => o.status === col.key);
         return (

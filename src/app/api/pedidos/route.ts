@@ -134,7 +134,9 @@ export async function POST(req: Request) {
       bairro: body.bairro,
     },
     new Date().toISOString(),
-    "recebido",
+    // pedido do link já entra EM PREPARO (a loja começa a fazer na hora). A próxima ação é "saiu
+    // p/ entrega", que dispara o aviso no WhatsApp pro cliente. Não há etapa "recebido" manual.
+    "preparo",
     storeId,
   );
 
