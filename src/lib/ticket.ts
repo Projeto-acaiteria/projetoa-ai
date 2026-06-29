@@ -174,6 +174,62 @@ export function leituraXHtml(d: LeituraXData): string {
   </body></html>`;
 }
 
+// ── SANGRIA / SUPRIMENTO (comprovante de movimento de caixa) ──────────────────
+// Cupom físico assinável de retirada (sangria) ou reforço (suprimento). Espelha o
+// cabeçalho white-label + valor em destaque + saldo resultante. Sangria leva linha
+// de assinatura (rastro de quem retirou). Disparo é toggle por-máquina no caixa.
+export type MovTicketData = {
+  loja: string;
+  endereco?: string;
+  cnpj?: string;
+  tel?: string;
+  tipo: "sangria" | "suprimento";
+  amountCents: number;
+  operator?: string;
+  reason?: string;
+  dateLabel: string;
+  saldoCaixaCents: number;
+  rodape?: string;
+};
+
+export function movTicketHtml(d: MovTicketData): string {
+  const isSangria = d.tipo === "sangria";
+  const titulo = isSangria ? "SANGRIA (RETIRADA)" : "SUPRIMENTO (REFORÇO)";
+  const sinal = isSangria ? "- " : "+ ";
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    body{width:72mm;padding:2mm 4mm;font-size:14px;line-height:1.45;font-weight:700}
+    .c{text-align:center}.b{font-weight:700}
+    .dash{border-top:1px dashed #000;margin:5px 0}
+    .lead{display:flex;align-items:baseline}
+    .lead .dots{flex:1;border-bottom:1px dotted #000;margin:0 4px 3px}
+    .brand{text-align:center;font-weight:700;font-size:19px;letter-spacing:1px}
+    .info{text-align:center;font-size:13px;line-height:1.55}
+    .tag{border:2px solid #000;text-align:center;font-weight:700;padding:3px;margin:4px 0;font-size:15px;letter-spacing:2px}
+    .val{text-align:center;font-size:26px;font-weight:700;margin:6px 0}
+    .total{font-size:16px}
+    .sign{margin-top:16px;border-top:1px solid #000;padding-top:3px;text-align:center;font-size:12px}
+  </style></head><body>
+    <div class="brand">${esc(d.loja).toUpperCase()}</div>
+    ${d.endereco ? `<div class="info">${esc(d.endereco)}</div>` : ""}
+    ${d.tel ? `<div class="info">Tel: ${esc(d.tel)}</div>` : ""}
+    ${d.cnpj ? `<div class="info">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
+    <div class="dash"></div>
+    <div class="tag">${titulo}</div>
+    <div class="val">${sinal}${brl(d.amountCents)}</div>
+    ${d.operator ? lead("Operador", esc(d.operator)) : ""}
+    ${d.reason ? lead("Motivo", esc(d.reason)) : ""}
+    ${lead("Data", esc(d.dateLabel))}
+    <div class="dash"></div>
+    ${lead("SALDO EM CAIXA", brl(d.saldoCaixaCents), "b total")}
+    <div class="dash"></div>
+    ${isSangria ? `<div class="sign">Recebi a quantia acima</div>` : ""}
+    <div class="c" style="margin-top:6px">NÃO É DOCUMENTO FISCAL</div>
+    ${d.rodape && d.rodape.trim() ? `<div class="c" style="margin-top:4px">${esc(d.rodape)}</div>` : ""}
+    <div class="c" style="font-size:10px;margin-top:6px">. . . . . . . .</div>
+  </body></html>`;
+}
+
 export function ticketHtml(d: TicketData): string {
   const isLink = d.origem === "link";
 

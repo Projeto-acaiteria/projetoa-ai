@@ -116,16 +116,20 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [drawerAuto, setDrawerAuto] = useState(false);
   // imprimir via de preparo (cozinha/bar) no balcão ao finalizar — POR-MÁQUINA, default DESLIGADO (só relacional com estação)
   const [prepAuto, setPrepAuto] = useState(false);
+  // imprimir comprovante de sangria/suprimento — POR-MÁQUINA, default LIGADO (rastro físico assinável)
+  const [movComp, setMovComp] = useState(true);
 
   useEffect(() => { qzIsActive().then(setActive); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
   useEffect(() => { setDuasVias(localStorage.getItem("print:duasvias") !== "0"); }, []);
   useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
   useEffect(() => { setPrepAuto(localStorage.getItem("autoprint:preparo") === "1"); }, []);
+  useEffect(() => { setMovComp(localStorage.getItem("mov:comprovante") !== "0"); }, []);
   const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
   const toggleDuasVias = () => setDuasVias((v) => { const n = !v; localStorage.setItem("print:duasvias", n ? "1" : "0"); return n; });
   const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
   const togglePrep = () => setPrepAuto((v) => { const n = !v; localStorage.setItem("autoprint:preparo", n ? "1" : "0"); return n; });
+  const toggleMovComp = () => setMovComp((v) => { const n = !v; localStorage.setItem("mov:comprovante", n ? "1" : "0"); return n; });
 
   // dispara o pulso da gaveta isolado (sem fazer venda) — pra testar o hardware
   async function testDrawer() {
@@ -262,6 +266,24 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${prepAuto ? "brand-gradient" : "bg-bg-surface-2"}`}
           >
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${prepAuto ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+      </Card>
+
+      {/* Comprovante de sangria/suprimento (por-máquina) */}
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-bold text-ink">Comprovante de sangria/suprimento</div>
+            <div className="mt-0.5 text-xs text-[var(--text-muted)]">Ao registrar uma retirada (sangria) ou reforço (suprimento), imprime um comprovante com valor, operador, motivo e saldo. A sangria sai com linha de assinatura.</div>
+          </div>
+          <button
+            onClick={toggleMovComp}
+            role="switch"
+            aria-checked={movComp}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${movComp ? "brand-gradient" : "bg-bg-surface-2"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${movComp ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
       </Card>

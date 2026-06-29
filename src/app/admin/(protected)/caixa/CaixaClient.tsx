@@ -10,7 +10,7 @@ import PDV, { type Fees } from "@/components/admin/PDV";
 import type { CardMachine } from "@/lib/settings-store";
 import { printTicket } from "@/lib/print";
 import QzStatus from "@/components/admin/QzStatus";
-import { leituraXHtml } from "@/lib/ticket";
+import { leituraXHtml, movTicketHtml } from "@/lib/ticket";
 import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter } from "@/components/Icons";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
@@ -55,7 +55,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
 
   return (
     <div className="space-y-5">
-      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
+      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cupomRodape={cupomRodape} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
       {showPdv && <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />}
       {!showPdv && <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>}
     </div>
@@ -114,7 +114,7 @@ function Abertura({ onOpened }: { onOpened: () => void }) {
 }
 
 /* ---------------- Painel do caixa aberto ---------------- */
-function PainelCaixa({ session, resumo, store, cashPinSet, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; cashPinSet: boolean; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
+function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; cupomRodape?: string; cashPinSet: boolean; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
   const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax" | "movimentos">(null);
 
   return (
@@ -160,8 +160,8 @@ function PainelCaixa({ session, resumo, store, cashPinSet, onChanged, onClosed }
         <Stat label="Sangrias / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? `${session.movements.length} mov. · ver trilha` : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
       </div>
 
-      {modal === "sangria" && <MovModal type="sangria" cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
-      {modal === "suprimento" && <MovModal type="suprimento" cashPinSet={false} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "sangria" && <MovModal type="sangria" store={store} rodape={cupomRodape} cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
+      {modal === "suprimento" && <MovModal type="suprimento" store={store} rodape={cupomRodape} cashPinSet={false} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
       {modal === "movimentos" && <MovimentosModal movements={session.movements} onClose={() => setModal(null)} />}
       {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
@@ -359,7 +359,7 @@ function Stat({ label, value, sub, onClick }: { label: string; value: string; su
 }
 
 /* ---------------- Modais ---------------- */
-function MovModal({ type, cashPinSet, onClose, onDone }: { type: "sangria" | "suprimento"; cashPinSet: boolean; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
+function MovModal({ type, store, rodape, cashPinSet, onClose, onDone }: { type: "sangria" | "suprimento"; store: StoreHeader; rodape?: string; cashPinSet: boolean; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
   const [val, setVal] = useState("");
   const [reason, setReason] = useState("");
   const [operator, setOperator] = useState("");
@@ -381,7 +381,19 @@ function MovModal({ type, cashPinSet, onClose, onDone }: { type: "sangria" | "su
       body: JSON.stringify({ action: type, amountCents: n, reason, operator: operator.trim() || undefined, pin: needsPin ? pin.trim() : undefined }),
     });
     const d = await r.json().catch(() => null);
-    if (d && d.ok) { onDone(d); return; } // aplica o resumo autoritativo do POST (sem refetch que corre atrás do write)
+    if (d && d.ok) {
+      // comprovante físico (toggle por-máquina em /admin/impressora; default ligado)
+      if (localStorage.getItem("mov:comprovante") !== "0") {
+        try {
+          await printTicket(movTicketHtml({
+            loja: store.name, endereco: store.endereco, cnpj: store.cnpj, tel: store.tel,
+            tipo: type, amountCents: n, operator: operator.trim() || undefined, reason: reason.trim() || undefined,
+            dateLabel: dmyhm(new Date().toISOString()), saldoCaixaCents: d.resumo?.saldoCaixaCents ?? 0, rodape,
+          }), "caixa");
+        } catch { /* impressão é best-effort: o movimento já foi salvo */ }
+      }
+      onDone(d); return; // aplica o resumo autoritativo do POST (sem refetch que corre atrás do write)
+    }
     setSaving(false);
     setErr(d?.error || "Não consegui registrar.");
   }
