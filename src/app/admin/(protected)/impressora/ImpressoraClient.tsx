@@ -19,7 +19,7 @@ function caixaTest(loja: string) {
       { qty: 1, name: "Leite condensado", totalCents: 200 },
     ],
     totalCents: 1800,
-    pointsInfo: "Pontos ganhos: +18",
+    pointsInfo: "Você ganhou +18 pontos\nSaldo: 118 pontos\nFaltam 32 pra Açaí 300ml grátis",
     origem: "balcao",
   });
 }
