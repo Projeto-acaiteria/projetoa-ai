@@ -36,10 +36,10 @@ export async function qzConnect(): Promise<QZ> {
 
 export async function qzPrintHtml(printer: string, html: string): Promise<void> {
   const qz = await qzConnect();
-  // size 72 = página casa com a cabeça imprimível (~72mm). O conteúdo é estreitado e CENTRALIZADO
-  // via padding lateral (4mm no ticket.ts → texto de 64mm no meio), mesmo envelope do texto
-  // centralizado que comprovadamente cabe — assim as linhas alinhadas não vazam por NENHUM lado.
-  // (corpo de 80mm vazava dos dois lados; corpo de 72mm colado vazava à esquerda). (29/06 v2)
+  // size 72 = página casa com a cabeça imprimível (~72mm). A área imprimível desta classe de
+  // térmica é DESLOCADA pra esquerda (esquerda ~4mm, direita corta ~6-7mm antes da borda), então o
+  // padding do ticket.ts é ASSIMÉTRICO (esq 4mm / dir 12mm → conteúdo ~56mm puxado pra esquerda),
+  // calibrado nas fotos do Cantinho/EPSON: linha alinhada não vaza por nenhum lado. (29/06 v3)
   const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 72 } });
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
