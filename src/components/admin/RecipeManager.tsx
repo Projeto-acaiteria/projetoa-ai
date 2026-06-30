@@ -20,6 +20,7 @@ export default function RecipeManager({ product, onClose, onChanged }: { product
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState("");
   const [qty, setQty] = useState("1");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/estoque", { cache: "no-store" }).then((r) => r.json()).then((d) => setStock(d.items ?? []));
@@ -77,10 +78,15 @@ export default function RecipeManager({ product, onClose, onChanged }: { product
             <p className="text-sm text-[var(--text-faded)]">Nenhum insumo cadastrado ainda. Cadastre seus insumos em <b className="text-ink">Estoque</b> primeiro — aí eles aparecem aqui pra montar a ficha técnica.</p>
           ) : (
             <>
+              {stock.length > 8 && (
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar insumo…" className={`${inputCls} mb-2`} />
+              )}
               <div className="flex gap-2">
                 <select value={pick} onChange={(e) => setPick(e.target.value)} className={inputCls}>
                   <option value="">Escolha o insumo…</option>
-                  {stock.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
+                  {stock
+                    .filter((s) => !search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase()))
+                    .map((s) => <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
                 </select>
                 <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" placeholder="qtd" className={`${inputCls} w-20`} />
                 <button onClick={add} disabled={busy || !pick} className="rounded-lg brand-gradient px-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "…" : "ok"}</button>
