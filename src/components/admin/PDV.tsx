@@ -234,6 +234,11 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
               )}
             </div>
 
+            {/* Fidelidade no TOPO da comanda — sempre visível, sem precisar rolar (achado Eduardo no caixa) */}
+            <div className="mb-3 shrink-0 border-b border-line pb-3">
+              <CustomerBox customer={customer} onChange={setCustomer} />
+            </div>
+
             <div className="min-h-0 flex-1 overflow-y-auto">
               {cart.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[var(--text-faded)]">Toque nos itens pra montar a comanda.</p>
@@ -264,9 +269,6 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
             </div>
 
             <div className="mt-3 border-t border-line pt-3">
-              <div className="mb-3">
-                <CustomerBox customer={customer} onChange={setCustomer} />
-              </div>
               {discountCents > 0 && (
                 <div className="mb-1 flex items-center justify-between text-sm text-[var(--text-muted)]">
                   <span>Subtotal</span><span className="tabular-nums">{brl(total)}</span>
