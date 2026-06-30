@@ -73,7 +73,7 @@ export function stationTicketHtml(d: StationTicketData): string {
     )
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
     body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;line-height:1.3;font-weight:700}
     .loja{font-weight:700;font-size:15px;text-align:center;margin-bottom:3px}
     .stn{font-weight:700;font-size:16px;text-align:center;border:2px solid #000;padding:3px 0;margin-bottom:4px;letter-spacing:2px}
@@ -129,7 +129,7 @@ export function leituraXHtml(d: LeituraXData): string {
   const card = d.salesCardCents > 0;
   const pix = d.salesPixCents > 0;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
     body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;font-size:14px;line-height:1.45;font-weight:700}
     .c{text-align:center}.b{font-weight:700}
     .dash{border-top:1px dashed #000;margin:5px 0}
@@ -198,7 +198,7 @@ export function movTicketHtml(d: MovTicketData): string {
   const titulo = isSangria ? "SANGRIA (RETIRADA)" : "SUPRIMENTO (REFORÇO)";
   const sinal = isSangria ? "- " : "+ ";
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
     body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;font-size:14px;line-height:1.45;font-weight:700}
     .c{text-align:center}.b{font-weight:700}
     .dash{border-top:1px dashed #000;margin:5px 0}
@@ -253,7 +253,7 @@ export function ticketHtml(d: TicketData): string {
       : "";
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    *{font-family:'Courier New',monospace;color:#000;margin:0}
+    *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
     body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;font-size:14px;line-height:1.45;font-weight:700}
     .c{text-align:center}.b{font-weight:700}
     .dash{border-top:1px dashed #000;margin:5px 0}
