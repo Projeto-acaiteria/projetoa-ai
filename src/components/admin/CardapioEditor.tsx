@@ -70,7 +70,7 @@ const numInp = `${inp} w-16 text-center`;
 const delBtn =
   "shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-bold text-[var(--red-no)] hover:bg-[#FEECEC]";
 
-export default function CardapioEditor() {
+export default function CardapioEditor({ hasEstoque = false }: { hasEstoque?: boolean }) {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -186,7 +186,7 @@ export default function CardapioEditor() {
                 remover
               </button>
               </div>
-              <RecipeRow recipe={s.recipe} insumos={insumos} onChange={(r) => updSize(i, { recipe: r })} />
+              {hasEstoque && <RecipeRow recipe={s.recipe} insumos={insumos} onChange={(r) => updSize(i, { recipe: r })} />}
             </div>
           ))}
         </div>
@@ -264,7 +264,7 @@ export default function CardapioEditor() {
                   x
                 </button>
                 </div>
-                <RecipeRow recipe={it.recipe} insumos={insumos} onChange={(r) => updItem(gi, ii, { recipe: r })} />
+                {hasEstoque && <RecipeRow recipe={it.recipe} insumos={insumos} onChange={(r) => updItem(gi, ii, { recipe: r })} />}
               </div>
             ))}
           </div>

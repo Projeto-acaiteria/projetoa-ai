@@ -41,7 +41,7 @@ export default async function CardapioAdminPage() {
       ) : (
         <>
           <QRCardapio storeName={store.name} storeTagline={store.tagline} />
-          <CardapioEditor />
+          <CardapioEditor hasEstoque={!!cfg?.has_estoque} />
         </>
       )}
     </>

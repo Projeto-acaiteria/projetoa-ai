@@ -26,6 +26,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     coverEnabled: !!cfg?.cover_enabled,
     hasStations: !!cfg?.has_stations,
     loyaltyEnabled: !!cfg?.loyalty_enabled,
+    hasEstoque: !!cfg?.has_estoque,
   };
   return (
     <AdminShell storeName={store.name} nav={nav}>

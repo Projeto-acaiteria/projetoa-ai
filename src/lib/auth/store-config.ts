@@ -16,6 +16,7 @@ export type StoreConfig = {
   stock_dose: boolean;
   has_stations: boolean;
   loyalty_enabled: boolean;
+  has_estoque: boolean; // controle de estoque/ficha técnica (baixa por insumo) — ligável por loja
 };
 
 export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig | null> => {
@@ -24,7 +25,7 @@ export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig
 });
 
 // Flags que o DONO pode ligar/desligar no painel (as outras vêm do segmento e não mudam pela UI).
-const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose"];
+const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose", "has_estoque"];
 
 export async function setStoreConfig(patch: Partial<StoreConfig>, storeId: string): Promise<void> {
   const clean: Record<string, boolean> = {};

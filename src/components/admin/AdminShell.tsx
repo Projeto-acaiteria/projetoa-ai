@@ -25,7 +25,7 @@ import {
 // NAV por SEGMENTO: cada negócio vê só o seu sistema (gate pelas flags do store_config).
 // "Caixa" aparece pra todos (gestão de caixa); o PDV de copo dentro dele é só pra açaí (ver caixa/page).
 // "Balcão" (cardápio relacional) só pra bar/grid; açaí vende pelo Caixa.
-export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean };
+export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean };
 type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean };
 const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
@@ -37,8 +37,8 @@ const NAV: NavItem[] = [
   { href: "/admin/preparo", label: "Preparo", Icon: IconFlame, show: (c) => c.hasStations },
   { href: "/admin/eventos", label: "Shows", Icon: IconMusic, show: (c) => c.coverEnabled },
   { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl },
-  { href: "/admin/estoque", label: "Estoque", Icon: IconBox },
-  { href: "/admin/cmv", label: "CMV", Icon: IconChart },
+  { href: "/admin/estoque", label: "Estoque", Icon: IconBox, show: (c) => c.hasEstoque },
+  { href: "/admin/cmv", label: "CMV", Icon: IconChart, show: (c) => c.hasEstoque },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
   { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled },
   { href: "/admin/clientes", label: "Clientes", Icon: IconUsers },
