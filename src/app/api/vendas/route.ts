@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addOrder, markPointsAwarded, type OrderItem } from "@/lib/orders-store";
-import { applyConsumes, listStock } from "@/lib/stock-store";
+import { applyConsumes, listStock, snapshotConsumes } from "@/lib/stock-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -72,6 +72,8 @@ export async function POST(req: Request) {
     paidCents: i.unitCents * i.qty,
   }));
   const nowIso = new Date().toISOString();
+  // congela o custo dos insumos no consumes → CMV histórico estável (não-fatal)
+  const consumes = await snapshotConsumes(b.consumes || [], storeId);
 
   const order = await addOrder(
     {
@@ -91,7 +93,7 @@ export async function POST(req: Request) {
       cardMachineName: card.machineName,
       cardFeePercent: card.feePercent,
       parcelas: card.parcelas,
-      consumes: b.consumes || [], // grava a ficha técnica aplicada (rastro de auditoria — espelha /api/balcao-venda)
+      consumes, // ficha técnica aplicada (custo congelado — rastro de auditoria + CMV)
     },
     nowIso,
     "entregue", // balcão = já entregue/pago
@@ -99,7 +101,7 @@ export async function POST(req: Request) {
 
   // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
   // Mas NÃO engole o resultado: se alguma baixa falhar, o operador é avisado (stockWarning).
-  const stock = await applyConsumes(b.consumes || [], `Venda ${order.display}`, nowIso.slice(0, 10));
+  const stock = await applyConsumes(consumes, `Venda ${order.display}`, nowIso.slice(0, 10));
   const stockWarning = stock.failed.length
     ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
     : undefined;

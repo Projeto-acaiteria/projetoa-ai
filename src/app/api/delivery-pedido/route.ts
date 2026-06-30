@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
+import { snapshotConsumes } from "@/lib/stock-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     // ficha técnica agregada → baixa de estoque (mesma lógica do delivery do açaí)
     const consumesMap: Record<string, number> = {};
     for (const it of resolved) for (const r of it.recipe) consumesMap[r.stockId] = (consumesMap[r.stockId] ?? 0) + r.qty * it.qty;
-    const consumes = Object.entries(consumesMap).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));
+    const consumes = await snapshotConsumes(Object.entries(consumesMap).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) })), storeId);
 
     const paymentMethod = PAYMENTS.includes(b.paymentMethod as PaymentMethod) ? (b.paymentMethod as PaymentMethod) : undefined;
 

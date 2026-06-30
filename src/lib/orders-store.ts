@@ -37,7 +37,7 @@ export type Order = {
   cardMachineName?: string; // nome da máquina no momento da venda
   cardFeePercent?: number; // % da taxa fotografado
   parcelas?: number; // nº de parcelas (crédito; 1 = à vista)
-  consumes?: { stockId: string; qty: number }[]; // ficha técnica (baixa de estoque)
+  consumes?: { stockId: string; qty: number; costCents?: number }[]; // ficha técnica (baixa + custo congelado p/ CMV)
   consumed?: boolean; // estoque já abatido (evita duplicar na entrega)
   bairro?: string; // zona de entrega (delivery)
   code?: string; // código de rastreio (curto, aleatório) — cliente consulta o status por ele

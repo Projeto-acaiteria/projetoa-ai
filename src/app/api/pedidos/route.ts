@@ -5,6 +5,7 @@ import { getStore } from "@/lib/settings-store";
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getCurrentStore } from "@/lib/auth/store";
+import { snapshotConsumes } from "@/lib/stock-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ type RecvBody = {
 
 type Calc =
   | { error: string }
-  | { sizeLabel: string; items: OrderItem[]; subtotalCents: number; feeCents: number; totalCents: number; consumes: { stockId: string; qty: number }[] };
+  | { sizeLabel: string; items: OrderItem[]; subtotalCents: number; feeCents: number; totalCents: number; consumes: { stockId: string; qty: number; costCents?: number }[] };
 
 // Recalcula o pedido SÓ pelo menu/loja — descarta qualquer preço/consumo enviado
 // pelo cliente (o link é público; não dá pra confiar no que vem do navegador).
@@ -91,7 +92,7 @@ async function recompute(body: RecvBody, storeId: string): Promise<Calc> {
   if (body.mode === "entrega" && totalCents < store.minOrderCents) {
     return { error: `Pedido mínimo de R$ ${(store.minOrderCents / 100).toFixed(2).replace(".", ",")}` };
   }
-  const consumesArr = Object.entries(consumes).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));
+  const consumesArr = await snapshotConsumes(Object.entries(consumes).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) })), storeId);
   return { sizeLabel: size.label, items, subtotalCents, feeCents, totalCents, consumes: consumesArr };
 }
 

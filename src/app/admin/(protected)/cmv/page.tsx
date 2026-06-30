@@ -29,7 +29,7 @@ export default async function CmvPage({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader title="CMV & margem" sub="Custo dos insumos vendidos × receita — vem da ficha técnica de cada produto" action={<Badge tone="lime">bar / restaurante</Badge>} />
+      <PageHeader title="CMV & margem" sub="Custo dos insumos vendidos × receita (balcão, mesa e delivery) — vem da ficha técnica de cada produto" action={<Badge tone="lime">todos os canais</Badge>} />
 
       <div className="mb-4 flex gap-2">
         {(["mes", "7d", "tudo"] as Range[]).map((k) => (

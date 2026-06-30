@@ -4,6 +4,7 @@
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { listStock, unitCostCents } from "@/lib/stock-store";
+import { listOrders } from "@/lib/orders-store";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -68,6 +69,39 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
     cur.cmvCents += cmv;
     cur.marginCents = cur.revenueCents - cur.cmvCents;
     byName.set(name, cur);
+  }
+
+  // Balcão / PDV / delivery (orders-store) — o CMV de mesa (tab_order_items acima) NÃO os cobre.
+  // O consumes é agregado por PEDIDO; distribui o custo entre os itens por participação na receita.
+  const storeOrders = (await listOrders(sid)).filter((o) => {
+    const at = o.createdAt || "";
+    if (fromISO && at < fromISO) return false;
+    if (toISO && at > toISO) return false;
+    return true;
+  });
+  for (const o of storeOrders) {
+    const cons = Array.isArray(o.consumes) ? (o.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
+    const orderCmv = cons.reduce((s, c) => {
+      const cc = c.costCents != null ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
+      if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
+      return s + num(c.qty) * cc;
+    }, 0);
+    const its = Array.isArray(o.items) ? o.items : [];
+    const orderRev = its.reduce((s, it) => s + num(it.paidCents), 0);
+    if (!its.length) { cmvCents += orderCmv; continue; } // pedido sem itens detalhados: só soma o custo
+    for (const it of its) {
+      const rev = num(it.paidCents);
+      const lineCmv = orderRev > 0 ? Math.round(orderCmv * (rev / orderRev)) : 0;
+      revenueCents += rev;
+      cmvCents += lineCmv;
+      const name = it.name || "—";
+      const cur = byName.get(name) ?? { name, qty: 0, revenueCents: 0, cmvCents: 0, marginCents: 0 };
+      cur.qty += num(it.qty);
+      cur.revenueCents += rev;
+      cur.cmvCents += lineCmv;
+      cur.marginCents = cur.revenueCents - cur.cmvCents;
+      byName.set(name, cur);
+    }
   }
 
   const marginCents = revenueCents - cmvCents;
