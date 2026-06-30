@@ -7,6 +7,7 @@
 
 import { QZ_CERT } from "./qz-cert";
 import { parseScaleWeight } from "./scale";
+import { getPrintWidthMm } from "./print-config";
 
 type QZ = any;
 let qzMod: QZ = null;
@@ -36,10 +37,11 @@ export async function qzConnect(): Promise<QZ> {
 
 export async function qzPrintHtml(printer: string, html: string): Promise<void> {
   const qz = await qzConnect();
-  // size 72 = página inteira; `size` aqui RECORTA (não escala) — reduzir corta mais, não encolhe.
-  // O corte da direita (~8mm ≈ 64 dots) é a impressora em modo 512-dot (64mm) em vez de 576 (72mm):
-  // fix de verdade é no PERFIL DA IMPRESSORA (utilitário EPSON / largura 80mm-576dots), não no HTML.
-  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width: 72 } });
+  // Largura CALIBRÁVEL por máquina (print-config). A página do QZ e o corpo do cupom (ticket.ts)
+  // usam o MESMO valor, então o conteúdo é AUTORADO na largura real da impressora — o sistema se
+  // adapta à impressora. Se cortava na direita, o operador baixa a largura em Ajustes → Impressora.
+  const width = getPrintWidthMm();
+  const cfg = qz.configs.create(printer, { scaleContent: true, margins: 0, units: "mm", size: { width } });
   await qz.print(cfg, [{ type: "html", format: "plain", data: html }]);
 }
 

@@ -5,6 +5,7 @@ import { Card } from "@/components/admin/ui";
 import { IconPrinter, IconCheck } from "@/components/Icons";
 import { qzConnect, qzIsActive, qzListPrinters, qzPrintHtml, qzKickDrawer, getStationPrinter, setStationPrinter } from "@/lib/qz";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
+import { getPrintWidthMm, setPrintWidthMm, PRINT_WIDTH_PRESETS, widthTestHtml } from "@/lib/print-config";
 
 function caixaTest(loja: string) {
   return ticketHtml({
@@ -118,6 +119,8 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [prepAuto, setPrepAuto] = useState(false);
   // imprimir comprovante de sangria/suprimento — POR-MÁQUINA, default LIGADO (rastro físico assinável)
   const [movComp, setMovComp] = useState(true);
+  // largura do cupom (mm) — CALIBRÁVEL por máquina; o sistema imprime nesta largura (se adapta à impressora)
+  const [widthMm, setWidthMm] = useState(72);
 
   useEffect(() => { qzIsActive().then(setActive); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
@@ -125,6 +128,24 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
   useEffect(() => { setPrepAuto(localStorage.getItem("autoprint:preparo") === "1"); }, []);
   useEffect(() => { setMovComp(localStorage.getItem("mov:comprovante") !== "0"); }, []);
+  useEffect(() => { setWidthMm(getPrintWidthMm()); }, []);
+
+  function changeWidth(mm: number) {
+    const v = Math.max(40, Math.min(80, Math.round(mm || 0)));
+    setWidthMm(v);
+    setPrintWidthMm(v);
+  }
+  async function testWidth() {
+    const printer = getStationPrinter("caixa");
+    if (!printer) { setMsg("Escolha a impressora do caixa (logo abaixo) antes de imprimir a régua."); return; }
+    setMsg(null);
+    try {
+      await qzPrintHtml(printer, widthTestHtml());
+      setMsg(`Régua de teste enviada (${widthMm}mm). Veja se a borda direita saiu inteira — se cortou, diminua a largura.`);
+    } catch (e) {
+      setMsg("Falha ao imprimir: " + (e instanceof Error ? e.message : "erro") + ". Conecte o QZ Tray primeiro.");
+    }
+  }
   const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
   const toggleDuasVias = () => setDuasVias((v) => { const n = !v; localStorage.setItem("print:duasvias", n ? "1" : "0"); return n; });
   const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
@@ -292,6 +313,26 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
       {destinos.map((d) => (
         <PrinterPicker key={d.key} destKey={d.key} label={d.label} hint={d.hint} printers={printers} makeTest={() => (d.key === "caixa" ? caixaTest(storeName) : stationTest(d.key))} onMsg={setMsg} />
       ))}
+
+      {/* Largura do cupom — CALIBRÁVEL: o sistema se adapta à impressora, não o contrário */}
+      <Card className="p-4 sm:p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Largura do cupom (calibrar)</h3>
+        <p className="mb-3 mt-0.5 text-xs text-[var(--text-faded)]">
+          Se o cupom corta na direita (ou sobra muito espaço em branco), ajuste a largura até ficar certo. O sistema imprime exatamente nesta largura — você não precisa reconfigurar a impressora.
+        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {PRINT_WIDTH_PRESETS.map((p) => (
+            <button key={p} onClick={() => changeWidth(p)} className={`rounded-xl border-2 px-4 py-2 text-sm font-bold transition ${widthMm === p ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{p}mm</button>
+          ))}
+          <div className="inline-flex items-center gap-1 rounded-xl border border-line bg-bg-elevated px-3 py-1.5">
+            <input type="number" min={40} max={80} value={widthMm} onChange={(e) => changeWidth(+e.target.value)} className="w-14 bg-transparent text-right text-sm font-bold text-ink outline-none" />
+            <span className="text-sm font-semibold text-[var(--text-muted)]">mm</span>
+          </div>
+        </div>
+        <button onClick={testWidth} className="rounded-xl border-2 border-brand-600 px-5 py-2.5 text-sm font-bold text-brand-600">
+          Imprimir régua de teste
+        </button>
+      </Card>
 
       {stations.length > 0 && (
         <p className="rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
