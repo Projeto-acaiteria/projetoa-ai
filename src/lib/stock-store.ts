@@ -6,19 +6,23 @@ import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getStoreConfig } from "@/lib/auth/store-config";
 
-// Universo de uma açaiteria, em 3 famílias (a cor da UI vem da família):
+// Universo multi-segmento (açaí, bar, lanchonete, restaurante), em 3 famílias (a cor da UI vem da família):
 export type StockCategory =
   // Produtos à venda (revenda — têm preço de venda)
-  | "sorvete" | "picole" | "bebida" | "salgado" | "doce"
-  // Insumos de produção (pra montar açaí/sorvete)
+  | "sorvete" | "picole" | "bebida" | "bebida_alcoolica" | "salgado" | "doce"
+  // Insumos de produção (pra montar açaí/lanche/prato)
   | "polpa" | "fruta" | "cereal" | "cobertura" | "adicional"
+  | "proteina" | "paes_massas" | "laticinio" | "mercearia"
   // Operação
   | "embalagem" | "limpeza" | "outro";
 
+// categoria do movimento (pra relatório de perda/desperdício separar do uso normal)
+export type StockMoveKind = "compra" | "uso" | "consumo" | "perda" | "vencido" | "quebra" | "ajuste" | "outro";
 export type StockMove = {
   type: "entrada" | "saida";
   qty: number;
   reason: string;
+  kind?: StockMoveKind;
   at: string;
 };
 
@@ -36,9 +40,16 @@ export type StockItem = {
   dosesPerBottle?: number;
   costPerBottleCents?: number;
   costCents?: number; // custo por UNIDADE do insumo (kg/un/L...) — base do CMV (ficha técnica)
+  supplier?: string; // fornecedor (filtrar compras/perdas por fornecedor)
+  purchaseUnit?: string; // unidade de COMPRA (ex: fardo, caixa, saco) — opcional
+  purchaseFactor?: number; // 1 unidade de compra = purchaseFactor unidades de uso (ex: 1 caixa = 12 un)
   updatedAt: string;
   history: StockMove[];
 };
+
+// linha da ficha técnica consumida na venda. costCents é o custo CONGELADO no momento da venda
+// (snapshot) — sem ele o CMV histórico mudaria toda vez que o custo do insumo fosse editado.
+export type Consume = { stockId: string; qty: number; costCents?: number };
 
 /** Custo de UMA unidade consumida (a mesma unidade da ficha técnica). Dose = custo/garrafa ÷ doses. */
 export function unitCostCents(item: Pick<StockItem, "dosesPerBottle" | "costPerBottleCents" | "costCents">): number {
@@ -160,6 +171,42 @@ export async function applyConsumes(
   }
   if (failed.length) console.error(`applyConsumes: ${failed.length} baixa(s) falharam (${reason}):`, JSON.stringify(failed));
   return { applied, failed };
+}
+
+/** Congela o custo unitário de cada insumo no `consumes`, no momento da venda. Assim o CMV
+ *  histórico NÃO muda quando o custo do insumo é editado depois (snapshot). Lê o estoque 1x. */
+export async function snapshotConsumes(consumes: { stockId: string; qty: number }[], storeId?: string): Promise<Consume[]> {
+  const clean = (consumes ?? []).filter((c) => c?.stockId && c.qty > 0).map((c) => ({ stockId: c.stockId, qty: c.qty }));
+  if (!clean.length) return [];
+  // NÃO-LANÇANTE: roda no caminho de venda. Se o estoque falhar de ler, devolve o consumes
+  // SEM custo (cmv-store cai no custo atual) — nunca deixa o snapshot derrubar uma venda.
+  try {
+    const stock = await listStock(storeId);
+    const costById = new Map(stock.map((s) => [s.id, unitCostCents(s)]));
+    return clean.map((c) => ({ ...c, costCents: costById.get(c.stockId) ?? 0 }));
+  } catch (e) {
+    console.error("snapshotConsumes: falha ao congelar custo (segue sem custo):", e instanceof Error ? e.message : e);
+    return clean;
+  }
+}
+
+/** Custo médio ponderado: ao dar ENTRADA de `inQty` a `inUnitCostCents`, recalcula o custo unitário
+ *  misturando com o saldo antigo. (newQty já inclui a entrada — qty velha = newQty − inQty.) */
+export async function reweightCost(id: string, newQty: number, inQty: number, inUnitCostCents: number, at: string, storeId?: string): Promise<StockItem | null> {
+  if (!(inUnitCostCents > 0) || !(inQty > 0)) return null;
+  const sid = storeId ?? (await resolveStoreId());
+  const all = await readAll(sid);
+  const cur = all.find((x) => x.id === id);
+  if (!cur) return null;
+  const oldQty = Math.max(0, +(newQty - inQty).toFixed(3));
+  const oldCost = unitCostCents(cur);
+  const total = oldQty + inQty;
+  const avg = total > 0 ? Math.round((oldQty * oldCost + inQty * inUnitCostCents) / total) : inUnitCostCents;
+  // dose/garrafa guarda custo por garrafa; senão custo por unidade
+  const patch = cur.dosesPerBottle && cur.dosesPerBottle > 0
+    ? { costPerBottleCents: avg * cur.dosesPerBottle }
+    : { costCents: avg };
+  return updateItem(id, patch, at);
 }
 
 /** Entrada por GARRAFA (item dose/garrafa): soma bottles × dosesPerBottle ao estoque em doses. */

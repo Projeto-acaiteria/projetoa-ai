@@ -1,4 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { IconAlert } from "@/components/Icons";
 import { cmvReport } from "@/lib/cmv-store";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,18 @@ export default async function CmvPage({ searchParams }: { searchParams: Promise<
           </a>
         ))}
       </div>
+
+      {rep.missingCostItems.length > 0 && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[var(--gold)] bg-[#FFF8E6] p-3.5">
+          <IconAlert width={18} height={18} className="mt-0.5 shrink-0 text-[var(--gold)]" />
+          <div>
+            <p className="text-sm font-bold text-ink">{rep.missingCostItems.length} insumo{rep.missingCostItems.length > 1 ? "s" : ""} vendido{rep.missingCostItems.length > 1 ? "s" : ""} sem custo cadastrado</p>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+              A margem abaixo está <b>inflada</b> — esses insumos entram com custo zero. Cadastre o custo deles em Estoque pra o CMV ficar real: {rep.missingCostItems.join(", ")}.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Receita" value={brl(rep.revenueCents)} />

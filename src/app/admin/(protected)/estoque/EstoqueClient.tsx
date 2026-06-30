@@ -3,20 +3,25 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { StatCard } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
-import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash } from "@/components/Icons";
+import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash, IconGear } from "@/components/Icons";
 import type { StockItem, StockCategory } from "@/lib/stock-store";
 
 const CAT_LABEL: Record<StockCategory, string> = {
   sorvete: "Sorvetes e potes",
   picole: "Picolés",
   bebida: "Bebidas",
+  bebida_alcoolica: "Bebidas alcoólicas",
   salgado: "Salgados e lanches",
   doce: "Doces e guloseimas",
   polpa: "Polpas e bases",
-  fruta: "Frutas",
+  fruta: "Frutas e hortifruti",
   cereal: "Cereais e complementos",
   cobertura: "Coberturas e caldas",
   adicional: "Adicionais premium",
+  proteina: "Carnes e proteínas",
+  paes_massas: "Pães e massas",
+  laticinio: "Laticínios e frios",
+  mercearia: "Mercearia (secos)",
   embalagem: "Embalagens e descartáveis",
   limpeza: "Limpeza",
   outro: "Outros",
@@ -24,8 +29,8 @@ const CAT_LABEL: Record<StockCategory, string> = {
 
 type FamilyKey = "venda" | "producao" | "operacao";
 const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: string; soft: string }[] = [
-  { key: "venda", label: "Produtos à venda", cats: ["sorvete", "picole", "bebida", "salgado", "doce"], color: "#4F46E5", soft: "#EEF2FF" },
-  { key: "producao", label: "Insumos de produção", cats: ["polpa", "fruta", "cereal", "cobertura", "adicional"], color: "#0E9488", soft: "#D7F2F0" },
+  { key: "venda", label: "Produtos à venda", cats: ["sorvete", "picole", "bebida", "bebida_alcoolica", "salgado", "doce"], color: "#4F46E5", soft: "#EEF2FF" },
+  { key: "producao", label: "Insumos de produção", cats: ["polpa", "fruta", "cereal", "cobertura", "adicional", "proteina", "paes_massas", "laticinio", "mercearia"], color: "#0E9488", soft: "#D7F2F0" },
   { key: "operacao", label: "Operação", cats: ["embalagem", "limpeza", "outro"], color: "#7C6E92", soft: "#EFEAF6" },
 ];
 const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c))!;
@@ -44,7 +49,7 @@ export default function EstoqueClient() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<FamilyKey | "todos">("todos");
-  const [modal, setModal] = useState<null | { kind: "add" } | { kind: "inventory" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" }>(null);
+  const [modal, setModal] = useState<null | { kind: "add" } | { kind: "inventory" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" } | { kind: "edit"; item: StockItem } | { kind: "history"; item: StockItem }>(null);
   // fidelidade: categorias de revenda que NÃO pontuam (a montagem do copo sempre pontua). null=carregando.
   const [nonEarning, setNonEarning] = useState<string[] | null>(null);
 
@@ -112,9 +117,15 @@ export default function EstoqueClient() {
   return (
     <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Itens" value={String(items.length)} hint="cadastrados" Icon={IconBox} tone="brand" />
-        <StatCard label="Em falta" value={String(low.length)} hint="abaixo do mínimo" Icon={IconAlert} tone="accent" />
-        <StatCard label="Vencendo" value={String(expAlert.length)} hint="≤ 7 dias ou vencido" Icon={IconClock} tone="gold" />
+        {!loaded ? (
+          <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
+        ) : (
+          <>
+            <StatCard label="Itens" value={String(items.length)} hint="cadastrados" Icon={IconBox} tone="brand" />
+            <StatCard label="Em falta" value={String(low.length)} hint="abaixo do mínimo" Icon={IconAlert} tone="accent" />
+            <StatCard label="Vencendo" value={String(expAlert.length)} hint="≤ 7 dias ou vencido" Icon={IconClock} tone="gold" />
+          </>
+        )}
         <div className="card flex flex-col items-center justify-center gap-2 p-4">
           <button
             onClick={() => setModal({ kind: "add" })}
@@ -183,7 +194,7 @@ export default function EstoqueClient() {
             </div>
             <div className="card divide-y divide-[var(--line)] overflow-hidden">
               {f.list.map((it) => (
-                <ItemRow key={it.id} it={it} onMove={(dir) => setModal({ kind: "move", item: it, dir })} onRemove={() => remove(it.id)} />
+                <ItemRow key={it.id} it={it} onMove={(dir) => setModal({ kind: "move", item: it, dir })} onEdit={() => setModal({ kind: "edit", item: it })} onHistory={() => setModal({ kind: "history", item: it })} onRemove={() => remove(it.id)} />
               ))}
             </div>
           </section>
@@ -195,7 +206,19 @@ export default function EstoqueClient() {
       {modal?.kind === "move" && (
         <MoveModal item={modal.item} dir={modal.dir} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
       )}
+      {modal?.kind === "edit" && <EditModal item={modal.item} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.kind === "history" && <HistoryModal item={modal.item} onClose={() => setModal(null)} />}
     </>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="card p-4">
+      <div className="h-3 w-16 animate-pulse rounded bg-bg-surface-2" />
+      <div className="mt-2 h-7 w-10 animate-pulse rounded bg-bg-surface-2" />
+      <div className="mt-2 h-2.5 w-20 animate-pulse rounded bg-bg-surface-2" />
+    </div>
   );
 }
 
@@ -214,7 +237,7 @@ function Chip({ active, onClick, label, count, color }: { active: boolean; onCli
   );
 }
 
-function ItemRow({ it, onMove, onRemove }: { it: StockItem; onMove: (dir: "entrada" | "saida") => void; onRemove: () => void }) {
+function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; onMove: (dir: "entrada" | "saida") => void; onEdit: () => void; onHistory: () => void; onRemove: () => void }) {
   const d = daysTo(it.expiry);
   const isLow = it.qty <= it.minQty;
   const expired = d !== null && d < 0;
@@ -238,6 +261,7 @@ function ItemRow({ it, onMove, onRemove }: { it: StockItem; onMove: (dir: "entra
           {expired && <span className="font-bold text-[var(--red-no)]">· vencido</span>}
           {expiring && <span className="font-bold text-gold">· vence em {d}d</span>}
           {it.expiry && !expired && !expiring && <span>· val. {it.expiry.split("-").reverse().join("/")}</span>}
+          {it.supplier && <span>· {it.supplier}</span>}
         </div>
       </div>
 
@@ -253,6 +277,12 @@ function ItemRow({ it, onMove, onRemove }: { it: StockItem; onMove: (dir: "entra
         </button>
         <button onClick={() => onMove("saida")} title="Saída" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-[var(--text-muted)] transition hover:border-ink hover:text-ink">
           <IconMinus width={15} height={15} />
+        </button>
+        <button onClick={onHistory} title="Movimentações" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-brand-600">
+          <IconClock width={15} height={15} />
+        </button>
+        <button onClick={onEdit} title="Editar" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-ink">
+          <IconGear width={15} height={15} />
         </button>
         <button onClick={onRemove} title="Remover" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-[var(--red-no)]">
           <IconTrash width={15} height={15} />
@@ -272,6 +302,9 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [sell, setSell] = useState("");
   const [dpb, setDpb] = useState(""); // doses por garrafa (destilado)
   const [cost, setCost] = useState(""); // custo (CMV): por garrafa se dose, senão por unidade
+  const [supplier, setSupplier] = useState("");
+  const [purchaseUnit, setPurchaseUnit] = useState(""); // unidade de compra (caixa, fardo...)
+  const [purchaseFactor, setPurchaseFactor] = useState(""); // 1 unidade de compra = N unidades de uso
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
@@ -297,6 +330,9 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         // custo p/ CMV: dose → por garrafa; demais → por unidade
         costPerBottleCents: doses > 0 && costC ? costC : undefined,
         costCents: doses === 0 && costC ? costC : undefined,
+        supplier: supplier.trim() || undefined,
+        purchaseUnit: purchaseUnit.trim() || undefined,
+        purchaseFactor: purchaseFactor ? parseFloat(purchaseFactor.replace(",", ".")) || undefined : undefined,
       }),
     });
     onSaved();
@@ -349,6 +385,18 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         <label className="text-xs font-semibold text-[var(--text-muted)]">Validade (opcional)</label>
         <input className={`${inp} mt-1`} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
       </div>
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Fornecedor (opcional)</label>
+        <input className={`${inp} mt-1`} placeholder="ex: Distribuidora Central" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Compra em (opcional)</label>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <input className={inp} placeholder="Unid. compra (ex: caixa)" value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} />
+          <input className={inp} type="number" min={0} placeholder={`${unit || "un"} por ${purchaseUnit || "compra"}`} value={purchaseFactor} onChange={(e) => setPurchaseFactor(e.target.value)} />
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--text-faded)]">Ex: 1 caixa = 12 un. Aí a entrada pode ser lançada em {purchaseUnit || "caixas"}.</p>
+      </div>
       <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Salvando..." : "Cadastrar item"}
       </button>
@@ -356,19 +404,28 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   );
 }
 
+const SAIDA_REASONS = ["Uso", "Perda", "Vencido", "Quebra"];
+
 function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "entrada" | "saida"; onClose: () => void; onSaved: () => void }) {
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
+  const [cost, setCost] = useState(""); // entrada: custo desta compra (custo médio ponderado)
+  const [byPurchase, setByPurchase] = useState(false); // entrada lançada em unidade de compra
   const [saving, setSaving] = useState(false);
 
+  const canConvert = dir === "entrada" && !!item.purchaseFactor && item.purchaseFactor > 0;
+  const factor = item.purchaseFactor ?? 1;
+  const typed = parseFloat(qty.replace(",", ".")) || 0;
+  const useQty = +(byPurchase ? typed * factor : typed).toFixed(3); // sempre na unidade de USO
+
   async function save() {
-    const n = parseFloat(qty);
-    if (!n || n <= 0) return;
+    if (!(useQty > 0)) return;
     setSaving(true);
+    const costC = dir === "entrada" && cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : undefined;
     await fetch(`/api/estoque/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ move: dir, qty: n, reason: reason || (dir === "entrada" ? "Compra" : "Uso") }),
+      body: JSON.stringify({ move: dir, qty: useQty, reason: reason || (dir === "entrada" ? "Compra" : "Uso"), costCents: costC }),
     });
     onSaved();
   }
@@ -378,11 +435,168 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
       <div className="rounded-xl bg-bg-surface-2 px-3 py-2 text-sm text-ink-2">
         Saldo atual: <b className="text-ink">{item.qty} {item.unit}</b>
       </div>
-      <input className={inp} type="number" min={0} step="0.1" placeholder={`Quantidade (${item.unit})`} value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
-      <input className={inp} placeholder={dir === "entrada" ? "Motivo (ex: Compra fornecedor)" : "Motivo (ex: Uso / perda)"} value={reason} onChange={(e) => setReason(e.target.value)} />
+
+      {canConvert && (
+        <div className="flex gap-1.5">
+          <button onClick={() => setByPurchase(false)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${!byPurchase ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em {item.unit}</button>
+          <button onClick={() => setByPurchase(true)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${byPurchase ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em {item.purchaseUnit || "compra"} (×{factor})</button>
+        </div>
+      )}
+
+      <input className={inp} type="number" min={0} step="0.1" placeholder={`Quantidade (${byPurchase ? item.purchaseUnit || "compra" : item.unit})`} value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
+      {byPurchase && typed > 0 && <p className="-mt-1 text-[11px] text-[var(--text-faded)]">= {useQty} {item.unit} no estoque</p>}
+
+      {dir === "saida" ? (
+        <div>
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            {SAIDA_REASONS.map((r) => (
+              <button key={r} onClick={() => setReason(r)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${reason === r ? "border-brand-600 bg-bg-base text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{r}</button>
+            ))}
+          </div>
+          <input className={inp} placeholder="Motivo (opcional — detalhe)" value={SAIDA_REASONS.includes(reason) ? "" : reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+      ) : (
+        <>
+          <input className={inp} placeholder="Motivo (ex: Compra fornecedor)" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Custo por {item.unit} nesta compra (opcional)</label>
+            <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
+              <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+              <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} />
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--text-faded)]">Preenchendo, recalcula o custo médio do insumo (CMV) com base nesta entrada.</p>
+          </div>
+        </>
+      )}
+
       <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Salvando..." : dir === "entrada" ? "Registrar entrada" : "Registrar saída"}
       </button>
+    </Overlay>
+  );
+}
+
+function EditModal({ item, onClose, onSaved }: { item: StockItem; onClose: () => void; onSaved: () => void }) {
+  const isDose = !!item.dosesPerBottle && item.dosesPerBottle > 0;
+  const [name, setName] = useState(item.name);
+  const [category, setCategory] = useState<StockCategory>(item.category);
+  const [unit, setUnit] = useState(item.unit);
+  const [minQty, setMinQty] = useState(String(item.minQty));
+  const [expiry, setExpiry] = useState(item.expiry ?? "");
+  const [sell, setSell] = useState(item.sellPriceCents ? String(item.sellPriceCents / 100) : "");
+  const [cost, setCost] = useState(() => {
+    const c = isDose ? item.costPerBottleCents : item.costCents;
+    return c ? String(c / 100) : "";
+  });
+  const [supplier, setSupplier] = useState(item.supplier ?? "");
+  const [purchaseUnit, setPurchaseUnit] = useState(item.purchaseUnit ?? "");
+  const [purchaseFactor, setPurchaseFactor] = useState(item.purchaseFactor ? String(item.purchaseFactor) : "");
+  const [saving, setSaving] = useState(false);
+  const isVenda = famOf(category).key === "venda";
+
+  async function save() {
+    if (!name.trim()) return;
+    setSaving(true);
+    const costC = cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : 0;
+    // valores explícitos (não undefined) pra permitir LIMPAR um campo na edição
+    await fetch(`/api/estoque/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        category,
+        unit,
+        minQty: +minQty,
+        expiry: expiry || "",
+        sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : 0,
+        ...(isDose ? { costPerBottleCents: costC } : { costCents: costC }),
+        supplier: supplier.trim(),
+        purchaseUnit: purchaseUnit.trim(),
+        purchaseFactor: purchaseFactor ? parseFloat(purchaseFactor.replace(",", ".")) || 0 : 0,
+      }),
+    });
+    onSaved();
+  }
+
+  return (
+    <Overlay onClose={onClose} title={`Editar · ${item.name}`}>
+      <input className={inp} placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <select className={inp} value={category} onChange={(e) => setCategory(e.target.value as StockCategory)}>
+        {FAMILIES.map((f) => (
+          <optgroup key={f.key} label={f.label}>
+            {f.cats.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={isDose} />
+        <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
+      </div>
+      {isVenda && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Preço de venda</label>
+          <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
+            <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+            <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={sell} onChange={(e) => setSell(e.target.value)} />
+          </div>
+        </div>
+      )}
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">{isDose ? "Custo por garrafa (CMV)" : "Custo por unidade (CMV)"}</label>
+        <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
+          <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+          <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} />
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--text-faded)]">Quanto você paga. Base do CMV e da margem — corrigir aqui não apaga o histórico.</p>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Fornecedor (opcional)</label>
+        <input className={`${inp} mt-1`} placeholder="ex: Distribuidora Central" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Compra em (opcional)</label>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <input className={inp} placeholder="Unid. compra (ex: caixa)" value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} />
+          <input className={inp} type="number" min={0} placeholder={`${unit || "un"} por ${purchaseUnit || "compra"}`} value={purchaseFactor} onChange={(e) => setPurchaseFactor(e.target.value)} />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Validade (opcional)</label>
+        <input className={`${inp} mt-1`} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+      </div>
+      <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
+        {saving ? "Salvando..." : "Salvar alterações"}
+      </button>
+    </Overlay>
+  );
+}
+
+function HistoryModal({ item, onClose }: { item: StockItem; onClose: () => void }) {
+  const moves = [...(item.history ?? [])].reverse();
+  const fmt = (at: string) => {
+    const d = at.length <= 10 ? at : at.slice(0, 10);
+    return d.split("-").reverse().join("/");
+  };
+  return (
+    <Overlay onClose={onClose} title={`Movimentações · ${item.name}`}>
+      {moves.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">Sem movimentações registradas ainda. Entradas, saídas e ajustes de inventário aparecem aqui.</p>
+      ) : (
+        <div className="max-h-[55vh] divide-y divide-line overflow-y-auto rounded-xl border border-line">
+          {moves.map((m, i) => {
+            const isIn = m.type === "entrada";
+            return (
+              <div key={i} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0">
+                  <span className={`text-sm font-extrabold ${isIn ? "text-lime" : "text-[var(--red-no)]"}`}>{isIn ? "+" : "−"}{m.qty} {item.unit}</span>
+                  <div className="truncate text-xs text-[var(--text-muted)]">{m.reason || (isIn ? "Entrada" : "Saída")}</div>
+                </div>
+                <span className="shrink-0 text-[11px] text-[var(--text-faded)]">{fmt(m.at)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Overlay>
   );
 }

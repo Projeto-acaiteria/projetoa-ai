@@ -5,7 +5,7 @@
 // SEM garçom/comissão. Todos os valores em CENTAVOS (int).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
-import { applyConsumes } from "@/lib/stock-store";
+import { applyConsumes, listStock, unitCostCents } from "@/lib/stock-store";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -20,7 +20,7 @@ const num = (v: unknown) => Number(v ?? 0);
 // ── Tipos ──────────────────────────────────────────────────────────────────
 export type TabStatus = "aberta" | "fechada";
 
-export type StockConsume = { stockId: string; qty: number };
+export type StockConsume = { stockId: string; qty: number; costCents?: number };
 
 export type Tab = {
   id: number;
@@ -290,6 +290,15 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
     }
   }
 
+  // custo CONGELADO dos insumos no momento da venda → CMV histórico estável (não muda se o custo
+  // for editado depois). Não-fatal: se o estoque falhar de ler, segue sem custo (cmv usa o atual).
+  const costById = new Map<string, number>();
+  try {
+    for (const s of await listStock(sid)) costById.set(s.id, unitCostCents(s));
+  } catch (e) {
+    console.error("addTabItems: falha ao congelar custo no consumes (segue sem custo):", e instanceof Error ? e.message : e);
+  }
+
   // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
   const resolved = items.map((it) => {
     let consumes: StockConsume[] = [];
@@ -301,6 +310,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
     } else if (it.productId) {
       consumes = recipeByProduct.get(it.productId) ?? [];
     }
+    consumes = consumes.map((c) => ({ ...c, costCents: costById.get(c.stockId) ?? 0 }));
     return { ...it, consumes, station: it.station || "cozinha" };
   });
 

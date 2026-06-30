@@ -5,8 +5,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CATS: StockCategory[] = [
-  "sorvete", "picole", "bebida", "salgado", "doce",
+  "sorvete", "picole", "bebida", "bebida_alcoolica", "salgado", "doce",
   "polpa", "fruta", "cereal", "cobertura", "adicional",
+  "proteina", "paes_massas", "laticinio", "mercearia",
   "embalagem", "limpeza", "outro",
 ];
 
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
       dosesPerBottle: b.dosesPerBottle ? Math.max(1, Math.round(Number(b.dosesPerBottle))) : undefined,
       costPerBottleCents: b.costPerBottleCents ? Math.max(0, Math.round(Number(b.costPerBottleCents))) : undefined,
       costCents: b.costCents ? Math.max(0, Math.round(Number(b.costCents))) : undefined,
+      supplier: b.supplier?.trim() || undefined,
+      purchaseUnit: b.purchaseUnit?.trim() || undefined,
+      purchaseFactor: b.purchaseFactor ? Math.max(0, Number(b.purchaseFactor)) || undefined : undefined,
     },
     new Date().toISOString().slice(0, 10),
   );
