@@ -36,7 +36,7 @@ export default async function LojaMeusPontos({ params }: { params: Promise<{ slu
           </div>
         </div>
       </header>
-      <MeusPontosClient storeId={storeId} />
+      <MeusPontosClient storeId={storeId} backHref={`/${slug}`} />
     </main>
   );
 }

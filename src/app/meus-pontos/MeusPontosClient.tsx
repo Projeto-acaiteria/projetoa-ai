@@ -12,7 +12,7 @@ const IconGift = (p: { width?: number; height?: number; className?: string }) =>
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
 );
 
-export default function MeusPontosClient({ storeId }: { storeId?: string }) {
+export default function MeusPontosClient({ storeId, backHref }: { storeId?: string; backHref?: string }) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -41,6 +41,11 @@ export default function MeusPontosClient({ storeId }: { storeId?: string }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-6">
+      {backHref && (
+        <a href={backHref} className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-[var(--text-muted)] transition hover:text-brand-600">
+          <IconArrowRight width={16} height={16} className="rotate-180" /> Voltar ao cardápio
+        </a>
+      )}
       {/* Busca */}
       <div className="card p-4">
         <label className="text-sm font-bold text-ink">Consulte seus pontos</label>

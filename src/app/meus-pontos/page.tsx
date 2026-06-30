@@ -29,7 +29,7 @@ export default async function MeusPontosPage() {
           </div>
         </div>
       </header>
-      <MeusPontosClient />
+      <MeusPontosClient backHref="/cardapio" />
     </main>
   );
 }
