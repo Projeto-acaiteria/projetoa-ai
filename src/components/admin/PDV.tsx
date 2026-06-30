@@ -168,9 +168,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
 
   return (
     <>
-      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        {/* Catálogo */}
-        <div>
+      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[1fr_360px]">
+        {/* Catálogo — rola por dentro no desktop (não cresce a página) */}
+        <div className="lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           <div className="mb-4 inline-flex rounded-xl border border-line bg-bg-elevated p-1">
             {pricePerKgCents > 0 && <TabBtn active={tab === "peso"} onClick={() => setTab("peso")} Icon={IconScale} label="Por peso" />}
             <TabBtn active={tab === "acai"} onClick={() => setTab("acai")} Icon={IconBowl} label="Copo" />
@@ -221,9 +221,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           )}
         </div>
 
-        {/* Comanda */}
-        <div className="lg:sticky lg:top-4 lg:self-start">
-          <div className="card flex max-h-[calc(100vh-7rem)] flex-col p-4">
+        {/* Comanda — preenche a altura no desktop; itens rolam por dentro */}
+        <div className="lg:min-h-0">
+          <div className="card flex max-h-[calc(100vh-7rem)] flex-col p-4 lg:h-full lg:max-h-full">
             <div className="mb-3 flex items-center gap-2">
               <IconCart width={18} height={18} className="text-brand-600" />
               <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Comanda</h2>

@@ -53,11 +53,20 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
   // sem caixa aberto → abertura (primeira tela do dia)
   if (!session) return <Abertura onOpened={load} />;
 
+  // Caixa cabe numa tela só (DELL): painel fixo no topo + PDV preenchendo o resto, cada coluna
+  // rolando por dentro — sem scroll de PÁGINA no desktop. Mobile mantém o scroll natural.
   return (
-    <div className="space-y-5">
-      <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cupomRodape={cupomRodape} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
-      {showPdv && <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />}
-      {!showPdv && <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>}
+    <div className={`flex flex-col gap-5 ${showPdv ? "lg:h-[calc(100dvh-4rem)] lg:gap-4 lg:overflow-hidden" : ""}`}>
+      <div className="shrink-0">
+        <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cupomRodape={cupomRodape} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
+      </div>
+      {showPdv ? (
+        <div className="min-h-0 flex-1">
+          <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />
+        </div>
+      ) : (
+        <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>
+      )}
     </div>
   );
 }
