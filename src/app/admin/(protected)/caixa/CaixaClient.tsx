@@ -129,44 +129,37 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
   return (
     <div className="card relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 6%, var(--bg-elevated)) 0%, var(--bg-elevated) 50%)" }}>
       <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: "linear-gradient(90deg, var(--brand-600), transparent)" }} aria-hidden />
-      <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full blur-3xl" style={{ background: "color-mix(in srgb, var(--brand-600) 18%, transparent)" }} aria-hidden />
-      <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-lime">
-            <span className="h-2 w-2 rounded-full bg-lime" /> Caixa aberto
-            <span className="font-semibold text-[var(--text-muted)]"><IconClock width={12} height={12} className="mb-0.5 inline" /> desde {hhmm(session.openedAt)}</span>
+      {/* barra compacta estilo PDV: saldo + stats inline + ações icônicas, tudo numa faixa fina */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 p-3.5">
+        <div className="shrink-0">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-lime">
+            <span className="h-1.5 w-1.5 rounded-full bg-lime" /> Caixa aberto
+            <span className="font-semibold text-[var(--text-muted)]">· desde {hhmm(session.openedAt)}</span>
+            <QzStatus className="ml-1" />
           </div>
-          <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink tabular-nums sm:text-5xl">{brl(resumo.saldoCaixaCents)}</div>
-          <div className="text-xs font-semibold text-[var(--text-muted)]">em caixa agora</div>
-          <QzStatus className="mt-2" />
+          <div className="mt-0.5 flex items-baseline gap-1.5">
+            <span className="text-3xl font-extrabold leading-none tracking-tight text-ink tabular-nums">{brl(resumo.saldoCaixaCents)}</span>
+            <span className="text-[11px] font-semibold text-[var(--text-muted)]">em caixa</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setModal("consulta")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-brand-600">
-            <IconStar width={15} height={15} /> Consultar pontos
-          </button>
-          <button onClick={() => setModal("historico")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
-            <IconClock width={15} height={15} /> Histórico
-          </button>
-          <button onClick={() => setModal("leiturax")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
-            <IconPrinter width={15} height={15} /> Leitura X
-          </button>
-          <button onClick={() => setModal("suprimento")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
-            <IconPlus width={15} height={15} /> Suprimento
-          </button>
-          <button onClick={() => setModal("sangria")} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-sm font-bold text-ink">
-            <IconMinus width={15} height={15} /> Sangria
-          </button>
-          <button onClick={() => setModal("fechar")} className="inline-flex items-center gap-1.5 rounded-xl brand-gradient px-3.5 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
+
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:border-l sm:border-line sm:pl-5">
+          <MiniStat label="Total vendido" value={brl(resumo.salesTotalCents)} sub={`${resumo.nVendas} venda${resumo.nVendas === 1 ? "" : "s"}`} />
+          <MiniStat label="Dinheiro" value={brl(resumo.salesCashCents)} />
+          <MiniStat label="Fundo troco" value={brl(session.openingFloatCents)} />
+          <MiniStat label="Sangria / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? "ver trilha" : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
+        </div>
+
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <IconBtn onClick={() => setModal("consulta")} Icon={IconStar} title="Consultar pontos do cliente" />
+          <IconBtn onClick={() => setModal("historico")} Icon={IconClock} title="Histórico de caixas" />
+          <IconBtn onClick={() => setModal("leiturax")} Icon={IconPrinter} title="Leitura X (relatório parcial)" />
+          <IconBtn onClick={() => setModal("suprimento")} Icon={IconPlus} title="Suprimento (reforço de troco)" />
+          <IconBtn onClick={() => setModal("sangria")} Icon={IconMinus} title="Sangria (retirada)" />
+          <button onClick={() => setModal("fechar")} className="inline-flex items-center gap-1.5 rounded-lg brand-gradient px-3.5 py-2 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
             <IconCheck width={15} height={15} /> Fechar caixa
           </button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-px border-t border-line bg-[var(--line)] sm:grid-cols-4">
-        <Stat label="Vendas (dinheiro)" value={brl(resumo.salesCashCents)} />
-        <Stat label="Total vendido" value={brl(resumo.salesTotalCents)} sub={`${resumo.nVendas} venda${resumo.nVendas === 1 ? "" : "s"}`} />
-        <Stat label="Fundo de troco" value={brl(session.openingFloatCents)} />
-        <Stat label="Sangrias / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? `${session.movements.length} mov. · ver trilha` : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
       </div>
 
       {modal === "sangria" && <MovModal type="sangria" store={store} rodape={cupomRodape} cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
@@ -355,16 +348,23 @@ function LeituraXModal({ store, onClose }: { store: StoreHeader; onClose: () => 
   );
 }
 
-function Stat({ label, value, sub, onClick }: { label: string; value: string; sub?: string; onClick?: () => void }) {
+function MiniStat({ label, value, sub, onClick }: { label: string; value: string; sub?: string; onClick?: () => void }) {
   const inner = (
     <>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</div>
-      <div className="mt-0.5 text-base font-extrabold tabular-nums text-ink">{value}</div>
-      {sub && <div className={`text-[11px] font-semibold ${onClick ? "text-brand-600" : "text-[var(--text-faded)]"}`}>{sub}</div>}
+      <div className="text-[9px] font-bold uppercase tracking-wide leading-none text-[var(--text-muted)]">{label}</div>
+      <div className="mt-1 text-sm font-extrabold leading-none tabular-nums text-ink">{value}</div>
+      {sub && <div className={`mt-1 text-[9px] font-semibold leading-none ${onClick ? "text-brand-600" : "text-[var(--text-faded)]"}`}>{sub}</div>}
     </>
   );
-  if (onClick) return <button onClick={onClick} className="bg-bg-elevated px-4 py-3 text-left transition hover:bg-bg-surface-2">{inner}</button>;
-  return <div className="bg-bg-elevated px-4 py-3">{inner}</div>;
+  return onClick ? <button onClick={onClick} className="text-left">{inner}</button> : <div>{inner}</div>;
+}
+
+function IconBtn({ onClick, Icon, title }: { onClick: () => void; Icon: (p: { width?: number; height?: number }) => React.ReactNode; title: string }) {
+  return (
+    <button onClick={onClick} title={title} aria-label={title} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-ink-2 transition hover:border-brand-400 hover:text-brand-600">
+      <Icon width={16} height={16} />
+    </button>
+  );
 }
 
 /* ---------------- Modais ---------------- */
