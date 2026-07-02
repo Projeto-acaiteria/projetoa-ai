@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { brl } from "@/lib/format";
 import type { CardMachine } from "@/lib/settings-store";
-import { type Size, type ModifierGroup, type Ingredient } from "@/lib/menu";
+import { type Size, type ModifierGroup, type Ingredient, WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
 import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox, IconStar, IconPrinter, IconSearch } from "@/components/Icons";
 import { type CupomData } from "@/components/admin/CupomPrinter";
 import { printVias, openDrawer } from "@/lib/print";
@@ -341,7 +341,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           product={{ name: "Açaí por peso", price_cents: pricePerKgCents, tare_grams: 0 }}
           onClose={() => setWeighing(false)}
           onConfirm={(grams) => {
-            addBuilt({ key: `peso-${++pesoSeq}`, label: `Açaí ${grams}g`, unitCents: Math.round((grams / 1000) * pricePerKgCents), group: "acai" });
+            // baixa de estoque do açaí pesado — polpa proporcional (igual à mesa). Antes o peso do
+            // balcão NÃO baixava, então o estoque/kg-vendido saíam furados. Product-wide (WEIGHT_BASE).
+            addBuilt({ key: `peso-${++pesoSeq}`, label: `Açaí ${grams}g`, unitCents: Math.round((grams / 1000) * pricePerKgCents), group: "acai", consumes: [{ stockId: WEIGHT_BASE_STOCK_ID, qty: +(grams / 1000).toFixed(3) }] });
             setWeighing(false);
           }}
         />

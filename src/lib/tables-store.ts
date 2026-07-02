@@ -8,12 +8,13 @@ import { resolveStoreId } from "@/lib/auth/current";
 import { applyConsumes, listStock, unitCostCents } from "@/lib/stock-store";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
+import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 
-const POLPA_STOCK_ID = "polpa"; // insumo base do açaí pesado (kg)
+const POLPA_STOCK_ID = WEIGHT_BASE_STOCK_ID; // insumo base do açaí pesado (kg) — fonte única em menu.ts
 
 const num = (v: unknown) => Number(v ?? 0);
 

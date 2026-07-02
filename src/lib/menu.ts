@@ -5,6 +5,10 @@
 // Ficha técnica: insumos que o item consome do estoque ao ser vendido.
 export type Ingredient = { stockId: string; qty: number };
 
+// Insumo-base do produto vendido POR PESO (açaí = polpa). Venda por peso baixa este insumo em
+// QUALQUER canal (caixa, mesa) — fonte única pra caixa e mesa não divergirem. Product-wide.
+export const WEIGHT_BASE_STOCK_ID = "polpa";
+
 export type Size = { id: string; label: string; ml: number; priceCents: number; img: string; recipe?: Ingredient[] };
 
 export type Modifier = { id: string; name: string; priceCents: number; recipe?: Ingredient[] };
