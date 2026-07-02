@@ -411,6 +411,7 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
   const [reason, setReason] = useState("");
   const [cost, setCost] = useState(""); // entrada: custo desta compra (custo médio ponderado)
   const [byPurchase, setByPurchase] = useState(false); // entrada lançada em unidade de compra
+  const [expiry, setExpiry] = useState(item.expiry ?? ""); // entrada: validade do lote que está chegando
   const [saving, setSaving] = useState(false);
 
   const canConvert = dir === "entrada" && !!item.purchaseFactor && item.purchaseFactor > 0;
@@ -425,7 +426,7 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
     await fetch(`/api/estoque/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ move: dir, qty: useQty, reason: reason || (dir === "entrada" ? "Compra" : "Uso"), costCents: costC }),
+      body: JSON.stringify({ move: dir, qty: useQty, reason: reason || (dir === "entrada" ? "Compra" : "Uso"), costCents: costC, expiry: dir === "entrada" ? (expiry || undefined) : undefined }),
     });
     onSaved();
   }
@@ -465,6 +466,11 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
               <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} />
             </div>
             <p className="mt-1 text-[11px] text-[var(--text-faded)]">Preenchendo, recalcula o custo médio do insumo (CMV) com base nesta entrada.</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Validade do lote (opcional)</label>
+            <input className={`${inp} mt-1`} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+            <p className="mt-1 text-[11px] text-[var(--text-faded)]">A validade do que está chegando. Alimenta o alerta de vencimento.</p>
           </div>
         </>
       )}

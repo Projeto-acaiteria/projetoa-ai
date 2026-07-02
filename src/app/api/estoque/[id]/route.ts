@@ -17,12 +17,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (b.move === "entrada" || b.move === "saida") {
     const qty = Number(b.qty) || 0;
-    const item = await moveStock(id, b.move, qty, String(b.reason || ""), today);
+    let item = await moveStock(id, b.move, qty, String(b.reason || ""), today);
     if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
-    // custo médio ponderado: entrada com custo unitário desta compra recalcula o custo do CMV
-    if (b.move === "entrada" && Number(b.costCents) > 0) {
-      const reweighted = await reweightCost(id, item.qty, qty, Number(b.costCents), today);
-      return NextResponse.json({ ok: true, item: reweighted ?? item });
+    if (b.move === "entrada") {
+      // validade do lote que chegou (alimenta o alerta de vencimento)
+      if (typeof b.expiry === "string" && b.expiry) item = (await updateItem(id, { expiry: b.expiry }, today)) ?? item;
+      // custo médio ponderado: custo unitário desta compra recalcula o custo do CMV
+      if (Number(b.costCents) > 0) item = (await reweightCost(id, item.qty, qty, Number(b.costCents), today)) ?? item;
     }
     return NextResponse.json({ ok: true, item });
   }
