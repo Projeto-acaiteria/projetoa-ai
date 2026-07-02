@@ -96,6 +96,7 @@ export type NewTabItem = {
   sizeId?: string; // copo: ficha técnica resolvida pelo tamanho no servidor
   grams?: number; // peso: polpa proporcional resolvida no servidor
   productId?: string; // bar: ficha técnica do menu_product resolvida no servidor (baixa automática)
+  stockId?: string; // revenda direta (refri/picolé): baixa 1 un do próprio item de estoque
   station?: string; // estação de preparo (bar). Ausente = 'cozinha' (açaí).
   mods?: { name: string; price_cents: number }[] | null; // personalização escolhida (espelha no KDS/cupom)
   note?: string | null; // observação da LINHA (ex: ponto da carne, sem cebola)
@@ -309,6 +310,8 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       consumes = [{ stockId: POLPA_STOCK_ID, qty: +(it.grams / 1000).toFixed(3) }];
     } else if (it.productId) {
       consumes = recipeByProduct.get(it.productId) ?? [];
+    } else if (it.stockId) {
+      consumes = [{ stockId: it.stockId, qty: 1 }]; // revenda: baixa 1 un do próprio item
     }
     consumes = consumes.map((c) => ({ ...c, costCents: costById.get(c.stockId) ?? 0 }));
     return { ...it, consumes, station: it.station || "cozinha" };

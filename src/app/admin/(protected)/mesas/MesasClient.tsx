@@ -12,9 +12,19 @@ import {
   IconClock,
 } from "@/components/Icons";
 import { brl } from "@/lib/format";
+import { printVias } from "@/lib/print";
+import { ticketHtml } from "@/lib/ticket";
+import type { CupomData } from "@/components/admin/CupomPrinter";
 
 // ---- tipos do contrato das APIs ----
 type SizeOption = { id: string; label: string; priceCents: number; ml: number };
+type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
+
+const nowLabel = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 type TableCell = {
   number: number;
@@ -37,7 +47,7 @@ type Comanda = {
   paidCents: number;
 };
 
-type CartLine = { name: string; sizeLabel?: string; qty: number; unitPriceCents: number; consumes?: unknown; sizeId?: string; grams?: number };
+type CartLine = { name: string; sizeLabel?: string; qty: number; unitPriceCents: number; consumes?: unknown; sizeId?: string; grams?: number; stockId?: string };
 
 const METHODS: { key: string; label: string }[] = [
   { key: "dinheiro", label: "Dinheiro" },
@@ -58,13 +68,25 @@ function agoMin(iso: string | null): string {
 export default function MesasClient({
   pricePerKgCents,
   sizes,
+  produtos = [],
   coverShow = null,
   staff = [],
+  storeName,
+  endereco,
+  cnpj,
+  tel,
+  cupomRodape,
 }: {
   pricePerKgCents: number;
   sizes: SizeOption[];
+  produtos?: Produto[];
   coverShow?: { artist: string; coverCents: number } | null;
   staff?: { id: string; name: string }[];
+  storeName: string;
+  endereco: string;
+  cnpj: string;
+  tel: string;
+  cupomRodape: string;
 }) {
   const [tables, setTables] = useState<TableCell[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -82,7 +104,7 @@ export default function MesasClient({
 
   // carrinho temporário (antes de lançar na comanda)
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [mode, setMode] = useState<"copo" | "pesar">("copo");
+  const [mode, setMode] = useState<"copo" | "pesar" | "produtos">("copo");
   const [grams, setGrams] = useState("");
 
   // pagamento
@@ -213,6 +235,18 @@ export default function MesasClient({
     setGrams("");
   }
 
+  function addProduto(p: Produto) {
+    setCart((c) => {
+      const i = c.findIndex((l) => l.stockId === p.id);
+      if (i >= 0) {
+        const nx = [...c];
+        nx[i] = { ...nx[i], qty: nx[i].qty + 1 };
+        return nx;
+      }
+      return [...c, { name: p.name, qty: 1, unitPriceCents: p.priceCents, stockId: p.id }];
+    });
+  }
+
   function incCart(i: number, d: number) {
     setCart((c) => {
       const nx = [...c];
@@ -304,6 +338,30 @@ export default function MesasClient({
         }),
       });
       const data = await res.json();
+
+      // CUPOM da mesa — respeita o toggle autoprint:venda (mesma política do balcão/PDV).
+      // Faltava por completo: o fechar da mesa nunca imprimia. (achado do teste do Eduardo)
+      if (typeof window !== "undefined" && localStorage.getItem("autoprint:venda") !== "0") {
+        const cupomItems: { qty: number; name: string; totalCents: number }[] = lines.map((l) => ({ qty: l.qty, name: l.name, totalCents: l.qty * l.unitPriceCents }));
+        if (cover > 0) cupomItems.push({ qty: 1, name: "Couvert artístico", totalCents: cover });
+        if (serviceFeeCents > 0) cupomItems.push({ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFeeCents });
+        const pays = comanda?.payments ?? [];
+        const payLabel = pays.length === 1 ? (METHODS.find((m) => m.key === pays[0].method)?.label ?? pays[0].method) : pays.length > 1 ? "Vários" : undefined;
+        const cupom: CupomData = {
+          loja: storeName, endereco, cnpj, tel, rodape: cupomRodape,
+          display: `Mesa ${tableNumber}`,
+          dateLabel: nowLabel(),
+          modeLabel: `Mesa ${tableNumber}`,
+          paymentLabel: payLabel,
+          customerName: name.trim() || undefined,
+          phone: phone.replace(/\D+/g, "") || undefined,
+          items: cupomItems,
+          totalCents: grand,
+          pointsInfo: data?.pointsAwarded ? `Pontos ganhos: +${data.pointsAwarded}` : undefined,
+        };
+        void printVias((via) => ticketHtml({ ...cupom, origem: "balcao", via }));
+      }
+
       if (data?.pointsAwarded) {
         setPointsMsg(`Cliente ganhou ${data.pointsAwarded} ponto${data.pointsAwarded === 1 ? "" : "s"}.`);
         setTimeout(closeModal, 1600);
@@ -406,9 +464,9 @@ export default function MesasClient({
               <>
                 {/* corpo: lançar + comanda */}
                 <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                  {/* toggle copo / pesar */}
-                  <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-bg-surface-2 p-1">
-                    {(["copo", "pesar"] as const).map((m) => (
+                  {/* toggle copo / pesar / produtos (produtos só aparece se houver revenda cadastrada) */}
+                  <div className={`grid gap-1.5 rounded-xl bg-bg-surface-2 p-1 ${produtos.length > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
+                    {(produtos.length > 0 ? (["copo", "pesar", "produtos"] as const) : (["copo", "pesar"] as const)).map((m) => (
                       <button
                         key={m}
                         onClick={() => setMode(m)}
@@ -416,7 +474,7 @@ export default function MesasClient({
                           mode === m ? "brand-gradient text-white shadow-[var(--shadow-brand)]" : "text-[var(--text-muted)]"
                         }`}
                       >
-                        {m === "copo" ? "Copo" : "Pesar"}
+                        {m === "copo" ? "Copo" : m === "pesar" ? "Pesar" : "Produtos"}
                       </button>
                     ))}
                   </div>
@@ -434,7 +492,7 @@ export default function MesasClient({
                         </button>
                       ))}
                     </div>
-                  ) : (
+                  ) : mode === "pesar" ? (
                     <div className="rounded-xl border border-line bg-bg-elevated p-3">
                       <label className="text-xs font-bold uppercase text-[var(--text-muted)]">Peso (gramas)</label>
                       <div className="mt-1.5 flex items-center gap-2">
@@ -457,6 +515,20 @@ export default function MesasClient({
                       >
                         <IconPlus width={15} height={15} /> Lançar açaí pesado
                       </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {produtos.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => addProduto(p)}
+                          disabled={p.qty <= 0}
+                          className="rounded-xl border border-line bg-bg-elevated p-3 text-left transition hover:border-brand-600 disabled:opacity-40"
+                        >
+                          <div className="text-sm font-bold text-ink">{p.name}</div>
+                          <div className="mt-0.5 text-xs font-semibold text-brand-600">{brl(p.priceCents)}</div>
+                        </button>
+                      ))}
                     </div>
                   )}
 

@@ -2,6 +2,7 @@ import { PageHeader, Badge } from "@/components/admin/ui";
 import { getStore, getCardMachines } from "@/lib/settings-store";
 import { readMenu } from "@/lib/menu-store";
 import { readBarMenu } from "@/lib/menu-bar-store";
+import { listStock } from "@/lib/stock-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 import { listStaff } from "@/lib/staff-store";
@@ -32,7 +33,12 @@ export default async function MesasPage() {
   }
 
   // açaí (copo/peso): fluxo existente
-  const [store, menu] = await Promise.all([getStore(storeId), readMenu(storeId)]);
+  const [store, menu, stock] = await Promise.all([getStore(storeId), readMenu(storeId), listStock(storeId)]);
   const sizes = menu.sizes.map((s) => ({ id: s.id, label: s.label, priceCents: s.priceCents, ml: s.ml }));
-  return <>{header}<MesasClient pricePerKgCents={store.pricePerKgCents} sizes={sizes} coverShow={coverShow} staff={staff} /></>;
+  // produtos de revenda (refri, picolé, água…) — mesma fonte do Caixa, pra vender também na mesa
+  const VENDA_CATS = ["sorvete", "picole", "bebida", "bebida_alcoolica", "salgado", "doce"];
+  const produtos = stock
+    .filter((i) => VENDA_CATS.includes(i.category) && i.sellPriceCents)
+    .map((i) => ({ id: i.id, name: i.name, priceCents: i.sellPriceCents!, qty: i.qty, unit: i.unit }));
+  return <>{header}<MesasClient pricePerKgCents={store.pricePerKgCents} sizes={sizes} produtos={produtos} coverShow={coverShow} staff={staff} storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} /></>;
 }
