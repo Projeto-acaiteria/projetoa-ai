@@ -13,11 +13,11 @@ const CAT_LABEL: Record<StockCategory, string> = {
   bebida_alcoolica: "Bebidas alcoólicas",
   salgado: "Salgados e lanches",
   doce: "Doces e guloseimas",
-  polpa: "Polpas e bases",
-  fruta: "Frutas e hortifruti",
-  cereal: "Cereais e complementos",
-  cobertura: "Coberturas e caldas",
-  adicional: "Adicionais premium",
+  polpa: "Açaí (polpas)",
+  fruta: "Frutas",
+  cereal: "Crocantes",
+  cobertura: "Cremes e caldas",
+  adicional: "Adicionais",
   proteina: "Carnes e proteínas",
   paes_massas: "Pães e massas",
   laticinio: "Laticínios e frios",
@@ -34,7 +34,14 @@ const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: s
   { key: "operacao", label: "Operação", cats: ["embalagem", "limpeza", "outro"], color: "#7C6E92", soft: "#EFEAF6" },
 ];
 const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c))!;
-const ALL_CATS = FAMILIES.flatMap((f) => f.cats);
+// Ordem das SEÇÕES no estoque — espelha o fluxo do cardápio: açaí primeiro, depois frutas,
+// crocantes, cremes, adicionais, doces; por fim revenda e operação.
+const SECTION_ORDER: StockCategory[] = [
+  "polpa", "fruta", "cereal", "cobertura", "adicional", "doce",
+  "sorvete", "picole", "bebida", "bebida_alcoolica", "salgado",
+  "proteina", "paes_massas", "laticinio", "mercearia",
+  "embalagem", "limpeza", "outro",
+];
 
 function daysTo(expiry?: string): number | null {
   if (!expiry) return null;
@@ -93,19 +100,22 @@ export default function EstoqueClient() {
     return d !== null && d <= 7;
   });
 
-  const byFamily = useMemo(() => {
+  const byCat = useMemo(() => {
     const rank = (i: StockItem) => {
       const d = daysTo(i.expiry);
       if (i.qty <= i.minQty) return 0;
       if (d !== null && d <= 7) return 1;
       return 2;
     };
-    return FAMILIES.map((f) => ({
-      ...f,
-      list: items
-        .filter((i) => f.cats.includes(i.category))
-        .sort((a, b) => rank(a) - rank(b) || a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
-    })).filter((f) => f.list.length > 0 && (filter === "todos" || filter === f.key));
+    return SECTION_ORDER
+      .filter((cat) => filter === "todos" || famOf(cat).key === filter)
+      .map((cat) => ({
+        cat,
+        list: items
+          .filter((i) => i.category === cat)
+          .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name)),
+      }))
+      .filter((s) => s.list.length > 0);
   }, [items, filter]);
 
   const remove = async (id: string) => {
@@ -184,16 +194,16 @@ export default function EstoqueClient() {
       )}
 
       <div className="mt-5 space-y-7">
-        {byFamily.map((f) => (
-          <section key={f.key}>
+        {byCat.map((s) => (
+          <section key={s.cat}>
             <div className="mb-2.5 flex items-center gap-2.5">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: f.color }} />
-              <h2 className="text-sm font-extrabold text-ink">{f.label}</h2>
-              <span className="text-xs font-bold text-[var(--text-faded)]">{f.list.length}</span>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: famOf(s.cat).color }} />
+              <h2 className="text-sm font-extrabold text-ink">{CAT_LABEL[s.cat]}</h2>
+              <span className="text-xs font-bold text-[var(--text-faded)]">{s.list.length}</span>
               <div className="ml-1 h-px flex-1 bg-line" />
             </div>
             <div className="card divide-y divide-[var(--line)] overflow-hidden">
-              {f.list.map((it) => (
+              {s.list.map((it) => (
                 <ItemRow key={it.id} it={it} onMove={(dir) => setModal({ kind: "move", item: it, dir })} onEdit={() => setModal({ kind: "edit", item: it })} onHistory={() => setModal({ kind: "history", item: it })} onRemove={() => remove(it.id)} />
               ))}
             </div>
