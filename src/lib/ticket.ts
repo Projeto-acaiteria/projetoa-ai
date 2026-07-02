@@ -123,11 +123,15 @@ export type LeituraXData = {
   suprimentoCents: number;
   sangriaCents: number;
   saldoCaixaCents: number;
+  acai?: { totalKg: number; pesoKg: number; copoKg: number; copoCount: number; pesoCount: number };
 };
+
+const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 export function leituraXHtml(d: LeituraXData): string {
   const card = d.salesCardCents > 0;
   const pix = d.salesPixCents > 0;
+  const acai = d.acai && (d.acai.totalKg > 0 || d.acai.copoCount > 0 || d.acai.pesoCount > 0) ? d.acai : null;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
     body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;font-size:14px;line-height:1.45;font-weight:700}
@@ -161,6 +165,11 @@ export function leituraXHtml(d: LeituraXData): string {
     ${card ? lead("Cartão (líquido)", brl(d.cardNetCents)) : ""}
     ${pix ? lead("Pix", brl(d.salesPixCents)) : ""}
     ${lead("TOTAL VENDIDO", brl(d.salesTotalCents), "b total")}
+    ${acai ? `<div class="dash"></div>
+    <div class="sec">Açaí vendido</div>
+    ${lead("Total", `${kgFmt(acai.totalKg)} kg`, "b total")}
+    ${lead("Em copo", `${acai.copoCount} copos (~${kgFmt(acai.copoKg)} kg)`)}
+    ${lead("Por peso", `${kgFmt(acai.pesoKg)} kg`)}` : ""}
     <div class="dash"></div>
     <div class="sec">Gaveta (dinheiro)</div>
     ${lead("Fundo de troco", brl(d.openingFloatCents))}

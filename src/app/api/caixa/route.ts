@@ -4,6 +4,7 @@ import { getCashPin } from "@/lib/settings-store";
 import { getCurrentUser } from "@/lib/auth/store";
 import { listOrders } from "@/lib/orders-store";
 import { listMesaPayments } from "@/lib/tables-store";
+import { weightSoldSince } from "@/lib/weight-report";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,10 @@ async function resumo(session: CashSession) {
   const saldoCaixaCents = session.openingFloatCents + salesCashCents + suprimentoCents - sangriaCents;
   // nVendas: balcão (1 order = 1 venda) + comandas DISTINTAS (split em N parciais NÃO conta N vezes)
   const nMesas = new Set(mesas.map((m) => m.tabId)).size;
-  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas };
+  // "quantos kg de açaí vendi hoje" (Vidal): polpa consumida nas vendas da sessão (copo + peso).
+  // Reusa `orders` (balcão) já carregado acima; a função busca só os itens de mesa.
+  const acai = await weightSoldSince(session.openedAt, undefined, orders);
+  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas, acai };
 }
 
 export async function GET() {

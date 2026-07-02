@@ -17,7 +17,12 @@ type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string }
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
-type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number };
+type AcaiSold = { totalKg: number; pesoKg: number; copoKg: number; copoCount: number; pesoCount: number };
+type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number; acai?: AcaiSold };
+
+// kg em pt-BR (vírgula), até 2 casas; "12,5" / "40" / "3,25"
+const kg = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const hasAcai = (a?: AcaiSold) => !!a && (a.totalKg > 0 || a.copoCount > 0 || a.pesoCount > 0);
 
 const hhmm = (iso: string) => {
   const d = new Date(iso);
@@ -148,6 +153,9 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
           <MiniStat label="Dinheiro" value={brl(resumo.salesCashCents)} />
           <MiniStat label="Fundo troco" value={brl(session.openingFloatCents)} />
           <MiniStat label="Sangria / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? "ver trilha" : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
+          {hasAcai(resumo.acai) && (
+            <MiniStat label="Açaí vendido" value={`${kg(resumo.acai!.totalKg)} kg`} sub={`${resumo.acai!.copoCount} copos · ${kg(resumo.acai!.pesoKg)}kg peso`} />
+          )}
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -316,6 +324,7 @@ function LeituraXModal({ store, onClose }: { store: StoreHeader; onClose: () => 
       suprimentoCents: resumo.suprimentoCents,
       sangriaCents: resumo.sangriaCents,
       saldoCaixaCents: resumo.saldoCaixaCents,
+      acai: resumo.acai,
     });
     const r = await printTicket(html, "caixa");
     localStorage.setItem(key, String(seq));
@@ -337,6 +346,13 @@ function LeituraXModal({ store, onClose }: { store: StoreHeader; onClose: () => 
             {data.resumo.salesPixCents > 0 && <Row label="Pix" value={brl(data.resumo.salesPixCents)} />}
             <Row label="Total vendido" value={brl(data.resumo.salesTotalCents)} strong />
             <Row label="Saldo em caixa (gaveta)" value={brl(data.resumo.saldoCaixaCents)} strong tone="ok" />
+            {hasAcai(data.resumo.acai) && (
+              <>
+                <Row label="Açaí vendido" value={`${kg(data.resumo.acai!.totalKg)} kg`} strong />
+                <Row label="· em copo" value={`${data.resumo.acai!.copoCount} copos (≈ ${kg(data.resumo.acai!.copoKg)} kg)`} />
+                <Row label="· por peso" value={`${kg(data.resumo.acai!.pesoKg)} kg`} />
+              </>
+            )}
           </div>
           <button onClick={imprimir} disabled={printing} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
             <IconPrinter width={17} height={17} /> {printing ? "Imprimindo..." : "Imprimir Leitura X"}
