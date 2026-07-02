@@ -61,7 +61,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
         <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cupomRodape={cupomRodape} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
       </div>
       {showPdv ? (
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />
         </div>
       ) : (

@@ -134,9 +134,9 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
   /* ---- tela de sucesso ---- */
   if (result) {
     return (
-      <div className="mx-auto max-w-md py-12 text-center">
-        <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full brand-gradient text-white shadow-[var(--shadow-brand)]">
-          <IconCheck width={42} height={42} />
+      <div className="mx-auto max-w-md py-6 text-center">
+        <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full brand-gradient text-white shadow-[var(--shadow-brand)]">
+          <IconCheck width={36} height={36} />
         </div>
         <h2 className="text-2xl font-extrabold text-ink">Venda registrada!</h2>
         <p className="mt-1 text-[var(--text-muted)]">Comanda {result.display}</p>
