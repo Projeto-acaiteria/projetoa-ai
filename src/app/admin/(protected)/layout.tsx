@@ -3,7 +3,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import OrderWatcher from "@/components/admin/OrderWatcher";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
-import { getSubscription, isBlocked } from "@/lib/auth/subscription";
+import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
 import { getStoreConfig } from "@/lib/auth/store-config";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     hasEstoque: !!cfg?.has_estoque,
   };
   return (
-    <AdminShell storeName={store.name} nav={nav}>
+    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
       <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
       {children}

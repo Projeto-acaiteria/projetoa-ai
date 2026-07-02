@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { db } from "@/lib/supabase";
+import { BILLING } from "@/config/billing";
 
 export type SubStatus = "pending_payment" | "trial" | "active" | "past_due" | "cancelled" | "expired";
 
@@ -32,4 +33,54 @@ export function isBlocked(sub: Subscription | null): boolean {
     return grace < Date.now();
   }
   return false;
+}
+
+const DAY = 86400000;
+const STATUS_LABEL: Record<SubStatus, string> = {
+  trial: "Em teste grátis", active: "Ativo", past_due: "Vencido",
+  pending_payment: "Pagamento pendente", cancelled: "Cancelado", expired: "Expirado",
+};
+
+// Info do plano pra exibir (seção "Plano" em Ajustes): status, plano, vencimento, dias restantes.
+export type BillingView = {
+  statusLabel: string;
+  planoLabel: string;
+  planoCents: number | null;
+  pagoAte: string | null;
+  daysLeft: number | null; // dias até o vencimento (negativo = já venceu)
+  graceDays: number | null; // dias de graça restantes (past_due)
+  tone: "ok" | "warn" | "danger";
+  courtesy: boolean;
+};
+export function billingView(sub: Subscription | null): BillingView | null {
+  if (!sub) return null;
+  const cfg = sub.plano && sub.plano in BILLING.planos ? BILLING.planos[sub.plano as keyof typeof BILLING.planos] : null;
+  const daysLeft = sub.pago_ate ? Math.ceil((new Date(sub.pago_ate).getTime() - Date.now()) / DAY) : null;
+  const graceDays = sub.grace_ends_at ? Math.max(0, Math.ceil((new Date(sub.grace_ends_at).getTime() - Date.now()) / DAY)) : null;
+  const tone: "ok" | "warn" | "danger" = sub.permanent_courtesy
+    ? "ok"
+    : sub.status === "past_due" || sub.status === "pending_payment" || sub.status === "expired"
+      ? "danger"
+      : sub.status === "active" && daysLeft != null && daysLeft <= 3
+        ? "warn"
+        : "ok";
+  return {
+    statusLabel: sub.permanent_courtesy ? "Cortesia" : STATUS_LABEL[sub.status],
+    planoLabel: cfg?.label ?? "—",
+    planoCents: cfg?.cents ?? null,
+    pagoAte: sub.pago_ate,
+    daysLeft, graceDays, tone,
+    courtesy: sub.permanent_courtesy,
+  };
+}
+
+// Aviso do topo do painel — 3 dias ANTES do vencimento e durante a graça (vencido). null = sem aviso.
+export function billingBanner(sub: Subscription | null): { text: string; tone: "warn" | "danger" } | null {
+  const v = billingView(sub);
+  if (!v || v.courtesy) return null;
+  if (sub!.status === "active" && v.tone === "warn" && v.daysLeft != null)
+    return { text: v.daysLeft <= 0 ? "Sua mensalidade vence hoje — renove pra não travar." : `Sua mensalidade vence em ${v.daysLeft} dia${v.daysLeft === 1 ? "" : "s"} — renove pra não travar.`, tone: "warn" };
+  if (sub!.status === "past_due")
+    return { text: `Mensalidade vencida — você tem ${v.graceDays ?? 0} dia${v.graceDays === 1 ? "" : "s"} antes do bloqueio. Renove agora.`, tone: "danger" };
+  return null;
 }

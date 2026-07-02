@@ -46,7 +46,7 @@ const NAV: NavItem[] = [
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName, nav }: { children: React.ReactNode; storeName: string; nav: NavCtx }) {
+export default function AdminShell({ children, storeName, nav, billing }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -126,7 +126,15 @@ export default function AdminShell({ children, storeName, nav }: { children: Rea
           </div>
         )}
 
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+          {billing && (
+            <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border p-3 ${billing.tone === "danger" ? "border-[var(--red-no)] bg-[#FEECEC]" : "border-[var(--gold)] bg-[#FFF8E6]"}`}>
+              <span className={`text-sm font-semibold ${billing.tone === "danger" ? "text-[var(--red-no)]" : "text-ink"}`}>{billing.text}</span>
+              <Link href="/admin/bloqueado" className="shrink-0 rounded-lg brand-gradient px-3.5 py-1.5 text-xs font-bold text-white">Renovar</Link>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );
