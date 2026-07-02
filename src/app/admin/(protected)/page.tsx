@@ -8,8 +8,11 @@ import { listMesaPayments } from "@/lib/tables-store";
 import { listExpenses } from "@/lib/expense-store";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
+import { weightSoldPeriods, type WeightSoldReport } from "@/lib/weight-report";
 import SetupChecklist from "@/components/admin/SetupChecklist";
-import { IconWallet, IconMoto, IconBag, IconClock } from "@/components/Icons";
+import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
+
+const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregue: "lime" } as const;
 
@@ -22,7 +25,7 @@ export default async function AdminHome() {
   const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
   const orders = await listOrders();
   const expenses = await listExpenses();
-  const [settings, cur, mesaPagosAll] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments()]);
+  const [settings, cur, mesaPagosAll, acai] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments(), weightSoldPeriods()]);
 
   const vendasHoje = orders.filter((o) => o.status === "entregue" && dateBR(o.createdAt) === today);
   // vendas de MESA também entram no faturamento (vivem em tab_payments, não em orders).
@@ -91,6 +94,21 @@ export default async function AdminHome() {
         </div>
       </div>
 
+      {/* Açaí vendido (kg) — dia / semana / mês. Só acende pra loja que vende por peso. */}
+      {(acai.mes.totalKg > 0 || acai.mes.copoCount > 0) && (
+        <Card className="mt-6 p-4 sm:p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <IconBowl width={17} height={17} className="text-brand-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Açaí vendido</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <AcaiKg label="Hoje" r={acai.hoje} />
+            <AcaiKg label="7 dias" r={acai.semana} />
+            <AcaiKg label="Este mês" r={acai.mes} />
+          </div>
+        </Card>
+      )}
+
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         {/* Pedidos / vendas recentes */}
         <Card className="p-4 sm:p-5">
@@ -158,6 +176,18 @@ export default async function AdminHome() {
         </Card>
       )}
     </>
+  );
+}
+
+function AcaiKg({ label, r }: { label: string; r: WeightSoldReport }) {
+  return (
+    <div className="rounded-xl border border-line bg-bg-base p-3 text-center">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</div>
+      <div className="mt-1 text-2xl font-extrabold tabular-nums text-brand-600">
+        {kgFmt(r.totalKg)}<span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">kg</span>
+      </div>
+      <div className="mt-0.5 text-[10px] leading-tight text-[var(--text-faded)]">{r.copoCount} copos · {kgFmt(r.pesoKg)}kg peso</div>
+    </div>
   );
 }
 
