@@ -37,11 +37,12 @@ function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; c
   };
 }
 
-// pedido do link já nasce "preparo" (sem etapa "recebido" manual) — board: preparo → saiu → entregue
+// pedido do link já nasce "preparo" (sem etapa "recebido" manual). Colunas cobrem ENTREGA e
+// RETIRADA: "Pronto / Saiu" (retirada = pronto p/ buscar; entrega = saiu na moto) → "Concluído".
 const COLS: { key: OrderStatus; label: string; tone: "accent" | "gold" | "brand" | "lime" }[] = [
   { key: "preparo", label: "Em preparo", tone: "gold" },
-  { key: "saiu", label: "Saiu p/ entrega", tone: "brand" },
-  { key: "entregue", label: "Entregue", tone: "lime" },
+  { key: "saiu", label: "Pronto / Saiu", tone: "brand" },
+  { key: "entregue", label: "Concluído", tone: "lime" },
 ];
 const NEXT: Record<OrderStatus, OrderStatus | null> = {
   recebido: "preparo",
@@ -49,11 +50,23 @@ const NEXT: Record<OrderStatus, OrderStatus | null> = {
   saiu: "entregue",
   entregue: null,
 };
+const LATE_MIN = 20; // pedido ativo parado há mais que isso = destaque vermelho
 const hhmm = (iso: string) => {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
+const minsAgo = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+const isToday = (iso: string) => {
+  const d = new Date(iso), n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+};
+// rótulo do botão de avançar, adaptado ao modo (entrega × retirada)
+function advanceLabel(o: Order): string {
+  if (o.status === "preparo") return o.mode === "entrega" ? "Saiu p/ entrega" : "Pronto";
+  if (o.status === "saiu") return o.mode === "entrega" ? "Entregue" : "Retirado";
+  return "Avançar";
+}
 
 // telefone do cliente → formato wa.me (só dígitos, com DDI 55)
 function waPhone(raw?: string): string {
@@ -91,7 +104,6 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
   const [loaded, setLoaded] = useState(false);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
-  const [notifyWhats, setNotifyWhats] = useState(true); // avisar cliente no WhatsApp ao avançar status
   const [soundOn, setSoundOn] = useState(true);
   const audioCtx = useRef<AudioContext | null>(null);
 
@@ -162,11 +174,8 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
   async function advance(o: Order) {
     const next = NEXT[o.status];
     if (!next) return;
-    // semi-auto: avisa o cliente no WhatsApp com a msg do NOVO status. Abre ANTES do await
-    // (senão o popup é bloqueado por perder o gesto do clique). Controlado pelo toggle do topo.
-    if (notifyWhats && o.phone) {
-      window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(customerMsg({ ...o, status: next }, storeName, trackBase, waMsgs))}`, "_blank", "noopener,noreferrer");
-    }
+    // avançar é INSTANTÂNEO — NÃO abre WhatsApp (isso travava o fluxo). O aviso ao cliente é o
+    // botão de WhatsApp dedicado do card, que o operador clica quando quiser.
     setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: next } : x)));
     await fetch(`/api/pedidos/${o.id}`, {
       method: "PATCH",
@@ -196,9 +205,6 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>
           )}
         </button>
-        <button onClick={() => setNotifyWhats((v) => !v)} title={notifyWhats ? "Avisar cliente no WhatsApp ao avançar status (ligado)" : "Aviso ao cliente no WhatsApp desligado"} aria-label="Ligar/desligar aviso ao cliente no WhatsApp" className={`grid h-9 w-9 place-items-center rounded-lg border border-line ${notifyWhats ? "text-[#25D366]" : "text-[var(--text-faded)]"}`}>
-          <IconWhats size={18} />
-        </button>
         <button onClick={toggleAuto} aria-label="Ligar/desligar impressão automática" className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoPrint ? "bg-brand-600" : "bg-bg-surface-2"}`}>
           <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${autoPrint ? "left-6" : "left-1"}`} />
         </button>
@@ -206,7 +212,11 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
     </div>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {COLS.map((col) => {
-        const list = orders.filter((o) => o.status === col.key);
+        const list = orders
+          .filter((o) => o.status === col.key && (col.key !== "entregue" || isToday(o.createdAt)))
+          .sort((a, b) => (col.key === "entregue"
+            ? b.createdAt.localeCompare(a.createdAt)   // Concluído: mais recente no topo
+            : a.createdAt.localeCompare(b.createdAt))); // Preparo/Saiu: FIFO — mais antigo no topo
         return (
           <div key={col.key}>
             <div className="mb-2 flex items-center justify-between px-1">
@@ -222,10 +232,13 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
               {list.map((o) => (
                 <Card key={o.id} className="p-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-ink">{o.display}</span>
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-ink">{o.display}</span>
+                      <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{MODE_LABEL[o.mode]}</span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${o.status !== "entregue" && minsAgo(o.createdAt) >= LATE_MIN ? "text-[var(--red-no)]" : "text-[var(--text-muted)]"}`}>
                       {o.mode === "entrega" ? <IconMoto width={14} height={14} /> : <IconBag width={14} height={14} />}
-                      {hhmm(o.createdAt)}
+                      {o.status === "entregue" ? hhmm(o.createdAt) : `há ${minsAgo(o.createdAt)} min`}
                     </span>
                   </div>
                   <div className="mt-1 text-sm font-bold text-ink-2">{o.customerName}</div>
@@ -276,7 +289,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
                           onClick={() => advance(o)}
                           className="inline-flex items-center gap-1 rounded-lg brand-gradient px-2.5 py-1.5 text-[11px] font-bold text-white"
                         >
-                          {col.key === "recebido" ? "Preparar" : col.key === "preparo" ? (o.mode === "entrega" ? "Saiu p/ entrega" : "Pronto") : "Entregue"}
+                          {advanceLabel(o)}
                           <IconArrowRight width={13} height={13} />
                         </button>
                       )}
