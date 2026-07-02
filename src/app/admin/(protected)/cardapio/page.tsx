@@ -40,7 +40,7 @@ export default async function CardapioAdminPage() {
         <CardapioBarEditor />
       ) : (
         <>
-          <QRCardapio storeName={store.name} storeTagline={store.tagline} />
+          <QRCardapio storeName={store.name} storeTagline={store.tagline} slug={slug} />
           <CardapioEditor hasEstoque={!!cfg?.has_estoque} />
         </>
       )}

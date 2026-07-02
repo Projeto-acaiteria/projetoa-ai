@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { IconCheck, IconArrowRight } from "@/components/Icons";
 
-export default function QRCardapio({ storeName, storeTagline }: { storeName: string; storeTagline: string }) {
+export default function QRCardapio({ storeName, storeTagline, slug }: { storeName: string; storeTagline: string; slug?: string }) {
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -12,7 +12,8 @@ export default function QRCardapio({ storeName, storeTagline }: { storeName: str
     setOrigin(window.location.origin);
   }, []);
 
-  const url = origin ? `${origin}/cardapio` : "";
+  // link DEDICADO da loja (/<slug>); só cai no /cardapio legado se a loja não tiver slug
+  const url = origin ? `${origin}/${slug || "cardapio"}` : "";
 
   async function copy() {
     try {
