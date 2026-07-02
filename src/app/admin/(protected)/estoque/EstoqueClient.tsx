@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { StatCard } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
-import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash, IconGear } from "@/components/Icons";
+import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash, IconGear, IconBowl } from "@/components/Icons";
 import type { StockItem, StockCategory } from "@/lib/stock-store";
 
 const CAT_LABEL: Record<StockCategory, string> = {
@@ -50,6 +50,11 @@ function daysTo(expiry?: string): number | null {
   return Math.round((new Date(expiry + "T00:00:00").getTime() - t.getTime()) / 86400000);
 }
 
+// açaí vendido (kg) por período — o Vidal só quer o volume do dia/semana/mês
+type AcaiRep = { totalKg: number; pesoKg: number; copoKg: number; copoCount: number; pesoCount: number };
+type AcaiPeriods = { hoje: AcaiRep; semana: AcaiRep; mes: AcaiRep };
+const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
 export default function EstoqueClient() {
@@ -59,6 +64,7 @@ export default function EstoqueClient() {
   const [modal, setModal] = useState<null | { kind: "add" } | { kind: "inventory" } | { kind: "move"; item: StockItem; dir: "entrada" | "saida" } | { kind: "edit"; item: StockItem } | { kind: "history"; item: StockItem }>(null);
   // fidelidade: categorias de revenda que NÃO pontuam (a montagem do copo sempre pontua). null=carregando.
   const [nonEarning, setNonEarning] = useState<string[] | null>(null);
+  const [acaiVendido, setAcaiVendido] = useState<AcaiPeriods | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -76,6 +82,12 @@ export default function EstoqueClient() {
       .then((r) => r.json())
       .then((d) => setNonEarning(d.config?.nonEarningCategories ?? []))
       .catch(() => setNonEarning([]));
+  }, []);
+  useEffect(() => {
+    fetch("/api/estoque/acai-vendido", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d?.mes) setAcaiVendido(d); })
+      .catch(() => {});
   }, []);
 
   // liga/desliga pontos de uma categoria de revenda (otimista + persiste na config de fidelidade)
@@ -153,6 +165,21 @@ export default function EstoqueClient() {
         </div>
       </div>
 
+      {/* Açaí vendido (kg) — dia / semana / mês. O que o Vidal quer bater o olho. */}
+      {acaiVendido && (acaiVendido.mes.totalKg > 0 || acaiVendido.mes.copoCount > 0) && (
+        <div className="card mt-4 p-4">
+          <div className="flex items-center gap-2">
+            <IconBowl width={17} height={17} className="text-brand-600" />
+            <h2 className="text-sm font-extrabold text-ink">Açaí vendido</h2>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2.5">
+            <AcaiPeriodo label="Hoje" r={acaiVendido.hoje} />
+            <AcaiPeriodo label="7 dias" r={acaiVendido.semana} />
+            <AcaiPeriodo label="Este mês" r={acaiVendido.mes} />
+          </div>
+        </div>
+      )}
+
       {/* Filtro por família */}
       <div className="no-scrollbar mt-6 flex gap-2 overflow-x-auto pb-1">
         <Chip active={filter === "todos"} onClick={() => setFilter("todos")} label="Todos" count={items.length} />
@@ -228,6 +255,18 @@ function SkeletonCard() {
       <div className="h-3 w-16 animate-pulse rounded bg-bg-surface-2" />
       <div className="mt-2 h-7 w-10 animate-pulse rounded bg-bg-surface-2" />
       <div className="mt-2 h-2.5 w-20 animate-pulse rounded bg-bg-surface-2" />
+    </div>
+  );
+}
+
+function AcaiPeriodo({ label, r }: { label: string; r: AcaiRep }) {
+  return (
+    <div className="rounded-xl border border-line bg-bg-base p-3 text-center">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{label}</div>
+      <div className="mt-1 text-xl font-extrabold tabular-nums text-brand-600">
+        {kgFmt(r.totalKg)}<span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">kg</span>
+      </div>
+      <div className="mt-0.5 text-[10px] leading-tight text-[var(--text-faded)]">{r.copoCount} copos · {kgFmt(r.pesoKg)}kg peso</div>
     </div>
   );
 }
