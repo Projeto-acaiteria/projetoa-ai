@@ -8,6 +8,15 @@ import { listOrders } from "@/lib/orders-store";
 
 const num = (v: unknown) => Number(v ?? 0);
 
+// Venda por PESO entra com o nome embutindo as gramas exatas ("Açaí 559g") → cada pesagem vira
+// um nome único e polui o relatório com dezenas de linhas QTD 1, todas na mesma margem. Agrupa
+// todas numa linha só. Copo fixo/delivery têm nome próprio ("Copo 350ml") e seguem separados.
+const PESO_NAME_RE = /^a[çc]a[íi]\s+\d+\s*g$/i;
+const cmvGroupName = (raw?: string): string => {
+  const n = (raw ?? "").trim();
+  return PESO_NAME_RE.test(n) ? "Açaí (por peso)" : n || "—";
+};
+
 export type CmvLine = { name: string; qty: number; revenueCents: number; cmvCents: number; marginCents: number };
 export type CmvReport = {
   revenueCents: number;
@@ -64,7 +73,7 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
       const cmv = qty * unitCost;
       revenueCents += rev;
       cmvCents += cmv;
-      const name = it.name || "—";
+      const name = cmvGroupName(it.name);
       const cur = byName.get(name) ?? { name, qty: 0, revenueCents: 0, cmvCents: 0, marginCents: 0 };
       cur.qty += qty;
       cur.revenueCents += rev;
@@ -97,7 +106,7 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
       const lineCmv = orderRev > 0 ? Math.round(orderCmv * (rev / orderRev)) : 0;
       revenueCents += rev;
       cmvCents += lineCmv;
-      const name = it.name || "—";
+      const name = cmvGroupName(it.name);
       const cur = byName.get(name) ?? { name, qty: 0, revenueCents: 0, cmvCents: 0, marginCents: 0 };
       cur.qty += num(it.qty);
       cur.revenueCents += rev;
