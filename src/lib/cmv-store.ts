@@ -39,6 +39,16 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
   const nameById = new Map(stock.map((s) => [s.id, s.name]));
   const missingCost = new Set<string>(); // ids de insumo vendidos sem custo (congelado nem atual)
 
+  // Complementos de montagem (frutas, cremes/caldas, crocantes, doces, adicionais, sabor da polpa) vão
+  // EMBUTIDOS no peso/copo do açaí — não são produtos avulsos. Ficam fora do "por produto" pra não poluir
+  // a lista (regra do Vidal 03/07). Classifica pela categoria do estoque → vale pra qualquer loja.
+  const SKIP_CATS = new Set(["fruta", "cereal", "cobertura", "doce", "adicional", "polpa"]);
+  const catByName = new Map(stock.map((s) => [s.name.trim().toLowerCase(), s.category]));
+  const isComplemento = (raw?: string): boolean => {
+    const cat = catByName.get((raw ?? "").trim().toLowerCase());
+    return cat != null && SKIP_CATS.has(cat);
+  };
+
   // pedidos do período
   let q = d.from("tab_orders").select("id, created_at").eq("store_id", sid);
   if (fromISO) q = q.gte("created_at", fromISO);
@@ -61,6 +71,7 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
       .in("tab_order_id", orderIds);
     if (e2) throw new Error("Erro ao ler itens (CMV): " + e2.message);
     for (const it of (items ?? []) as { name: string; qty: number; unit_price_cents: number; consumes: unknown }[]) {
+      if (isComplemento(it.name)) continue; // complemento de montagem: não é linha de produto
       const qty = num(it.qty);
       const rev = qty * num(it.unit_price_cents);
       const consumes = Array.isArray(it.consumes) ? (it.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
@@ -98,7 +109,9 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
       if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
       return s + num(c.qty) * cc;
     }, 0);
-    const its = Array.isArray(o.items) ? o.items : [];
+    const rawIts = Array.isArray(o.items) ? o.items : [];
+    const its = rawIts.filter((it) => !isComplemento((it as { name?: string }).name));
+    if (rawIts.length && !its.length) continue; // pedido só de complementos (ex: copo teste sem base): ignora
     const orderRev = its.reduce((s, it) => s + num(it.paidCents), 0);
     if (!its.length) { cmvCents += orderCmv; continue; } // pedido sem itens detalhados: só soma o custo
     for (const it of its) {
