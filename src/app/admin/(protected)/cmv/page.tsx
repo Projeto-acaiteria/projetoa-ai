@@ -1,6 +1,7 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
 import { IconAlert } from "@/components/Icons";
 import { cmvReport } from "@/lib/cmv-store";
+import { todayBR, addDiasBR, inicioDiaBR } from "@/lib/date-br";
 
 export const dynamic = "force-dynamic";
 
@@ -10,15 +11,13 @@ type Range = "mes" | "7d" | "tudo";
 const LABEL: Record<Range, string> = { mes: "Este mês", "7d": "Últimos 7 dias", tudo: "Tudo" };
 
 function rangeISO(r: Range): { from?: string; to?: string } {
-  const now = new Date();
   if (r === "tudo") return {};
-  if (r === "7d") {
-    const f = new Date(now);
-    f.setDate(f.getDate() - 7);
-    return { from: f.toISOString() };
-  }
-  const f = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: f.toISOString() };
+  // Fronteira em Brasília, convertida pro INSTANTE UTC (…Z) — que é o formato que o cmvReport
+  // compara com o createdAt do pedido. Senão a virada de mês/semana contava em UTC.
+  const hoje = todayBR();
+  if (r === "7d") return { from: new Date(inicioDiaBR(addDiasBR(hoje, -6))).toISOString() };
+  const mesIni = hoje.slice(0, 8) + "01"; // YYYY-MM-01 (BR)
+  return { from: new Date(inicioDiaBR(mesIni)).toISOString() };
 }
 
 export default async function CmvPage({ searchParams }: { searchParams: Promise<{ r?: string }> }) {
