@@ -23,6 +23,7 @@ export type LoyaltyConfig = {
   doubleMultiplier: number; // multiplicador do dia turbo (ex: 2 = dobro)
   firstPurchaseBonus: number; // pontos extras na 1ª compra do cliente
   minEarnCents: number; // valor MÍNIMO (centavos) que pontua nada abaixo disso; 0 = sem mínimo
+  fixedPointsPerSale: number; // pontos FIXOS por compra (acima do mínimo), ignora pointsPerBrl; 0 = por valor gasto
   // AÇAÍ/PDV: categorias de REVENDA (stock.category) que NÃO pontuam — a montagem do copo
   // sempre pontua. (No mundo relacional a regra mora em menu_categories.earns_points.)
   nonEarningCategories: string[];
@@ -36,6 +37,7 @@ export const DEFAULT_LOYALTY: LoyaltyConfig = {
   doubleMultiplier: 2,
   firstPurchaseBonus: 0,
   minEarnCents: 0,
+  fixedPointsPerSale: 0,
   nonEarningCategories: [],
 };
 
@@ -124,7 +126,8 @@ export function pointsForSale(productCents: number, cfg: LoyaltyConfig, opts: { 
   // valor mínimo pra pontuar: abaixo do mínimo NÃO pontua (nem dia-turbo, nem bônus de 1ª compra)
   if (cfg.minEarnCents > 0 && productCents < cfg.minEarnCents) return 0;
   const now = opts.now ?? new Date();
-  let pts = computePoints(productCents, cfg.pointsPerBrl);
+  // pontos FIXOS por compra (se configurado) — senão proporcional ao valor gasto
+  let pts = cfg.fixedPointsPerSale > 0 ? cfg.fixedPointsPerSale : computePoints(productCents, cfg.pointsPerBrl);
   if (cfg.doubleDay != null && now.getDay() === cfg.doubleDay) pts = Math.floor(pts * cfg.doubleMultiplier);
   if (opts.isFirstPurchase && cfg.firstPurchaseBonus > 0) pts += cfg.firstPurchaseBonus;
   return pts;

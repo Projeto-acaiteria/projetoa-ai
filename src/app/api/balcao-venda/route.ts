@@ -3,7 +3,7 @@ import { resolveStoreId } from "@/lib/auth/current";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { addOrder, markPointsAwarded, type OrderItem, type PaymentMethod } from "@/lib/orders-store";
 import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
-import { applyConsumes } from "@/lib/stock-store";
+import { applyConsumes, snapshotConsumes } from "@/lib/stock-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
     const consumesMap: Record<string, number> = {};
     for (const it of resolved) for (const r of it.recipe) consumesMap[r.stockId] = (consumesMap[r.stockId] ?? 0) + r.qty * it.qty;
-    const consumes = Object.entries(consumesMap).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) }));
+    const consumes = await snapshotConsumes(Object.entries(consumesMap).map(([stockId, qty]) => ({ stockId, qty: +qty.toFixed(3) })), storeId);
 
     // vias de PREPARO por estação (cozinha/bar/copa) — pro balcão imprimir como nas mesas.
     // station vem da CATEGORIA (resolveOrderItems). O cliente agrupa por estação e imprime sem preço.

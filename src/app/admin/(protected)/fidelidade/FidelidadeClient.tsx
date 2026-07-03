@@ -108,8 +108,14 @@ export default function FidelidadeClient() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-bold uppercase text-[var(--text-muted)]">Pontos por R$ 1 gasto</span>
-              <input type="number" step="0.1" min="0.1" value={cfg.pointsPerBrl} onChange={(e) => patch({ pointsPerBrl: Number(e.target.value) })}
+              <input type="number" step="0.1" min="0.1" value={cfg.pointsPerBrl} disabled={cfg.fixedPointsPerSale > 0} onChange={(e) => patch({ pointsPerBrl: Number(e.target.value) })}
+                className="mt-1 w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-600 disabled:opacity-40" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase text-[var(--text-muted)]">Pontos fixos por compra</span>
+              <input type="number" min="0" value={cfg.fixedPointsPerSale} onChange={(e) => patch({ fixedPointsPerSale: Number(e.target.value) })}
                 className="mt-1 w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-600" />
+              <span className="mt-1 block text-[11px] text-[var(--text-faded)]">Se &gt; 0, toda compra acima do mínimo dá esses pontos, não importa o valor (ignora "pontos por R$1"). 0 = pontua por valor gasto.</span>
             </label>
             <label className="block">
               <span className="text-xs font-bold uppercase text-[var(--text-muted)]">Validade dos pontos (dias)</span>

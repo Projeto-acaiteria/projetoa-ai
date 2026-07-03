@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { type ModifierGroup, type Size } from "@/lib/menu";
 import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
 
-type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean; minEarnCents?: number };
+type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean; minEarnCents?: number; fixedPointsPerSale?: number };
 import { brl } from "@/lib/format";
 import {
   IconBowl,
@@ -86,9 +86,12 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const totalCents = size.priceCents + addCents + feeCents;
   const belowMin = mode === "entrega" && totalCents < brand.minOrderCents; // mínimo só vale p/ entrega
   const productCents = size.priceCents + addCents; // pontua só produto, sem taxa
-  // valor mínimo pra pontuar (config do dono): abaixo dele o preview mostra 0 — não engana o cliente
+  // regras de pontuação do dono: mínimo pra pontuar + modo fixo por compra (ignora o proporcional)
+  const fixedPts = brand.fixedPointsPerSale ?? 0;
+  const aboveMin = !brand.minEarnCents || productCents >= brand.minEarnCents;
+  const earnPts = !aboveMin ? 0 : fixedPts > 0 ? fixedPts : computePoints(productCents);
+  // pontos por TAMANHO (chip) — só no modo proporcional; abaixo do mínimo, 0
   const ptsFor = (cents: number) => (brand.minEarnCents && cents < brand.minEarnCents ? 0 : computePoints(cents));
-  const earnPts = ptsFor(productCents);
 
   function step(group: ModifierGroup, itemId: string, dir: 1 | -1) {
     setQty((prev) => {
@@ -266,7 +269,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
                 <div className="bg-bg-elevated p-2.5">
                   <div className="text-xs font-semibold text-[var(--text-muted)]">{s.ml}ml</div>
                   <div className="text-base font-extrabold text-ink">{brl(s.priceCents)}</div>
-                  {ptsFor(s.priceCents) > 0 && (
+                  {fixedPts === 0 && ptsFor(s.priceCents) > 0 && (
                     <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold text-gold">
                       <IconStar width={10} height={10} /> +{ptsFor(s.priceCents)} pts
                     </div>
@@ -295,7 +298,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           </span>
           <span className="leading-tight">
             <span className="block text-sm font-extrabold">Junte pontos, ganhe açaí grátis</span>
-            <span className="block text-xs text-white/80">{POINTS_PER_BRL} ponto a cada R$ 1{brand.minEarnCents ? ` · a partir de ${brl(brand.minEarnCents)}` : ""} — troque por açaí inteiro</span>
+            <span className="block text-xs text-white/80">{fixedPts > 0 ? `${fixedPts} pontos por compra` : `${POINTS_PER_BRL} ponto a cada R$ 1`}{brand.minEarnCents ? ` · a partir de ${brl(brand.minEarnCents)}` : ""} — troque por açaí inteiro</span>
           </span>
         </span>
         <span className="shrink-0 text-[11px] font-bold underline decoration-white/50 underline-offset-2">meus pontos</span>
@@ -433,7 +436,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
 
         <div className="bg-bg-elevated p-4">
           <div className="mb-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#FBF1DC] py-2 text-xs font-bold text-gold">
-            <IconStar width={14} height={14} /> Você ganha {POINTS_PER_BRL} ponto a cada R$ 1 gasto{brand.minEarnCents ? ` · pontua a partir de ${brl(brand.minEarnCents)}` : ""}
+            <IconStar width={14} height={14} /> {fixedPts > 0 ? `Você ganha ${fixedPts} pontos por compra` : `Você ganha ${POINTS_PER_BRL} ponto a cada R$ 1 gasto`}{brand.minEarnCents ? ` · pontua a partir de ${brl(brand.minEarnCents)}` : ""}
           </div>
 
           <div className="space-y-2.5">
