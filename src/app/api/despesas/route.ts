@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listExpenses, addExpense, EXPENSE_CATS, type ExpenseCategory } from "@/lib/expense-store";
+import { todayBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
       description: b.description.trim(),
       category: EXPENSE_CATS.includes(b.category as ExpenseCategory) ? (b.category as ExpenseCategory) : "outros",
       amountCents: Math.round(b.amountCents),
-      date: b.date || new Date().toISOString().slice(0, 10),
+      date: b.date || todayBR(),
     },
     new Date().toISOString(),
   );

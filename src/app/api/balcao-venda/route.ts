@@ -8,6 +8,7 @@ import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { dateBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
     // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada acima;
     // uma falha de baixa não pode virar 500 → operador refaz → pedido duplicado).
     const nowIso = new Date().toISOString();
-    const today = nowIso.slice(0, 10);
+    const today = dateBR(nowIso); // data-BR do movimento (não UTC — venda da noite carimbaria amanhã)
     const stock = await applyConsumes(consumes, `Venda ${order.display}`, today, storeId);
     const stockWarning = stock.failed.length
       ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`

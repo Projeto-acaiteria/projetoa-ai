@@ -13,3 +13,17 @@ export function dateBR(iso?: string | Date): string {
 
 /** Hoje (YYYY-MM-DD) no fuso do Brasil. */
 export const todayBR = (): string => dateBR();
+
+/** Instante ISO da meia-noite BR de um dia YYYY-MM-DD. Fronteira de janela de timestamp:
+ *  .gte(col, inicioDiaBR(dia)).lt(col, inicioDiaBR(addDiasBR(dia,1))) fecha 00h→00h LOCAL. */
+export const inicioDiaBR = (ymd: string): string => `${ymd}T00:00:00-03:00`;
+
+/** Soma n dias a um YYYY-MM-DD, ancorado ao MEIO-DIA UTC pra nunca saltar por borda de fuso. */
+export function addDiasBR(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// NOTA multi-tenant: TZ fixo em America/Sao_Paulo (todas as lojas são BR hoje). Se entrar loja de
+// outro fuso, virar isto por-loja (store.timezone) em vez de constante.

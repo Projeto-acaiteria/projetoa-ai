@@ -6,6 +6,7 @@
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { applyConsumes, listStock, unitCostCents } from "@/lib/stock-store";
+import { todayBR } from "@/lib/date-br";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
@@ -354,7 +355,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
 
   // baixa de estoque pela ficha técnica resolvida — NÃO-FATAL (os itens já estão na comanda acima;
   // uma falha de baixa não pode derrubar o lançamento já commitado).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBR();
   const consumes = resolved.flatMap((it) => it.consumes.map((c) => ({ stockId: c.stockId, qty: c.qty * it.qty })));
   await applyConsumes(consumes, "Mesa comanda", today, sid);
   return created;

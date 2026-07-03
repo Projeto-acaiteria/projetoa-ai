@@ -1,6 +1,7 @@
 // Despesas (saídas) · fluxo de caixa. JSON → tabela Supabase.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { dateBR } from "@/lib/date-br";
 
 export type ExpenseCategory =
   | "insumos" | "aluguel" | "salarios" | "utilidades" | "embalagens" | "marketing" | "manutencao" | "impostos" | "outros";
@@ -73,15 +74,15 @@ export async function removeFixed(id: string): Promise<void> {
 export async function launchFixedForMonth(nowIso: string): Promise<number> {
   const fixed = await readFixed();
   const all = await readAll();
-  const month = nowIso.slice(0, 7); // YYYY-MM
+  const dBR = dateBR(nowIso); // data-BR (não UTC) pra não lançar no mês errado na virada
   const toInsert: Expense[] = [];
   for (const f of fixed) {
-    const already = all.some((e) => e.date.slice(0, 7) === month && e.description === f.description && e.category === f.category);
+    const already = all.some((e) => e.date.slice(0, 7) === dBR.slice(0, 7) && e.description === f.description && e.category === f.category);
     if (already) continue;
     toInsert.push({
       id: "e" + Math.random().toString(36).slice(2, 9),
       description: f.description, category: f.category, amountCents: f.amountCents,
-      date: nowIso.slice(0, 10), createdAt: nowIso,
+      date: dBR, createdAt: nowIso,
     });
   }
   if (toInsert.length) {

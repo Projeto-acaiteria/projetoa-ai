@@ -7,6 +7,7 @@ import { getLoyalty } from "@/lib/loyalty-store";
 import { getOpenSession } from "@/lib/cash-store";
 import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
+import { dateBR } from "@/lib/date-br";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 const METHODS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
 
   // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
   // Mas NÃO engole o resultado: se alguma baixa falhar, o operador é avisado (stockWarning).
-  const stock = await applyConsumes(consumes, `Venda ${order.display}`, nowIso.slice(0, 10));
+  const stock = await applyConsumes(consumes, `Venda ${order.display}`, dateBR(nowIso));
   const stockWarning = stock.failed.length
     ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
     : undefined;

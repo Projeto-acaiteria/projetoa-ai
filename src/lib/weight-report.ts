@@ -5,6 +5,7 @@ import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { listOrders, type Order } from "@/lib/orders-store";
 import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
+import { dateBR, todayBR, addDiasBR, inicioDiaBR } from "@/lib/date-br";
 
 export type WeightSoldReport = {
   totalKg: number; // kg do insumo-base vendido (copo + peso)
@@ -68,17 +69,19 @@ const fin = (b: Acc): WeightSoldReport => ({
  *  Lê pedidos/itens UMA vez (desde a janela mais antiga) e distribui em cada balde. */
 export async function weightSoldPeriods(storeId?: string): Promise<{ hoje: WeightSoldReport; semana: WeightSoldReport; mes: WeightSoldReport }> {
   const sid = storeId ?? (await resolveStoreId());
-  const now = new Date();
-  const diaISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const semanaISO = new Date(now.getTime() - 7 * 86400000).toISOString();
-  const mesISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const earliest = [diaISO, semanaISO, mesISO].sort()[0];
+  // Baldes por DATA-BR (não UTC): senão venda pós-21h BRT cai no dia seguinte e o "hoje" do Vidal erra.
+  const hoje = todayBR();
+  const mesIni = hoje.slice(0, 8) + "01"; // YYYY-MM-01 (BR)
+  const semanaIni = addDiasBR(hoje, -6); // últimos 7 dias incluindo hoje
+  const earliestDate = [hoje, mesIni, semanaIni].sort()[0]; // menor data BR das 3 janelas
+  const earliestTs = inicioDiaBR(earliestDate); // instante (−03:00) p/ filtrar timestamp no SQL
 
   const b = { hoje: zero(), semana: zero(), mes: zero() };
   const addTo = (at: string, add: (acc: Acc) => void) => {
-    if (at >= diaISO) add(b.hoje);
-    if (at >= semanaISO) add(b.semana);
-    if (at >= mesISO) add(b.mes);
+    const d = dateBR(at); // data-BR do timestamp do pedido
+    if (d >= hoje) add(b.hoje);
+    if (d >= semanaIni) add(b.semana);
+    if (d >= mesIni) add(b.mes);
   };
   const tallyItem = (acc: Acc, name: string, qty: number) => {
     if (isPeso(name)) { acc.pesoKg += (gramsOf(name) / 1000) * qty; acc.pesoCount += qty; }
@@ -86,7 +89,7 @@ export async function weightSoldPeriods(storeId?: string): Promise<{ hoje: Weigh
   };
 
   // BALCÃO
-  const orders = (await listOrders(sid)).filter((o) => o.mode === "balcao" && o.createdAt >= earliest);
+  const orders = (await listOrders(sid)).filter((o) => o.mode === "balcao" && dateBR(o.createdAt) >= earliestDate);
   for (const o of orders) addTo(o.createdAt, (acc) => {
     acc.totalKg += polpaOf(o.consumes);
     for (const it of o.items ?? []) tallyItem(acc, it.name, num(it.qty));
@@ -94,7 +97,7 @@ export async function weightSoldPeriods(storeId?: string): Promise<{ hoje: Weigh
 
   // MESA
   const d = db();
-  const { data: tabOrders } = await d.from("tab_orders").select("id, created_at").eq("store_id", sid).gte("created_at", earliest);
+  const { data: tabOrders } = await d.from("tab_orders").select("id, created_at").eq("store_id", sid).gte("created_at", earliestTs);
   const atById = new Map((tabOrders ?? []).map((t) => [(t as { id: number }).id, (t as { created_at: string }).created_at]));
   const ids = [...atById.keys()];
   if (ids.length) {

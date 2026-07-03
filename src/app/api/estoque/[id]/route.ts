@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateItem, moveStock, removeItem, reweightCost } from "@/lib/stock-store";
+import { todayBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBR();
 
   if (b.move === "entrada" || b.move === "saida") {
     const qty = Number(b.qty) || 0;

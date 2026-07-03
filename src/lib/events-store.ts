@@ -2,6 +2,7 @@
 // pessoa + repasse). A comanda guarda o cover em snapshot na abertura. Server-side, por loja.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { todayBR, inicioDiaBR, addDiasBR } from "@/lib/date-br";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -33,7 +34,7 @@ export async function listEvents(storeId?: string): Promise<EventRow[]> {
  *  atração ao vivo no dia (event_date = hoje + active). Sem show hoje, getActiveEvent=null, cover=0. */
 export async function getActiveEvent(storeId?: string): Promise<EventRow | null> {
   const sid = storeId ?? (await resolveStoreId());
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBR();
   const { data } = await db().from("events").select("*").eq("store_id", sid).eq("active", true).eq("event_date", today).limit(1).maybeSingle();
   return data ? toEvent(data as Record<string, unknown>) : null;
 }
@@ -71,8 +72,8 @@ export async function coverReport(storeId?: string): Promise<Array<EventRow & { 
       .from("tabs")
       .select("cover_cents, opened_at")
       .eq("store_id", sid)
-      .gte("opened_at", e.event_date + "T00:00:00")
-      .lte("opened_at", e.event_date + "T23:59:59");
+      .gte("opened_at", inicioDiaBR(e.event_date))
+      .lt("opened_at", inicioDiaBR(addDiasBR(e.event_date, 1)));
     const rows = (data ?? []) as { cover_cents: number }[];
     out.push({ ...e, arrecadado_cents: rows.reduce((s, r) => s + num(r.cover_cents), 0), comandas: rows.filter((r) => num(r.cover_cents) > 0).length });
   }

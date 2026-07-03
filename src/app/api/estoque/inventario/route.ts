@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { inventoryDiff, adjustToCount } from "@/lib/stock-store";
+import { todayBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   const diff = await inventoryDiff(counts);
 
   if (b.apply) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayBR();
     for (const line of diff.lines) {
       if (line.deltaQty !== 0) await adjustToCount(line.id, line.realQty, today);
     }

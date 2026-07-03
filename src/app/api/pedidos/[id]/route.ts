@@ -6,6 +6,7 @@ import { pointsForSale, eligibleCents } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { dateBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // consumido SEMPRE após a tentativa — senão uma falha no meio re-baixaria os que já saíram na
   // próxima troca de status (dupla-baixa).
   if (order.status === "entregue" && !order.consumed && order.consumes?.length) {
-    await applyConsumes(order.consumes, `Pedido ${order.display}`, order.createdAt.slice(0, 10), sid);
+    await applyConsumes(order.consumes, `Pedido ${order.display}`, dateBR(order.createdAt), sid);
     await markConsumed(order.id, sid);
   }
 

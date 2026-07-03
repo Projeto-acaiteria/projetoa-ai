@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listStock, addItem, type NewStockItem, type StockCategory } from "@/lib/stock-store";
+import { todayBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       purchaseUnit: b.purchaseUnit?.trim() || undefined,
       purchaseFactor: b.purchaseFactor ? Math.max(0, Number(b.purchaseFactor)) || undefined : undefined,
     },
-    new Date().toISOString().slice(0, 10),
+    todayBR(),
   );
   return NextResponse.json({ ok: true, item }, { status: 201 });
 }

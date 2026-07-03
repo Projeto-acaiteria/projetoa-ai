@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { brl } from "@/lib/format";
+import { dateBR } from "@/lib/date-br";
 import { IconArrowRight } from "@/components/Icons";
 
 export type Venda = { display: string; date: string; mode: string; paymentMethod: string | null; grossCents: number; cardFeeCents: number; netCents: number; customerName: string };
@@ -75,11 +76,11 @@ export default function FluxoCaixaTabela({ vendas, despesas }: { vendas: Venda[]
     const inRange = (day: string, p: Period) => day >= p.from && day < p.to;
     const before0 = periods[0]?.from ?? "9999";
     let saldoCarry =
-      vendas.filter((v) => v.date.slice(0, 10) < before0).reduce((s, v) => s + v.netCents, 0) -
+      vendas.filter((v) => dateBR(v.date) < before0).reduce((s, v) => s + v.netCents, 0) -
       despesas.filter((e) => e.date < before0).reduce((s, e) => s + e.amountCents, 0);
 
     return periods.map((p) => {
-      const vP = vendas.filter((v) => inRange(v.date.slice(0, 10), p));
+      const vP = vendas.filter((v) => inRange(dateBR(v.date), p));
       const dP = despesas.filter((e) => inRange(e.date, p));
       // Receitas BRUTAS por forma (padrão Palace); a taxa do cartão vira despesa.
       const recByMethod: Record<string, number> = {};
@@ -224,7 +225,7 @@ export default function FluxoCaixaTabela({ vendas, despesas }: { vendas: Venda[]
 }
 
 function DrillModal({ data, onClose }: { data: { title: string; vendas?: Venda[]; despesas?: Despesa[] }; onClose: () => void }) {
-  const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
+  const dmy = (d: string) => (dateBR(d) || d.slice(0, 10)).split("-").reverse().join("/");
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
