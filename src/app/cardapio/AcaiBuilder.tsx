@@ -295,7 +295,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           </span>
           <span className="leading-tight">
             <span className="block text-sm font-extrabold">Junte pontos, ganhe açaí grátis</span>
-            <span className="block text-xs text-white/80">{POINTS_PER_BRL} ponto a cada R$ 1 — troque por açaí inteiro</span>
+            <span className="block text-xs text-white/80">{POINTS_PER_BRL} ponto a cada R$ 1{brand.minEarnCents ? ` · a partir de ${brl(brand.minEarnCents)}` : ""} — troque por açaí inteiro</span>
           </span>
         </span>
         <span className="shrink-0 text-[11px] font-bold underline decoration-white/50 underline-offset-2">meus pontos</span>
@@ -433,7 +433,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
 
         <div className="bg-bg-elevated p-4">
           <div className="mb-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#FBF1DC] py-2 text-xs font-bold text-gold">
-            <IconStar width={14} height={14} /> Você ganha {POINTS_PER_BRL} ponto a cada R$ 1 gasto
+            <IconStar width={14} height={14} /> Você ganha {POINTS_PER_BRL} ponto a cada R$ 1 gasto{brand.minEarnCents ? ` · pontua a partir de ${brl(brand.minEarnCents)}` : ""}
           </div>
 
           <div className="space-y-2.5">
