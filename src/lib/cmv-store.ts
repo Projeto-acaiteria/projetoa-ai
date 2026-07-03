@@ -54,8 +54,8 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
     const rev = qty * num(it.unit_price_cents);
     const consumes = Array.isArray(it.consumes) ? (it.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
     const unitCost = consumes.reduce((s, c) => {
-      // custo CONGELADO na venda (snapshot); se ausente (venda antiga), cai no custo atual
-      const cc = c.costCents != null ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
+      // custo CONGELADO na venda (snapshot); ausente OU zero (base sem custo na hora) → cai no custo atual
+      const cc = c.costCents != null && c.costCents > 0 ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
       if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
       return s + num(c.qty) * cc;
     }, 0);
@@ -82,7 +82,7 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
   for (const o of storeOrders) {
     const cons = Array.isArray(o.consumes) ? (o.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
     const orderCmv = cons.reduce((s, c) => {
-      const cc = c.costCents != null ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
+      const cc = c.costCents != null && c.costCents > 0 ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
       if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
       return s + num(c.qty) * cc;
     }, 0);
