@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { readMenu } from "@/lib/menu-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
+import { getLoyalty } from "@/lib/loyalty-store";
 import { IconClock, IconStar, IconArrowRight } from "@/components/Icons";
 import AcaiBuilder from "./AcaiBuilder";
 import InstallApp from "@/components/InstallApp";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic"; // reflete edições do adm na hora
 export default async function CardapioPage() {
   const menu = await readMenu();
   const store = await getStore();
+  const loyalty = await getLoyalty();
   const aberto = isOpenNow(store.hours);
   return (
     <main className="theme-dark relative min-h-screen">
@@ -91,7 +93,7 @@ export default async function CardapioPage() {
         sizes={menu.sizes}
         groups={menu.groups}
         isOpen={aberto}
-        brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones }}
+        brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, minEarnCents: loyalty.minEarnCents }}
       />
       </div>
     </main>

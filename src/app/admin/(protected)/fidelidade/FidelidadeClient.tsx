@@ -129,10 +129,20 @@ export default function FidelidadeClient() {
               <input type="number" step="0.5" min="1" value={cfg.doubleMultiplier} onChange={(e) => patch({ doubleMultiplier: Number(e.target.value) })}
                 className="mt-1 w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-600" />
             </label>
-            <label className="block sm:col-span-2">
+            <label className="block">
               <span className="text-xs font-bold uppercase text-[var(--text-muted)]">Bônus de 1ª compra (pontos de boas-vindas)</span>
               <input type="number" min="0" value={cfg.firstPurchaseBonus} onChange={(e) => patch({ firstPurchaseBonus: Number(e.target.value) })}
                 className="mt-1 w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-600" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase text-[var(--text-muted)]">Valor mínimo pra pontuar (R$)</span>
+              <div className="mt-1 flex items-center rounded-xl border border-line bg-bg-elevated px-3.5">
+                <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
+                <input type="number" step="0.5" min="0" value={cfg.minEarnCents ? cfg.minEarnCents / 100 : 0}
+                  onChange={(e) => patch({ minEarnCents: Math.max(0, Math.round((Number(e.target.value) || 0) * 100)) })}
+                  className="w-full bg-transparent px-2 py-2.5 text-sm font-semibold text-ink outline-none" />
+              </div>
+              <span className="mt-1 block text-[11px] text-[var(--text-faded)]">Abaixo desse valor a venda não pontua. 0 = sem mínimo.</span>
             </label>
           </div>
 

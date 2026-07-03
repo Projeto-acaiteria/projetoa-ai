@@ -6,6 +6,7 @@ import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
+import { getLoyalty } from "@/lib/loyalty-store";
 import { brandVars } from "@/lib/brand-theme";
 import { IconClock, IconStar, IconArrowRight } from "@/components/Icons";
 import AcaiBuilder from "../cardapio/AcaiBuilder";
@@ -73,6 +74,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
 
   const menu = await readMenu(storeId);
   const store = await getStore(storeId);
+  const loyalty = await getLoyalty(storeId);
   const aberto = isOpenNow(store.hours);
 
   return (
@@ -129,7 +131,7 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
           sizes={menu.sizes}
           groups={menu.groups}
           isOpen={aberto}
-          brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, slug, hasDelivery: cfg?.has_delivery !== false }}
+          brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, slug, hasDelivery: cfg?.has_delivery !== false, minEarnCents: loyalty.minEarnCents }}
         />
       </div>
     </main>

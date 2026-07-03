@@ -27,6 +27,7 @@ export async function setLoyalty(
   if (input.validityDays != null) clean.validityDays = Math.max(7, Math.min(3650, Math.round(Number(input.validityDays) || 60)));
   if (input.doubleMultiplier != null) clean.doubleMultiplier = Math.max(1, Math.min(10, Number(input.doubleMultiplier) || 2));
   if (input.firstPurchaseBonus != null) clean.firstPurchaseBonus = Math.max(0, Math.min(10000, Math.round(Number(input.firstPurchaseBonus) || 0)));
+  if (input.minEarnCents != null) clean.minEarnCents = Math.max(0, Math.min(1000000, Math.round(Number(input.minEarnCents) || 0)));
   if ("doubleDay" in input) {
     const d = input.doubleDay;
     clean.doubleDay = d == null || d === ("" as unknown) ? null : Math.max(0, Math.min(6, Math.round(Number(d))));

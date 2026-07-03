@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { type ModifierGroup, type Size } from "@/lib/menu";
 import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
 
-type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean };
+type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean; minEarnCents?: number };
 import { brl } from "@/lib/format";
 import {
   IconBowl,
@@ -86,7 +86,9 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const totalCents = size.priceCents + addCents + feeCents;
   const belowMin = mode === "entrega" && totalCents < brand.minOrderCents; // mínimo só vale p/ entrega
   const productCents = size.priceCents + addCents; // pontua só produto, sem taxa
-  const earnPts = computePoints(productCents);
+  // valor mínimo pra pontuar (config do dono): abaixo dele o preview mostra 0 — não engana o cliente
+  const ptsFor = (cents: number) => (brand.minEarnCents && cents < brand.minEarnCents ? 0 : computePoints(cents));
+  const earnPts = ptsFor(productCents);
 
   function step(group: ModifierGroup, itemId: string, dir: 1 | -1) {
     setQty((prev) => {
@@ -206,9 +208,15 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           </div>
         </div>
 
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-bg-surface-2 px-4 py-2 text-sm font-bold text-brand-400">
-          <IconStar width={16} height={16} /> Você vai juntar {computePoints(size.priceCents + addCents)} pontos
-        </div>
+        {earnPts > 0 ? (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-bg-surface-2 px-4 py-2 text-sm font-bold text-brand-400">
+            <IconStar width={16} height={16} /> Você vai juntar {earnPts} pontos
+          </div>
+        ) : brand.minEarnCents ? (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-bg-surface-2 px-4 py-2 text-xs font-semibold text-[var(--text-muted)]">
+            <IconStar width={14} height={14} /> Gaste {brl(brand.minEarnCents)} pra começar a pontuar
+          </div>
+        ) : null}
 
         {/* WhatsApp opcional — só se o cliente quiser falar */}
         <a
@@ -258,9 +266,11 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
                 <div className="bg-bg-elevated p-2.5">
                   <div className="text-xs font-semibold text-[var(--text-muted)]">{s.ml}ml</div>
                   <div className="text-base font-extrabold text-ink">{brl(s.priceCents)}</div>
-                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold text-gold">
-                    <IconStar width={10} height={10} /> +{computePoints(s.priceCents)} pts
-                  </div>
+                  {ptsFor(s.priceCents) > 0 && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold text-gold">
+                      <IconStar width={10} height={10} /> +{ptsFor(s.priceCents)} pts
+                    </div>
+                  )}
                   {on && (
                     <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-brand-400">
                       <IconCheck width={12} height={12} /> selecionado
