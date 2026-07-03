@@ -50,7 +50,9 @@ function buildPeriods(view: View): Period[] {
       res.push({ from: ymd(f), to: ymd(t), label: `${dd(f)}–${dd(last)}` });
     }
   } else {
-    for (let i = 13; i >= 0; i--) {
+    // Diário = últimos 7 dias (uma semana). Mais que isso estoura a largura no notebook e força
+    // scroll horizontal; horizontes maiores ficam nas abas Semanal/Mensal/Anual.
+    for (let i = 6; i >= 0; i--) {
       const f = new Date(now);
       f.setDate(now.getDate() - i);
       const t = new Date(f);
