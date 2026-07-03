@@ -37,38 +37,41 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
   const { data: orders, error } = await q;
   if (error) throw new Error("Erro ao ler pedidos (CMV): " + error.message);
   const orderIds = (orders ?? []).map((o) => num((o as { id: number }).id));
-  if (!orderIds.length) return { revenueCents: 0, cmvCents: 0, marginCents: 0, marginPct: 0, cmvPct: 0, lines: [], missingCostItems: [] };
-
-  // itens vendidos (com a ficha técnica consumida snapshot em consumes)
-  const { data: items, error: e2 } = await d
-    .from("tab_order_items")
-    .select("name, qty, unit_price_cents, consumes")
-    .in("tab_order_id", orderIds);
-  if (e2) throw new Error("Erro ao ler itens (CMV): " + e2.message);
 
   const byName = new Map<string, CmvLine>();
   let revenueCents = 0;
   let cmvCents = 0;
-  for (const it of (items ?? []) as { name: string; qty: number; unit_price_cents: number; consumes: unknown }[]) {
-    const qty = num(it.qty);
-    const rev = qty * num(it.unit_price_cents);
-    const consumes = Array.isArray(it.consumes) ? (it.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
-    const unitCost = consumes.reduce((s, c) => {
-      // custo CONGELADO na venda (snapshot); ausente OU zero (base sem custo na hora) → cai no custo atual
-      const cc = c.costCents != null && c.costCents > 0 ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
-      if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
-      return s + num(c.qty) * cc;
-    }, 0);
-    const cmv = qty * unitCost;
-    revenueCents += rev;
-    cmvCents += cmv;
-    const name = it.name || "—";
-    const cur = byName.get(name) ?? { name, qty: 0, revenueCents: 0, cmvCents: 0, marginCents: 0 };
-    cur.qty += qty;
-    cur.revenueCents += rev;
-    cur.cmvCents += cmv;
-    cur.marginCents = cur.revenueCents - cur.cmvCents;
-    byName.set(name, cur);
+
+  // MESA (tab_order_items): só processa se houver comanda de mesa no período.
+  // NÃO retornar cedo aqui — loja só-balcão (sem mesa) tem as vendas no `orders` (bloco abaixo).
+  // (bug corrigido 03/07: o early-return zerava o CMV de quem não usa mesa)
+  if (orderIds.length) {
+    const { data: items, error: e2 } = await d
+      .from("tab_order_items")
+      .select("name, qty, unit_price_cents, consumes")
+      .in("tab_order_id", orderIds);
+    if (e2) throw new Error("Erro ao ler itens (CMV): " + e2.message);
+    for (const it of (items ?? []) as { name: string; qty: number; unit_price_cents: number; consumes: unknown }[]) {
+      const qty = num(it.qty);
+      const rev = qty * num(it.unit_price_cents);
+      const consumes = Array.isArray(it.consumes) ? (it.consumes as { stockId: string; qty: number; costCents?: number }[]) : [];
+      const unitCost = consumes.reduce((s, c) => {
+        // custo CONGELADO na venda (snapshot); ausente OU zero (base sem custo na hora) → cai no custo atual
+        const cc = c.costCents != null && c.costCents > 0 ? c.costCents : (costById.get(String(c.stockId)) ?? 0);
+        if (!(cc > 0) && num(c.qty) > 0) missingCost.add(String(c.stockId));
+        return s + num(c.qty) * cc;
+      }, 0);
+      const cmv = qty * unitCost;
+      revenueCents += rev;
+      cmvCents += cmv;
+      const name = it.name || "—";
+      const cur = byName.get(name) ?? { name, qty: 0, revenueCents: 0, cmvCents: 0, marginCents: 0 };
+      cur.qty += qty;
+      cur.revenueCents += rev;
+      cur.cmvCents += cmv;
+      cur.marginCents = cur.revenueCents - cur.cmvCents;
+      byName.set(name, cur);
+    }
   }
 
   // Balcão / PDV / delivery (orders-store) — o CMV de mesa (tab_order_items acima) NÃO os cobre.
