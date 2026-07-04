@@ -18,6 +18,9 @@ export async function GET() {
     cardFeeCents: o.cardFeeCents ?? 0,
     netCents: o.totalCents - (o.cardFeeCents ?? 0),
     customerName: o.customerName,
+    items: (o.items ?? []).map((it) => ({ name: it.name, qty: it.qty, paidCents: it.paidCents })),
+    discountCents: o.discountCents ?? 0,
+    payments: o.payments ?? null,
   }));
   // receita das MESAS (tab_payments) — antes invisível no financeiro
   const vendasMesa = (await listMesaPayments()).map((m) => ({
@@ -29,6 +32,9 @@ export async function GET() {
     cardFeeCents: m.cardFeeCents,
     netCents: m.grossCents - m.cardFeeCents,
     customerName: m.customerName,
+    items: [] as { name: string; qty: number; paidCents: number }[],
+    discountCents: 0,
+    payments: null,
   }));
   const vendas = [...vendasOrders, ...vendasMesa];
   const despesas = await listExpenses();
