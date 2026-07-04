@@ -32,7 +32,7 @@ export async function weightSoldSince(sinceISO: string, storeId?: string, balcao
   let totalKg = 0, pesoKg = 0, copoCount = 0, pesoCount = 0;
 
   // BALCÃO / PDV — reusa os pedidos já carregados pelo resumo (evita reler tudo)
-  const orders = balcaoOrders ?? (await listOrders(sid)).filter((o) => o.mode === "balcao" && o.createdAt >= sinceISO);
+  const orders = balcaoOrders ?? (await listOrders(sid)).filter((o) => o.mode === "balcao" && !o.cancelled && o.createdAt >= sinceISO);
   for (const o of orders) {
     totalKg += polpaOf(o.consumes);
     for (const it of o.items ?? []) {
@@ -89,7 +89,7 @@ export async function weightSoldPeriods(storeId?: string): Promise<{ hoje: Weigh
   };
 
   // BALCÃO
-  const orders = (await listOrders(sid)).filter((o) => o.mode === "balcao" && dateBR(o.createdAt) >= earliestDate);
+  const orders = (await listOrders(sid)).filter((o) => o.mode === "balcao" && !o.cancelled && dateBR(o.createdAt) >= earliestDate);
   for (const o of orders) addTo(o.createdAt, (acc) => {
     acc.totalKg += polpaOf(o.consumes);
     for (const it of o.items ?? []) tallyItem(acc, it.name, num(it.qty));

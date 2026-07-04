@@ -97,6 +97,7 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
   // Balcão / PDV / delivery (orders-store) — o CMV de mesa (tab_order_items acima) NÃO os cobre.
   // O consumes é agregado por PEDIDO; distribui o custo entre os itens por participação na receita.
   const storeOrders = (await listOrders(sid)).filter((o) => {
+    if (o.cancelled) return false; // venda estornada não entra no CMV nem na receita
     const at = o.createdAt || "";
     if (fromISO && at < fromISO) return false;
     if (toISO && at > toISO) return false;

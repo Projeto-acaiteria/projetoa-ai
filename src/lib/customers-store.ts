@@ -68,6 +68,12 @@ export function awardPoints(phone: string, name: string, points: number, ref: st
   return upsert(phone, name, { type: "earn", points, ref, at });
 }
 
+/** Estorna pontos creditados numa venda cancelada — ajuste NEGATIVO no ledger (o FIFO do
+ *  validBalance consome os pontos de volta). `points` é a quantia positiva creditada na venda. */
+export function reversePoints(phone: string, name: string, points: number, ref: string, at: string) {
+  return upsert(phone, name, { type: "adjust", points: -Math.abs(points), ref, at });
+}
+
 // cadastro rápido (sem pontos) — cria ou atualiza nome/aniversário
 export async function saveCustomer(phone: string, name: string, birthday: string | undefined, at: string): Promise<Customer> {
   const key = normPhone(phone);

@@ -27,7 +27,7 @@ export default async function AdminHome() {
   const expenses = await listExpenses();
   const [settings, cur, mesaPagosAll, acai] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments(), weightSoldPeriods()]);
 
-  const vendasHoje = orders.filter((o) => o.status === "entregue" && dateBR(o.createdAt) === today);
+  const vendasHoje = orders.filter((o) => o.status === "entregue" && !o.cancelled && dateBR(o.createdAt) === today);
   // vendas de MESA também entram no faturamento (vivem em tab_payments, não em orders).
   // valor = soma dos pagamentos (split soma certo); contagem = comandas DISTINTAS (split não infla).
   const mesaHoje = mesaPagosAll.filter((m) => dateBR(m.date) === today);
@@ -40,11 +40,11 @@ export default async function AdminHome() {
   const saldoHoje = liquidoHoje - despHoje;
   const ticket = nVendasHoje ? Math.round(brutoHoje / nVendasHoje) : 0;
   const emPreparo = orders.filter((o) => o.status === "preparo").length;
-  const recentes = orders.slice(0, 6);
+  const recentes = orders.filter((o) => !o.cancelled).slice(0, 6);
 
   // mais vendidos (agrupado por item-base, ex "Copo 500ml")
   const itemCount: Record<string, number> = {};
-  for (const o of orders.filter((x) => x.status === "entregue")) {
+  for (const o of orders.filter((x) => x.status === "entregue" && !x.cancelled)) {
     for (const it of o.items) {
       const base = it.name.split(" — ")[0].split(" (")[0];
       itemCount[base] = (itemCount[base] || 0) + it.qty;

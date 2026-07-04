@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // Vendas reais (balcão/delivery entregues + comandas de mesa pagas) + despesas.
 export async function GET() {
-  const orders = (await listOrders()).filter((o) => o.status === "entregue");
+  const orders = (await listOrders()).filter((o) => o.status === "entregue" && !o.cancelled);
   const vendasOrders = orders.map((o) => ({
     display: o.display,
     date: o.createdAt,

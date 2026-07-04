@@ -41,6 +41,12 @@ export type Order = {
   consumed?: boolean; // estoque já abatido (evita duplicar na entrega)
   bairro?: string; // zona de entrega (delivery)
   code?: string; // código de rastreio (curto, aleatório) — cliente consulta o status por ele
+  // ESTORNO: venda cancelada (bateu errado, cliente desistiu). NÃO deleta — vira registro auditável
+  // e é excluída de caixa/receita/CMV/açaí-vendido; estoque e pontos são revertidos na ação.
+  cancelled?: boolean;
+  cancelledAt?: string;
+  cancelReason?: string;
+  cancelledBy?: string; // email do operador logado que cancelou
 };
 
 // código curto sem caracteres ambíguos (sem O/0/I/1/L) — fácil de ditar e digitar
@@ -114,4 +120,19 @@ export async function markPointsAwarded(id: number, points: number, storeId?: st
 export async function markConsumed(id: number, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await patchOrder(id, sid, (o) => ({ ...o, consumed: true }));
+}
+
+/** Uma order pelo id, restrita à loja (pra ação de cancelamento reverter estoque/pontos). */
+export async function getOrder(id: number, storeId?: string): Promise<Order | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("orders").select("data").eq("id", id).eq("store_id", sid).maybeSingle();
+  if (error) throw new Error("Erro ao ler pedido: " + error.message);
+  return data ? (data as { data: Order }).data : null;
+}
+
+/** Marca a venda como CANCELADA (estorno). Idempotente: se já cancelada, patchOrder não duplica
+ *  (o chamador checa antes de reverter estoque/pontos). NÃO deleta — mantém pro histórico. */
+export async function cancelOrder(id: number, reason: string, by: string | undefined, at: string, storeId?: string): Promise<Order | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  return patchOrder(id, sid, (o) => ({ ...o, cancelled: true, cancelledAt: at, cancelReason: reason, cancelledBy: by }));
 }

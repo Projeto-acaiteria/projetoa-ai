@@ -11,7 +11,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { printTicket } from "@/lib/print";
 import QzStatus from "@/components/admin/QzStatus";
 import { leituraXHtml, movTicketHtml } from "@/lib/ticket";
-import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter } from "@/components/Icons";
+import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter, IconTrash } from "@/components/Icons";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -129,7 +129,7 @@ function Abertura({ onOpened }: { onOpened: () => void }) {
 
 /* ---------------- Painel do caixa aberto ---------------- */
 function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChanged, onClosed }: { session: CashSession; resumo: Resumo; store: StoreHeader; cupomRodape?: string; cashPinSet: boolean; onChanged: (d?: { session: CashSession | null; resumo: Resumo | null }) => void; onClosed: (s: CashSession) => void }) {
-  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax" | "movimentos">(null);
+  const [modal, setModal] = useState<null | "sangria" | "suprimento" | "fechar" | "consulta" | "historico" | "leiturax" | "movimentos" | "cancelar">(null);
 
   return (
     <div className="card relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 6%, var(--bg-elevated)) 0%, var(--bg-elevated) 50%)" }}>
@@ -164,6 +164,7 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
           <IconBtn onClick={() => setModal("leiturax")} Icon={IconPrinter} title="Leitura X (relatório parcial)" />
           <IconBtn onClick={() => setModal("suprimento")} Icon={IconPlus} title="Suprimento (reforço de troco)" />
           <IconBtn onClick={() => setModal("sangria")} Icon={IconMinus} title="Sangria (retirada)" />
+          <IconBtn onClick={() => setModal("cancelar")} Icon={IconTrash} title="Cancelar / estornar uma venda" />
           <button onClick={() => setModal("fechar")} className="inline-flex items-center gap-1.5 rounded-lg brand-gradient px-3.5 py-2 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
             <IconCheck width={15} height={15} /> Fechar caixa
           </button>
@@ -177,7 +178,74 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
       {modal === "leiturax" && <LeituraXModal store={store} onClose={() => setModal(null)} />}
+      {modal === "cancelar" && <CancelarVendaModal cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
     </div>
+  );
+}
+
+/* ---------------- Cancelar / estornar venda ---------------- */
+function CancelarVendaModal({ cashPinSet, onClose, onDone }: { cashPinSet: boolean; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
+  type V = { id: number; display: string; createdAt: string; totalCents: number; paymentMethod: string | null; itens: number };
+  const [vendas, setVendas] = useState<V[] | null>(null);
+  const [sel, setSel] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const [pin, setPin] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/caixa", { cache: "no-store" }).then((r) => r.json()).then((d) => setVendas(d.vendas ?? [])).catch(() => setVendas([]));
+  }, []);
+
+  const PM: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Débito", credito: "Crédito" };
+
+  async function confirm() {
+    if (!sel) { setErr("Escolha a venda que quer cancelar."); return; }
+    if (!reason.trim()) { setErr("Diga o motivo do cancelamento."); return; }
+    if (cashPinSet && pin.trim().length < 4) { setErr("Digite o PIN do caixa."); return; }
+    setSaving(true); setErr("");
+    const r = await fetch("/api/caixa", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancelar-venda", orderId: sel, reason: reason.trim(), pin: cashPinSet ? pin.trim() : undefined }),
+    });
+    const d = await r.json().catch(() => null);
+    if (d && d.ok) { onDone(d); return; } // resumo autoritativo do POST (venda já fora do caixa)
+    setSaving(false);
+    setErr(d?.error || "Não consegui cancelar.");
+  }
+
+  return (
+    <Overlay title="Cancelar venda" onClose={onClose}>
+      <p className="text-sm text-[var(--text-muted)]">Estorna uma venda desta sessão: devolve o estoque, tira do caixa e do faturamento e estorna os pontos. Não apaga — fica registrada como cancelada.</p>
+      {vendas === null ? (
+        <p className="py-6 text-center text-sm text-[var(--text-faded)]">Carregando vendas...</p>
+      ) : vendas.length === 0 ? (
+        <p className="py-6 text-center text-sm text-[var(--text-faded)]">Nenhuma venda de balcão nesta sessão pra cancelar.</p>
+      ) : (
+        <div className="max-h-52 space-y-1.5 overflow-y-auto">
+          {vendas.map((v) => (
+            <button key={v.id} onClick={() => setSel(v.id)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${sel === v.id ? "border-brand-600 bg-[color-mix(in_srgb,var(--brand-600)_8%,transparent)]" : "border-line hover:border-brand-400"}`}>
+              <span>
+                <span className="text-sm font-bold text-ink">{v.display}</span>
+                <span className="ml-2 text-xs text-[var(--text-muted)]">{hhmm(v.createdAt)} · {v.itens} item{v.itens === 1 ? "" : "s"}{v.paymentMethod ? ` · ${PM[v.paymentMethod] ?? v.paymentMethod}` : ""}</span>
+              </span>
+              <span className="shrink-0 text-sm font-extrabold text-ink tabular-nums">{brl(v.totalCents)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (ex: bateu errado, cliente desistiu)" className="w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm outline-none focus:border-brand-600" />
+      {cashPinSet && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">PIN do caixa</label>
+          <input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••" className="mt-1 w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-center text-lg font-bold tracking-[0.3em] outline-none focus:border-brand-600" />
+        </div>
+      )}
+      {err && <p className="rounded-lg bg-[#FEECEC] px-3 py-2 text-center text-sm font-semibold text-[var(--red-no)]">{err}</p>}
+      <button onClick={confirm} disabled={saving || !sel} className="mt-1 w-full rounded-xl bg-[var(--red-no)] py-3 font-bold text-white disabled:opacity-50">
+        {saving ? "Cancelando..." : "Cancelar venda"}
+      </button>
+    </Overlay>
   );
 }
 
