@@ -5,6 +5,7 @@ import { StatCard } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash, IconGear, IconBowl } from "@/components/Icons";
 import type { StockItem, StockCategory } from "@/lib/stock-store";
+import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
 
 const CAT_LABEL: Record<StockCategory, string> = {
   sorvete: "Sorvetes e potes",
@@ -288,6 +289,7 @@ function Chip({ active, onClick, label, count, color }: { active: boolean; onCli
 
 function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; onMove: (dir: "entrada" | "saida") => void; onEdit: () => void; onHistory: () => void; onRemove: () => void }) {
   const d = daysTo(it.expiry);
+  const isBase = it.id === WEIGHT_BASE_STOCK_ID; // base do açaí: não pode excluir (âncora de CMV/baixa)
   const isLow = it.qty <= it.minQty;
   const expired = d !== null && d < 0;
   const expiring = d !== null && d >= 0 && d <= 7;
@@ -333,9 +335,11 @@ function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; o
         <button onClick={onEdit} title="Editar" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-ink">
           <IconGear width={15} height={15} />
         </button>
-        <button onClick={onRemove} title="Remover" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-[var(--red-no)]">
-          <IconTrash width={15} height={15} />
-        </button>
+        {!isBase && (
+          <button onClick={onRemove} title="Remover" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-faded)] transition hover:text-[var(--red-no)]">
+            <IconTrash width={15} height={15} />
+          </button>
+        )}
       </div>
     </div>
   );
