@@ -136,8 +136,10 @@ export async function POST(req: Request) {
     const who = (await getCurrentUser())?.email ?? undefined;
     const warnings: string[] = [];
 
-    // 1) devolve o estoque baixado (re-entrada) — NÃO-FATAL: falha não trava o estorno
-    if (order.consumed && order.consumes?.length) {
+    // 1) devolve o estoque baixado (re-entrada) — NÃO-FATAL: falha não trava o estorno.
+    // Balcão baixa NA HORA da venda (sem a flag `consumed`, que é do fluxo de delivery) → devolve
+    // sempre que houver consumes; delivery só se já tinha consumido.
+    if (order.consumes?.length && (order.mode === "balcao" || order.consumed)) {
       const dia = dateBR(nowIso);
       for (const c of order.consumes) {
         try { await moveStock(c.stockId, "entrada", c.qty, `Estorno venda ${order.display}`, dia); }
