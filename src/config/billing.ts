@@ -1,8 +1,8 @@
-// Pricing do ComandaPRO (Eduardo, 19/06): só mensalidade, 7 dias de trial grátis, sem setup.
+// Pricing do ComandaPRO (Eduardo, 19/06 → 14d em 05/07): só mensalidade, 14 dias de trial grátis, sem setup.
 // Base R$219/mês. Planos mais longos = mês mais barato (10% off semestral, ~20% off anual).
 // Recorrente via Asaas: cartão = subscription no cycle; PIX = cobrança avulsa pelo período.
 export const BILLING = {
-  trialDias: 7,
+  trialDias: 14, // onboarding: tempo de introduzir o sistema no cliente antes de cobrar
   planos: {
     mensal: { label: "Mensal", meses: 1, cents: 21_900, cycle: "MONTHLY" as const, equivMes: 219 },
     semestral: { label: "Semestral", meses: 6, cents: 118_200, cycle: "SEMIANNUALLY" as const, equivMes: 197 },
