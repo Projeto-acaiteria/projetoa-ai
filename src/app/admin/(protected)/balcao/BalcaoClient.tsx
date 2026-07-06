@@ -39,6 +39,11 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
   const [pay, setPay] = useState<PaymentMethod>("dinheiro");
   const [discInput, setDiscInput] = useState("");
   const [discMode, setDiscMode] = useState<"brl" | "pct">("brl");
+  // cupom de desconto: valida no server e preenche o desconto (que já flui pro total/caixa)
+  const [couponCode, setCouponCode] = useState("");
+  const [couponId, setCouponId] = useState<string | null>(null);
+  const [couponMsg, setCouponMsg] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
@@ -97,6 +102,23 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     finally { setLoyBusy(false); }
   }
 
+  async function aplicarCupom() {
+    const code = couponCode.trim();
+    if (!code || couponBusy || total <= 0) return;
+    setCouponBusy(true); setCouponMsg("");
+    try {
+      const r = await fetch("/api/cupons", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "validate", payload: { code, subtotalCents: total } }) });
+      const d = await r.json();
+      if (!d.ok) { setCouponId(null); setCouponMsg(d.reason || "Cupom inválido."); return; }
+      setCouponId(d.couponId);
+      setDiscMode("brl");
+      setDiscInput((d.discountCents / 100).toFixed(2).replace(".", ","));
+      setCouponMsg(`${d.code} aplicado · − R$ ${(d.discountCents / 100).toFixed(2).replace(".", ",")}`);
+    } catch { setCouponMsg("Não consegui validar o cupom."); }
+    finally { setCouponBusy(false); }
+  }
+  function limparCupom() { setCouponId(null); setCouponCode(""); setCouponMsg(""); setDiscInput(""); }
+
   function onProduct(p: BarProduct) {
     setErr("");
     if (p.by_weight) { setWeightFor(p); return; }
@@ -137,7 +159,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     try {
       const r = await fetch("/api/balcao-venda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: custName.trim() || (customer?.found ? customer.name : undefined), discountCents: discountCents || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
+        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: custName.trim() || (customer?.found ? customer.name : undefined), discountCents: discountCents || undefined, couponId: couponId || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
@@ -172,7 +194,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         }
       }
       const pts = d.pointsAwarded ?? 0;
-      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput("");
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput(""); setCouponId(null); setCouponCode(""); setCouponMsg("");
       setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {
@@ -318,6 +340,16 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
               <button type="button" onClick={() => setDiscMode("brl")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "brl" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>R$</button>
               <button type="button" onClick={() => setDiscMode("pct")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${discMode === "pct" ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>%</button>
             </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Cupom</span>
+              <input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="CÓDIGO" aria-label="Cupom de desconto" className="ml-auto w-24 rounded-lg border border-line bg-bg-base px-2 py-1.5 text-right font-mono text-sm uppercase text-ink outline-none focus:border-brand-600" />
+              {couponId ? (
+                <button type="button" onClick={limparCupom} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-bold text-red-500">tirar</button>
+              ) : (
+                <button type="button" onClick={aplicarCupom} disabled={couponBusy || !couponCode.trim()} className="rounded-lg border border-brand-600 px-2.5 py-1.5 text-xs font-bold text-brand-600 disabled:opacity-50">aplicar</button>
+              )}
+            </div>
+            {couponMsg && <div className={`mt-1 text-xs ${couponId ? "text-[var(--green-ok)]" : "text-red-500"}`}>{couponMsg}</div>}
           </div>
 
           {/* fidelidade: só quando o recurso está ligado (espelha o nav/store_config) */}

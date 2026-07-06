@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import OrderWatcher from "@/components/admin/OrderWatcher";
 import { getStore } from "@/lib/settings-store";
-import { getCurrentStore } from "@/lib/auth/store";
+import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
 import { getStoreConfig } from "@/lib/auth/store-config";
 
@@ -18,7 +18,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const sub = await getSubscription(loja.id);
   if (isBlocked(sub)) redirect("/admin/bloqueado");
 
-  const [store, cfg] = await Promise.all([getStore(), getStoreConfig(loja.id)]);
+  const [store, cfg, role] = await Promise.all([getStore(), getStoreConfig(loja.id), getCurrentRole()]);
   const nav = {
     template: cfg?.menu_template ?? "acai",
     hasTables: !!cfg?.has_tables,
@@ -27,6 +27,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     hasStations: !!cfg?.has_stations,
     loyaltyEnabled: !!cfg?.loyalty_enabled,
     hasEstoque: !!cfg?.has_estoque,
+    role: role ?? "owner",
   };
   return (
     <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)}>

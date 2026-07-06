@@ -8,6 +8,7 @@ import { getOpenSession } from "@/lib/cash-store";
 import { awardPoints, getByPhone } from "@/lib/customers-store";
 import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
+import { incrementCouponUsage } from "@/lib/coupons-store";
 import { dateBR } from "@/lib/date-br";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ type Body = {
   customerName?: string;
   customerPhone?: string; // fidelidade: identifica o cliente p/ pontuar a venda
   discountCents?: number; // desconto do operador (R$ ou % já convertido em centavos)
+  couponId?: string; // cupom aplicado — conta o uso após a venda (best-effort)
   payments?: { method: PaymentMethod; amountCents: number }[]; // split de pagamento (>1 forma)
 };
 
@@ -114,6 +116,9 @@ export async function POST(req: Request) {
       "entregue", // venda de balcão já sai pronta (não passa pela fila de preparo do delivery)
       storeId,
     );
+
+    // cupom: conta o uso DEPOIS da venda commitada. NÃO-FATAL (falha aqui não pode virar 500 → dupla venda).
+    if (b.couponId) { try { await incrementCouponUsage(b.couponId, storeId); } catch {} }
 
     // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada acima;
     // uma falha de baixa não pode virar 500 → operador refaz → pedido duplicado).

@@ -12,6 +12,7 @@ import {
   IconMenu as IconHamburger,
   IconWallet,
   IconStar,
+  IconGift,
   IconUsers,
   IconBox,
   IconChart,
@@ -20,15 +21,19 @@ import {
   IconGear,
   IconPrinter,
   IconTable,
+  IconClock,
 } from "@/components/Icons";
+import type { Role } from "@/lib/auth/store";
+import { canSeeNav } from "@/lib/auth/roles";
 
 // NAV por SEGMENTO: cada negócio vê só o seu sistema (gate pelas flags do store_config).
 // "Caixa" aparece pra todos (gestão de caixa); o PDV de copo dentro dele é só pra açaí (ver caixa/page).
 // "Balcão" (cardápio relacional) só pra bar/grid; açaí vende pelo Caixa.
-export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean };
+export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean; role: Role };
 type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean };
 const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
+  { href: "/admin/minha-area", label: "Minha área", Icon: IconClock },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai" },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables },
@@ -40,6 +45,7 @@ const NAV: NavItem[] = [
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox, show: (c) => c.hasEstoque },
   { href: "/admin/cmv", label: "CMV", Icon: IconChart, show: (c) => c.hasEstoque },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
+  { href: "/admin/cupons", label: "Cupons", Icon: IconGift },
   { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled },
   { href: "/admin/clientes", label: "Clientes", Icon: IconUsers },
   { href: "/admin/impressora", label: "Impressora", Icon: IconPrinter },
@@ -52,7 +58,7 @@ export default function AdminShell({ children, storeName, nav, billing }: { chil
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <nav className="flex flex-col gap-1">
-      {NAV.filter((n) => !n.show || n.show(nav)).map(({ href, label, Icon }) => {
+      {NAV.filter((n) => (!n.show || n.show(nav)) && canSeeNav(nav.role, n.href)).map(({ href, label, Icon }) => {
         const active = href === "/admin" ? path === href : path.startsWith(href);
         return (
           <Link

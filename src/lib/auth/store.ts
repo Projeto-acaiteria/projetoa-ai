@@ -28,8 +28,37 @@ export const getCurrentStore = cache(async (): Promise<Store | null> => {
   if (!user) return null;
   for (const delay of [0, 200, 400, 600]) {
     if (delay) await new Promise((r) => setTimeout(r, delay));
+    // dono da loja
     const { data } = await db().from("stores").select("*").eq("owner_id", user.id).maybeSingle();
     if (data) return data as Store;
+    // funcionário: resolve a loja pela membership ativa (recepção/técnico não têm owner_id)
+    const { data: m } = await db().from("store_members").select("store_id").eq("user_id", user.id).eq("active", true).maybeSingle();
+    if (m) {
+      const { data: s } = await db().from("stores").select("*").eq("id", (m as { store_id: string }).store_id).maybeSingle();
+      if (s) return s as Store;
+    }
   }
   return null;
+});
+
+export type Role = "owner" | "reception" | "technician";
+export type Membership = { store: Store; role: Role; technicianId: string | null };
+
+// Papel do usuário logado na loja resolvida. Owner = dono (owner_id) OU member role=owner.
+export const getCurrentMembership = cache(async (): Promise<Membership | null> => {
+  const [user, store] = await Promise.all([getCurrentUser(), getCurrentStore()]);
+  if (!user || !store) return null;
+  if (store.owner_id === user.id) return { store, role: "owner", technicianId: null };
+  const { data: m } = await db()
+    .from("store_members")
+    .select("role, technician_id")
+    .eq("store_id", store.id).eq("user_id", user.id).eq("active", true)
+    .maybeSingle();
+  const row = m as { role?: string; technician_id?: string | null } | null;
+  const role: Role = row?.role === "owner" ? "owner" : row?.role === "technician" ? "technician" : "reception";
+  return { store, role, technicianId: row?.technician_id ?? null };
+});
+
+export const getCurrentRole = cache(async (): Promise<Role | null> => {
+  return (await getCurrentMembership())?.role ?? null;
 });
