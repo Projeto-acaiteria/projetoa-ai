@@ -34,6 +34,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         priceCents: Number(d.sellPriceCents ?? 0),
         stock: Number(d.qty ?? 0),
         specs: (d.specs as Record<string, unknown>) ?? {},
+        badge: (d.badge as string | null) ?? null,
+        highlight: Boolean(d.highlight),
       };
     })
     .filter((p) => p.sku && p.priceCents > 0); // só o que tem preço de venda
