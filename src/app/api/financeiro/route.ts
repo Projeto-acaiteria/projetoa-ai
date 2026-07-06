@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
 import { listMesaPayments } from "@/lib/tables-store";
+import { listServiceOrders } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,25 @@ export async function GET() {
     discountCents: 0,
     payments: null,
   }));
-  const vendas = [...vendasOrders, ...vendasMesa];
+  // receita das ORDENS DE SERVIÇO quitadas (assistência técnica) — antes só aparecia no dashboard AT.
+  // Data = quitação (paidAt), não abertura, pra bater com o dia que o dinheiro entrou.
+  const vendasOS = (await listServiceOrders())
+    .filter((o) => o.paymentStatus === "quitada" && o.status !== "cancelado")
+    .map((o) => ({
+      display: "OS " + (o.code ?? o.id.slice(0, 8)),
+      date: o.paidAt ?? o.createdAt,
+      mode: "os",
+      paymentMethod: o.paymentMethod,
+      grossCents: o.totalCents,
+      cardFeeCents: 0,
+      netCents: o.totalCents,
+      customerName: o.customerName,
+      items: [{ name: o.device || "Serviço", qty: 1, paidCents: o.totalCents }],
+      discountCents: o.discountCents ?? 0,
+      payments: null,
+    }));
+
+  const vendas = [...vendasOrders, ...vendasMesa, ...vendasOS];
   const despesas = await listExpenses();
   return NextResponse.json({ vendas, despesas });
 }

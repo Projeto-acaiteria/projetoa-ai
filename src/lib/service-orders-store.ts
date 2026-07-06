@@ -29,6 +29,7 @@ export type ServiceOrder = {
   totalCents: number;
   paymentStatus: OSPaymentStatus;
   paidAt: string | null;
+  paymentMethod: string | null;
   createdAt: string;
 };
 
@@ -54,6 +55,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   totalCents: num(r.total_cents),
   paymentStatus: asPay(r.payment_status),
   paidAt: str(r.paid_at),
+  paymentMethod: str(r.payment_method),
   createdAt: String(r.created_at ?? ""),
 });
 
