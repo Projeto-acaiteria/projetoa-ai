@@ -3,6 +3,7 @@ import { getOpenSession, openCash, addMovement, closeCash, type CashSession } fr
 import { getCashPin } from "@/lib/settings-store";
 import { getCurrentUser } from "@/lib/auth/store";
 import { listOrders, getOrder, cancelOrder } from "@/lib/orders-store";
+import { listServiceOrders } from "@/lib/service-orders-store";
 import { moveStock } from "@/lib/stock-store";
 import { reversePoints } from "@/lib/customers-store";
 import { listMesaPayments } from "@/lib/tables-store";
@@ -38,15 +39,26 @@ async function resumo(session: CashSession) {
     orders.reduce((s, o) => s + (o.cardFeeCents ?? 0), 0) +
     mesas.filter((m) => isCard(m.method)).reduce((s, m) => s + (m.cardFeeCents ?? 0), 0);
   const cardNetCents = salesCardCents - cardFeeCents;
+  // OS quitadas DENTRO da sessão (assistência técnica). Reconciliação da gaveta: SÓ o dinheiro
+  // da OS entra no saldo físico; pix/cartão de OS aparecem no total mas não incham a gaveta (igual
+  // às vendas de balcão). Food não tem OS → lista vazia → tudo zero (no-op, food intacto).
+  // Compara paidAt >= openedAt por timestamp (não string): paid_at pode vir com "+00:00" e openedAt com "Z".
+  const sessOpenMs = new Date(session.openedAt).getTime();
+  const os = (await listServiceOrders()).filter(
+    (o) => o.paymentStatus === "quitada" && o.status !== "cancelado" && o.paidAt != null && new Date(o.paidAt).getTime() >= sessOpenMs,
+  );
+  const osTotalCents = os.reduce((s, o) => s + o.totalCents, 0);
+  const osCashCents = os.filter((o) => o.paymentMethod === "dinheiro").reduce((s, o) => s + o.totalCents, 0);
+  const nOS = os.length;
   const suprimentoCents = session.movements.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);
   const sangriaCents = session.movements.filter((m) => m.type === "sangria").reduce((s, m) => s + m.amountCents, 0);
-  const saldoCaixaCents = session.openingFloatCents + salesCashCents + suprimentoCents - sangriaCents;
+  const saldoCaixaCents = session.openingFloatCents + salesCashCents + osCashCents + suprimentoCents - sangriaCents;
   // nVendas: balcão (1 order = 1 venda) + comandas DISTINTAS (split em N parciais NÃO conta N vezes)
   const nMesas = new Set(mesas.map((m) => m.tabId)).size;
   // "quantos kg de açaí vendi hoje" (Vidal): polpa consumida nas vendas da sessão (copo + peso).
   // Reusa `orders` (balcão) já carregado acima; a função busca só os itens de mesa.
   const acai = await weightSoldSince(session.openedAt, undefined, orders);
-  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas, acai };
+  return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas, osTotalCents, osCashCents, nOS, acai };
 }
 
 // vendas de balcão da sessão aberta que ainda podem ser canceladas (não canceladas)
@@ -112,6 +124,8 @@ export async function POST(req: Request) {
       salesPixCents: r.salesPixCents,
       salesTotalCents: r.salesTotalCents,
       cardFeeCents: r.cardFeeCents,
+      osCashCents: r.osCashCents,
+      osTotalCents: r.osTotalCents,
     });
     return NextResponse.json({ ok: true, session, expectedCents: r.saldoCaixaCents });
   }

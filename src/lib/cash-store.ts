@@ -34,6 +34,10 @@ export type CashSession = {
   cardDiffCents?: number; // conferido − bruto cartão
   pixDiffCents?: number; // conferido − bruto pix
   closedBy?: string; // quem fechou (email do operador logado)
+  // OS de assistência técnica quitadas na sessão (reconciliação da gaveta). Só o dinheiro entra no
+  // saldo físico; total é auditoria. Food não tem OS → ambos ficam undefined/0.
+  osCashCents?: number; // dinheiro de OS quitada na sessão (JÁ somado ao saldo esperado)
+  osTotalCents?: number; // bruto de OS quitada na sessão (todos os métodos)
 };
 
 async function readAll(storeId?: string): Promise<CashSession[]> {
@@ -107,6 +111,8 @@ export type CloseCashInput = {
   salesPixCents: number;
   salesTotalCents: number;
   cardFeeCents: number;
+  osCashCents?: number; // dinheiro de OS quitada na sessão (já embutido no expectedCents)
+  osTotalCents?: number; // bruto de OS quitada na sessão (auditoria)
 };
 export async function closeCash(input: CloseCashInput): Promise<CashSession | null> {
   const open = await getOpenSession();
@@ -132,5 +138,7 @@ export async function closeCash(input: CloseCashInput): Promise<CashSession | nu
     pixCountedCents: pixCounted,
     cardDiffCents: cardCounted != null ? cardCounted - input.salesCardCents : undefined,
     pixDiffCents: pixCounted != null ? pixCounted - input.salesPixCents : undefined,
+    osCashCents: input.osCashCents,
+    osTotalCents: input.osTotalCents,
   }));
 }

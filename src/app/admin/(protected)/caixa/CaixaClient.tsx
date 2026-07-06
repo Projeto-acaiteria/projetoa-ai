@@ -18,7 +18,7 @@ const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-d
 
 type Produto = { id: string; name: string; priceCents: number; qty: number; unit: string };
 type AcaiSold = { totalKg: number; pesoKg: number; copoKg: number; copoCount: number; pesoCount: number };
-type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number; acai?: AcaiSold };
+type Resumo = { salesCashCents: number; salesTotalCents: number; salesCardCents: number; salesPixCents: number; cardFeeCents: number; cardNetCents: number; suprimentoCents: number; sangriaCents: number; saldoCaixaCents: number; nVendas: number; osTotalCents: number; osCashCents: number; nOS: number; acai?: AcaiSold };
 
 // kg em pt-BR (vírgula), até 2 casas; "12,5" / "40" / "3,25"
 const kg = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -151,6 +151,9 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:border-l sm:border-line sm:pl-5">
           <MiniStat label="Total vendido" value={brl(resumo.salesTotalCents)} sub={`${resumo.nVendas} venda${resumo.nVendas === 1 ? "" : "s"}`} />
           <MiniStat label="Dinheiro" value={brl(resumo.salesCashCents)} />
+          {resumo.nOS > 0 && (
+            <MiniStat label="OS quitadas" value={brl(resumo.osTotalCents)} sub={`${resumo.nOS} OS · ${brl(resumo.osCashCents)} em dinheiro`} />
+          )}
           <MiniStat label="Fundo troco" value={brl(session.openingFloatCents)} />
           <MiniStat label="Sangria / supr." value={`${brl(resumo.sangriaCents)} / ${brl(resumo.suprimentoCents)}`} sub={session.movements.length ? "ver trilha" : undefined} onClick={session.movements.length ? () => setModal("movimentos") : undefined} />
           {hasAcai(resumo.acai) && (
