@@ -8,6 +8,7 @@ const API_PUBLICAS = [
   "/api/mesa-pedido", "/api/delivery-pedido", "/api/cadastro", "/api/cadastro/check",
   "/api/webhooks/asaas", "/api/cron/billing-check", "/api/qz-sign",
   "/api/pedidos", "/api/pontos",
+  "/api/loja", // vitrine headless: catálogo/montagem/pedido do site (público por slug)
 ];
 
 export async function middleware(request: NextRequest) {
