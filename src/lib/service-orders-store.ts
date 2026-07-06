@@ -152,6 +152,14 @@ export async function quitarOS(id: string, paymentMethod?: string, storeId?: str
   } catch { /* baixa não-fatal */ }
 }
 
+/** Atribui um técnico (staff) à OS e puxa o % de comissão dele. */
+export async function assignTechnician(osId: string, staffId: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: st } = await db().from("staff").select("commission_percent").eq("id", staffId).eq("store_id", sid).maybeSingle();
+  const pct = st ? Number((st as { commission_percent: number }).commission_percent) : 0;
+  await db().from("service_orders").update({ staff_id: staffId, commission_percent: pct, updated_at: new Date().toISOString() }).eq("id", osId).eq("store_id", sid);
+}
+
 // Peça de uma montagem (componente escolhido no montador). priceCents = preço de venda cobrado.
 export type MontagemPart = { sku: string; name: string; priceCents: number };
 

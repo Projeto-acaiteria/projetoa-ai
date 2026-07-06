@@ -12,7 +12,7 @@ const STATUSES = [
 ] as const;
 const PAYS: [string, string][] = [["pix", "PIX"], ["dinheiro", "Dinheiro"], ["cartao", "Cartão"]];
 
-export default function OSActions({ id, status, paymentStatus }: { id: string; status: string; paymentStatus: string }) {
+export default function OSActions({ id, status, paymentStatus, staffId, staff }: { id: string; status: string; paymentStatus: string; staffId: string | null; staff: { id: string; name: string }[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -31,6 +31,16 @@ export default function OSActions({ id, status, paymentStatus }: { id: string; s
   return (
     <Card className="space-y-4 p-5">
       <div>
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Técnico</h3>
+        <select value={staffId ?? ""} disabled={busy} onChange={(e) => e.target.value && api("assign", { id, staffId: e.target.value })}
+          className="w-full rounded-lg border border-line bg-bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600 disabled:opacity-50">
+          <option value="">Sem técnico atribuído</option>
+          {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <p className="mt-1 text-[10px] text-[var(--text-faded)]">Define quem monta/repara e a comissão sobre o serviço.</p>
+      </div>
+
+      <div className="border-t border-line pt-4">
         <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Situação</h3>
         <div className="grid grid-cols-2 gap-2">
           {STATUSES.map((s) => (

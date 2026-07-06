@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/service-orders-store";
+import { listStaff } from "@/lib/staff-store";
 import OSActions from "./OSActions";
 
 export const dynamic = "force-dynamic";
@@ -9,10 +10,11 @@ const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFr
 
 export default async function OSDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const res = await getServiceOrder(id);
+  const [res, staff] = await Promise.all([getServiceOrder(id), listStaff()]);
   if (!res) notFound();
   const { os, parts } = res;
   const commission = osCommissionCents(os);
+  const tecnico = staff.find((s) => s.id === os.staffId);
 
   return (
     <>
@@ -62,6 +64,10 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
               <Row label="Total" value={brl(os.totalCents)} strong />
             </div>
             <div className="mt-3 rounded-lg bg-bg-surface-2 p-3 text-xs">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[var(--text-muted)]">Técnico</span>
+                <span className="font-semibold text-ink">{tecnico?.name ?? "não atribuído"}</span>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-muted)]">Comissão ({os.commissionPercent}% do serviço)</span>
                 <span className="font-mono font-bold text-ink">{os.paymentStatus === "quitada" ? brl(commission) : "—"}</span>
@@ -72,7 +78,7 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
             </div>
           </Card>
 
-          <OSActions id={os.id} status={os.status} paymentStatus={os.paymentStatus} />
+          <OSActions id={os.id} status={os.status} paymentStatus={os.paymentStatus} staffId={os.staffId} staff={staff.map((s) => ({ id: s.id, name: s.name }))} />
         </div>
       </div>
     </>

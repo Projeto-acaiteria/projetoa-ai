@@ -6,6 +6,7 @@ import type { Role } from "@/lib/auth/store";
 // Rotas de nav que a RECEPÇÃO enxerga (opera, mas sem financeiro/config/cupom-gestão/estoque).
 const RECEPTION_NAV = new Set<string>([
   "/admin",
+  "/admin/os", // recepção recebe o cliente e monta/abre a OS (assistência técnica)
   "/admin/caixa",
   "/admin/balcao",
   "/admin/mesas",
