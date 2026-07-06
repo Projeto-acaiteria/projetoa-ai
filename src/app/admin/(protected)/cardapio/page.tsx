@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader } from "@/components/admin/ui";
 import { db } from "@/lib/supabase";
 import { getStore } from "@/lib/settings-store";
@@ -12,6 +13,7 @@ import CardapioBarEditor from "@/components/admin/CardapioBarEditor";
 export const dynamic = "force-dynamic";
 
 export default async function CardapioAdminPage() {
+  await requireNavAccess("/admin/cardapio");
   const storeId = await resolveStoreId();
   const [store, cfg] = await Promise.all([getStore(storeId), getStoreConfig(storeId)]);
   // bar E grid usam o schema relacional (menu_categories/menu_products) → CardapioBarEditor.

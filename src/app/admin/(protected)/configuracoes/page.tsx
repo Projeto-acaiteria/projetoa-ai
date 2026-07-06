@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader } from "@/components/admin/ui";
 import { getCurrentStore } from "@/lib/auth/store";
 import { getSubscription, billingView } from "@/lib/auth/subscription";
@@ -10,6 +11,7 @@ const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const dmy = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
 
 export default async function ConfiguracoesPage() {
+  await requireNavAccess("/admin/configuracoes");
   const loja = await getCurrentStore();
   const sub = loja ? await getSubscription(loja.id) : null;
   const bv = billingView(sub);

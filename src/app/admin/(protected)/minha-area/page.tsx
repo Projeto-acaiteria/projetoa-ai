@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requireNavAccess } from "@/lib/auth/guard";
 import Link from "next/link";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getCurrentMembership } from "@/lib/auth/store";
@@ -11,6 +12,7 @@ const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFr
 // Área do TÉCNICO: só as OS dele + a comissão dele (λ.garcom-app-so-pedidos — vê o próprio trabalho
 // e o próprio ganho, nunca o financeiro da loja).
 export default async function MinhaAreaPage() {
+  await requireNavAccess("/admin/minha-area");
   const m = await getCurrentMembership();
   if (!m) redirect("/login");
 

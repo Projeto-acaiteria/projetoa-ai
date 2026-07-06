@@ -1,9 +1,11 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import CuponsClient from "./CuponsClient";
 
 export const dynamic = "force-dynamic";
 
-export default function CuponsPage() {
+export default async function CuponsPage() {
+  await requireNavAccess("/admin/cupons");
   return (
     <>
       <PageHeader

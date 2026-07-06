@@ -1,4 +1,5 @@
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { listServiceOrders, OS_STATUS_LABEL, type OSStatus } from "@/lib/service-orders-store";
 import Link from "next/link";
 import NovaOSButton from "./NovaOSButton";
@@ -16,6 +17,7 @@ const STATUS_CLS: Record<OSStatus, string> = {
 };
 
 export default async function OSPage() {
+  await requireNavAccess("/admin/os");
   const orders = await listServiceOrders();
   const abertas = orders.filter((o) => o.status !== "entregue" && o.status !== "cancelado");
   const fechadas = orders.filter((o) => o.status === "entregue" || o.status === "cancelado");

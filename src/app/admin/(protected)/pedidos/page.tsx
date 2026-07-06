@@ -1,4 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore } from "@/lib/auth/store";
 import PedidosClient from "./PedidosClient";
@@ -6,6 +7,7 @@ import PedidosClient from "./PedidosClient";
 export const dynamic = "force-dynamic";
 
 export default async function PedidosPage() {
+  await requireNavAccess("/admin/pedidos");
   const [store, cur] = await Promise.all([getStore(), getCurrentStore()]);
   return (
     <>

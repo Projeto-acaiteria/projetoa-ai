@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/service-orders-store";
 import { listStaff } from "@/lib/staff-store";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default async function OSDetail({ params }: { params: Promise<{ id: string }> }) {
+  await requireNavAccess("/admin/os");
   const { id } = await params;
   const [res, staff] = await Promise.all([getServiceOrder(id), listStaff()]);
   if (!res) notFound();

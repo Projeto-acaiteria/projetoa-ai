@@ -1,4 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { getStore, getCardMachines } from "@/lib/settings-store";
 import { readMenu } from "@/lib/menu-store";
 import { readBarMenu } from "@/lib/menu-bar-store";
@@ -13,6 +14,7 @@ import MesasBarClient from "./MesasBarClient";
 export const dynamic = "force-dynamic";
 
 export default async function MesasPage() {
+  await requireNavAccess("/admin/mesas");
   const storeId = await resolveStoreId();
   const cfg = await getStoreConfig(storeId);
   const isRelacional = cfg?.menu_template === "bar" || cfg?.menu_template === "grid";

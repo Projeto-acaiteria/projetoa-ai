@@ -1,4 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { IconAlert } from "@/components/Icons";
 import { cmvReport } from "@/lib/cmv-store";
 import { todayBR, addDiasBR, inicioDiaBR } from "@/lib/date-br";
@@ -21,6 +22,7 @@ function rangeISO(r: Range): { from?: string; to?: string } {
 }
 
 export default async function CmvPage({ searchParams }: { searchParams: Promise<{ r?: string }> }) {
+  await requireNavAccess("/admin/cmv");
   const sp = await searchParams;
   const r: Range = sp.r === "7d" || sp.r === "tudo" ? sp.r : "mes";
   const { from, to } = rangeISO(r);

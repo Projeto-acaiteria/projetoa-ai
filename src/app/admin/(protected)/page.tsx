@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { dateBR, todayBR } from "@/lib/date-br";
@@ -22,6 +23,7 @@ const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregu
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
+  await requireNavAccess("/admin");
   // vertical-aware: assistência técnica (serviço) tem Início de OS, não o dashboard de food.
   const store0 = await getCurrentStore();
   const cfg0 = store0 ? await getStoreConfig(store0.id) : null;

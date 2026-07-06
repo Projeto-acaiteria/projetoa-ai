@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { readMenu } from "@/lib/menu-store";
 import { listStock } from "@/lib/stock-store";
 import { getFees, getStore, getCardMachines, hasCashPin } from "@/lib/settings-store";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 const VENDA_CATS = ["sorvete", "picole", "bebida", "salgado", "doce"];
 
 export default async function CaixaPage() {
+  await requireNavAccess("/admin/caixa");
   const menu = await readMenu();
   const stock = await listStock();
   const fees = await getFees();

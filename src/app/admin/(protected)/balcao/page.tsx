@@ -1,4 +1,5 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { readBarMenu } from "@/lib/menu-bar-store";
 import { getStore, getCardMachines } from "@/lib/settings-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 // Venda de balcão pro menu relacional (bar/grid/marmitaria). Operador pesa/lança e recebe.
 export default async function BalcaoPage() {
+  await requireNavAccess("/admin/balcao");
   const storeId = await resolveStoreId();
   const [categories, store, machines, cfg] = await Promise.all([readBarMenu(), getStore(), getCardMachines(), getStoreConfig(storeId)]);
   return (

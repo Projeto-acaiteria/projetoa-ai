@@ -1,7 +1,9 @@
 import { PageHeader, Badge } from "@/components/admin/ui";
+import { requireNavAccess } from "@/lib/auth/guard";
 import FidelidadeClient from "./FidelidadeClient";
 
-export default function FidelidadePage() {
+export default async function FidelidadePage() {
+  await requireNavAccess("/admin/fidelidade");
   return (
     <>
       <PageHeader

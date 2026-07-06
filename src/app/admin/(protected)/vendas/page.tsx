@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requireNavAccess } from "@/lib/auth/guard";
 import { getCurrentStore } from "@/lib/auth/store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
@@ -10,6 +11,7 @@ import VendasClient from "./VendasClient";
 export const dynamic = "force-dynamic";
 
 export default async function VendasPage() {
+  await requireNavAccess("/admin/vendas");
   // tela EXCLUSIVA da vertical de serviço (AT). Food vende pelo Balcão/Caixa.
   const store = await getCurrentStore();
   const cfg = store ? await getStoreConfig(store.id) : null;
