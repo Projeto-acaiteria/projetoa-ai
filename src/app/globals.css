@@ -7,13 +7,14 @@
 ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Brand · ComandaPRO (índigo premium SaaS — sistema; o cardápio público usa a cor da loja) ── */
-  --brand-900: #312E81;  /* indigo-900 */
-  --brand-800: #3730A3;  /* indigo-800 */
-  --brand-700: #4338CA;  /* indigo-700 */
-  --brand-600: #4F46E5;  /* indigo-600 · primary / CTAs */
-  --brand-500: #6366F1;  /* indigo-500 */
-  --brand-400: #818CF8;  /* indigo-400 */
+  /* ── Brand · ComandaPRO (PADRÃO PRETO/BRANCO — neutro do sistema; cada negócio personaliza a cor,
+        e o cardápio público usa a cor da loja. Tenant novo nasce preto/branco por padrão.) ── */
+  --brand-900: #0a0a0a;  /* near-black */
+  --brand-800: #171717;
+  --brand-700: #262626;
+  --brand-600: #171717;  /* primary / CTAs — preto */
+  --brand-500: #404040;
+  --brand-400: #737373;
   --accent:    #B45309;  /* âmbar escuro · destaque "pago/premium" legível */
   --accent-2:  #F59E0B;  /* âmbar · status pago / detalhes */
   --lime:      #16A34A;  /* verde · "grátis" / positivo */
@@ -39,7 +40,7 @@
   /* ── Sombras (neutras + glow índigo no brand) ── */
   --shadow-card:    0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
   --shadow-pop:     0 12px 40px rgba(15, 23, 42, 0.18);
-  --shadow-brand:   0 10px 30px rgba(79, 70, 229, 0.30);
+  --shadow-brand:   0 10px 30px rgba(0, 0, 0, 0.18);
 }
 
 @theme inline {

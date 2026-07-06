@@ -26,6 +26,13 @@ import {
 import type { Role } from "@/lib/auth/store";
 import { canSeeNav } from "@/lib/auth/roles";
 import type { Family } from "@/config/segments";
+import { brandVars } from "@/lib/brand-theme";
+
+// Marca do painel: logo da loja se houver, senão a INICIAL do nome (neutro — nada de ícone de açaí).
+function BrandMark({ logoUrl, name }: { logoUrl?: string; name: string }) {
+  if (logoUrl) return <span className="h-full w-full rounded-xl bg-cover bg-center" style={{ backgroundImage: `url("${logoUrl}")` }} aria-hidden />;
+  return <span className="font-extrabold">{(name.trim()[0] || "?").toUpperCase()}</span>;
+}
 
 // NAV por SEGMENTO: cada negócio vê só o seu sistema (gate pelas flags do store_config).
 // "Caixa" aparece pra todos (gestão de caixa); o PDV de copo dentro dele é só pra açaí (ver caixa/page).
@@ -55,7 +62,7 @@ const NAV: NavItem[] = [
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName, nav, billing }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null }) {
+export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -83,12 +90,12 @@ export default function AdminShell({ children, storeName, nav, billing }: { chil
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={brandVars(brandColor)}>
       {/* Sidebar desktop */}
       <aside className="hidden border-r border-line bg-bg-elevated lg:flex lg:flex-col">
         <div className="flex items-center gap-2.5 px-5 py-5">
           <div className="grid h-10 w-10 place-items-center rounded-xl brand-gradient text-white">
-            <IconBowl width={22} height={22} />
+            <BrandMark logoUrl={logoUrl} name={storeName} />
           </div>
           <div className="leading-tight">
             <div className="text-sm font-extrabold text-ink">{storeName}</div>
@@ -106,7 +113,7 @@ export default function AdminShell({ children, storeName, nav, billing }: { chil
         <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-bg-elevated/95 px-4 py-3 backdrop-blur lg:hidden">
           <div className="flex items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-lg brand-gradient text-white">
-              <IconBowl width={19} height={19} />
+              <BrandMark logoUrl={logoUrl} name={storeName} />
             </div>
             <span className="text-sm font-extrabold text-ink">{storeName}</span>
           </div>
@@ -126,7 +133,7 @@ export default function AdminShell({ children, storeName, nav, billing }: { chil
             <div className="absolute left-0 top-0 h-full w-72 animate-pop bg-bg-elevated p-4 shadow-[var(--shadow-pop)]">
               <div className="mb-4 flex items-center gap-2.5 px-1">
                 <div className="grid h-10 w-10 place-items-center rounded-xl brand-gradient text-white">
-                  <IconBowl width={22} height={22} />
+                  <BrandMark logoUrl={logoUrl} name={storeName} />
                 </div>
                 <span className="text-sm font-extrabold text-ink">{storeName}</span>
               </div>

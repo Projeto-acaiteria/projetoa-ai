@@ -11,6 +11,9 @@ import { getCurrentStore } from "@/lib/auth/store";
 import { weightSoldPeriods, type WeightSoldReport } from "@/lib/weight-report";
 import SetupChecklist from "@/components/admin/SetupChecklist";
 import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
+import { getStoreConfig } from "@/lib/auth/store-config";
+import { familyOf } from "@/config/segments";
+import { listServiceOrders } from "@/lib/service-orders-store";
 
 const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
@@ -19,6 +22,11 @@ const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregu
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
+  // vertical-aware: assistência técnica (serviço) tem Início de OS, não o dashboard de food.
+  const store0 = await getCurrentStore();
+  const cfg0 = store0 ? await getStoreConfig(store0.id) : null;
+  if (familyOf(cfg0?.business_type) === "service") return <ATHome />;
+
   // caixa fechado NÃO bloqueia mais — vira um aviso suave (login cai no painel, não na tela de abrir caixa)
   const semCaixa = !(await getOpenSession());
 
@@ -175,6 +183,52 @@ export default async function AdminHome() {
           </div>
         </Card>
       )}
+    </>
+  );
+}
+
+// Início do vertical de ASSISTÊNCIA TÉCNICA: agenda de OS, não vendas/cardápio.
+async function ATHome() {
+  const orders = await listServiceOrders();
+  const abertas = orders.filter((o) => o.status !== "entregue" && o.status !== "cancelado");
+  const emReparo = orders.filter((o) => o.status === "em_reparo").length;
+  const prontas = orders.filter((o) => o.status === "pronto").length;
+  const aguardando = orders.filter((o) => o.status === "aguardando").length;
+  const today = todayBR();
+  const quitadasHoje = orders.filter((o) => o.paymentStatus === "quitada" && o.paidAt && dateBR(o.paidAt) === today);
+  const faturadoHoje = quitadasHoje.reduce((s, o) => s + o.totalCents, 0);
+
+  return (
+    <>
+      <PageHeader title="Início" sub="Sua assistência técnica hoje" />
+
+      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div className="card stagger-item relative flex flex-col justify-between gap-6 overflow-hidden p-6" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--brand-600) 7%, var(--bg-elevated)) 0%, var(--bg-elevated) 55%)" }}>
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: "linear-gradient(90deg, var(--brand-600), transparent)" }} aria-hidden />
+          <div className="relative flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Faturado hoje (OS quitadas)</span>
+            <Badge tone="muted">tempo real</Badge>
+          </div>
+          <div className="relative">
+            <div className="text-5xl font-semibold tracking-tight text-ink tabular-nums sm:text-6xl">{brl(faturadoHoje)}</div>
+            <div className="mt-1.5 text-sm text-[var(--text-muted)]">{quitadasHoje.length} OS quitada{quitadasHoje.length === 1 ? "" : "s"} hoje</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <MiniStat label="OS abertas" value={String(abertas.length)} />
+          <MiniStat label="Em reparo" value={String(emReparo)} />
+          <MiniStat label="Prontas p/ retirada" value={String(prontas)} accent="ok" />
+          <MiniStat label="Aguardando" value={String(aguardando)} />
+        </div>
+      </div>
+
+      <Link href="/admin/os" className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-4 transition hover:border-brand-400">
+        <span className="text-sm">
+          <span className="block font-bold text-ink">Ordens de serviço</span>
+          <span className="text-[var(--text-muted)]">{orders.length === 0 ? "Faça o check-in do primeiro aparelho." : `${abertas.length} em aberto · abrir a agenda completa.`}</span>
+        </span>
+        <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">Ver OS</span>
+      </Link>
     </>
   );
 }

@@ -32,7 +32,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     family: familyOf(cfg?.business_type),
   };
   return (
-    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)}>
+    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
       <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
       {children}
