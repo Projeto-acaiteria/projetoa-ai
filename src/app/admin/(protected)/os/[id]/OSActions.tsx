@@ -1,0 +1,76 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/admin/ui";
+
+const STATUSES = [
+  { k: "aguardando", label: "Aguardando" },
+  { k: "em_reparo", label: "Em reparo" },
+  { k: "pronto", label: "Pronto" },
+  { k: "entregue", label: "Entregue" },
+] as const;
+const PAYS: [string, string][] = [["pix", "PIX"], ["dinheiro", "Dinheiro"], ["cartao", "Cartão"]];
+
+export default function OSActions({ id, status, paymentStatus }: { id: string; status: string; paymentStatus: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+
+  async function api(action: string, payload: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
+      router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  const quitada = paymentStatus === "quitada";
+  const cancelada = status === "cancelado";
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div>
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Situação</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {STATUSES.map((s) => (
+            <button key={s.k} disabled={busy || status === s.k || cancelada} onClick={() => api("status", { id, status: s.k })}
+              className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${status === s.k ? "brand-gradient border-transparent text-white" : "border-line text-ink hover:border-brand-600"} disabled:opacity-50`}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {!cancelada && (
+          <button disabled={busy} onClick={() => confirm("Cancelar esta OS?") && api("status", { id, status: "cancelado" })} className="mt-2 text-xs font-bold text-red-500">
+            Cancelar OS
+          </button>
+        )}
+        {cancelada && <div className="mt-2 text-xs font-bold text-red-500">OS cancelada</div>}
+      </div>
+
+      <div className="border-t border-line pt-4">
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Pagamento</h3>
+        {quitada ? (
+          <div className="rounded-lg border border-[var(--green-ok)]/40 bg-[var(--green-ok)]/10 px-3 py-2 text-sm font-bold text-[var(--green-ok)]">✓ Quitada</div>
+        ) : !payOpen ? (
+          <button disabled={busy || cancelada} onClick={() => setPayOpen(true)} className="w-full rounded-xl brand-gradient px-4 py-3 text-sm font-bold uppercase text-white disabled:opacity-50">
+            Quitar OS
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-xs text-[var(--text-muted)]">Forma de pagamento:</div>
+            <div className="grid grid-cols-3 gap-2">
+              {PAYS.map(([k, l]) => (
+                <button key={k} disabled={busy} onClick={() => api("quitar", { id, paymentMethod: k })} className="rounded-lg border border-line px-2 py-2.5 text-xs font-bold text-ink hover:border-brand-600 disabled:opacity-50">
+                  {l}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setPayOpen(false)} className="text-xs text-[var(--text-muted)]">cancelar</button>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-[var(--text-faded)]">Quitar gera a comissão do técnico e dá baixa nas peças do estoque.</p>
+      </div>
+    </Card>
+  );
+}

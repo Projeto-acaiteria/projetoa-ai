@@ -131,6 +131,27 @@ export async function updateOSStatus(id: string, status: OSStatus, storeId?: str
   await db().from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
+/** Quita a OS: marca paga (nasce a comissão, via osCommissionCents) e dá BAIXA no estoque das peças.
+ *  A baixa é best-effort (peça sem SKU no estoque não trava a quitação). */
+export async function quitarOS(id: string, paymentMethod?: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const now = new Date().toISOString();
+  await db().from("service_orders").update({
+    payment_status: "quitada", paid_at: now, payment_method: paymentMethod ?? null, updated_at: now,
+  }).eq("id", id).eq("store_id", sid);
+  try {
+    const { data: parts } = await db().from("os_parts").select("sku, qty").eq("os_id", id).eq("store_id", sid);
+    for (const p of (parts ?? []) as { sku: string | null; qty: number }[]) {
+      if (!p.sku) continue;
+      const { data: item } = await db().from("stock_items").select("data").eq("store_id", sid).eq("id", p.sku).maybeSingle();
+      if (!item) continue;
+      const d = (item as { data: Record<string, unknown> }).data ?? {};
+      const newQty = Math.max(0, Number(d.qty ?? 0) - Number(p.qty ?? 0));
+      await db().from("stock_items").update({ data: { ...d, qty: newQty, updatedAt: now.slice(0, 10) } }).eq("store_id", sid).eq("id", p.sku);
+    }
+  } catch { /* baixa não-fatal */ }
+}
+
 // Peça de uma montagem (componente escolhido no montador). priceCents = preço de venda cobrado.
 export type MontagemPart = { sku: string; name: string; priceCents: number };
 

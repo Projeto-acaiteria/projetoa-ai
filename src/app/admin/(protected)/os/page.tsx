@@ -54,7 +54,8 @@ export default async function OSPage() {
 
 function OSRow({ os }: { os: Awaited<ReturnType<typeof listServiceOrders>>[number] }) {
   return (
-    <Card className="flex items-center justify-between gap-3 p-4">
+    <Link href={`/admin/os/${os.id}`} className="block">
+      <Card className="flex items-center justify-between gap-3 p-4 transition hover:border-brand-600">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-brand-600">{os.code ?? os.id.slice(0, 8)}</span>
@@ -67,6 +68,7 @@ function OSRow({ os }: { os: Awaited<ReturnType<typeof listServiceOrders>>[numbe
         <div className="font-mono text-sm font-bold text-ink">{brl(os.totalCents)}</div>
         <div className="text-[10px] text-[var(--text-muted)]">{os.paymentStatus}</div>
       </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }

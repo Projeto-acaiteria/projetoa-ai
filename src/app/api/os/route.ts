@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { createServiceOrder, updateOSStatus, createMontagemOS, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, createMontagemOS, quitarOS, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +33,9 @@ export async function POST(req: Request) {
       }
       case "status":
         await updateOSStatus(String(p.id), String(p.status) as OSStatus, storeId);
+        return NextResponse.json({ ok: true });
+      case "quitar":
+        await quitarOS(String(p.id), p.paymentMethod ? String(p.paymentMethod) : undefined, storeId);
         return NextResponse.json({ ok: true });
       case "montagem": {
         const parts = Array.isArray(p.parts) ? (p.parts as MontagemPart[]) : [];
