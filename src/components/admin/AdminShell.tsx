@@ -25,28 +25,31 @@ import {
 } from "@/components/Icons";
 import type { Role } from "@/lib/auth/store";
 import { canSeeNav } from "@/lib/auth/roles";
+import type { Family } from "@/config/segments";
 
 // NAV por SEGMENTO: cada negócio vê só o seu sistema (gate pelas flags do store_config).
 // "Caixa" aparece pra todos (gestão de caixa); o PDV de copo dentro dele é só pra açaí (ver caixa/page).
 // "Balcão" (cardápio relacional) só pra bar/grid; açaí vende pelo Caixa.
-export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean; role: Role };
-type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean };
+export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean; role: Role; family: Family };
+// family: "food" = cardápio/mesas; "service" = OS/bancada (assistência técnica). Item sem family = core (todo vertical).
+type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean; family?: Family };
 const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/minha-area", label: "Minha área", Icon: IconClock },
+  { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
-  { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai" },
-  { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables },
-  { href: "/admin/garcons", label: "Garçons", Icon: IconUsers, show: (c) => c.hasTables },
-  { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt, show: (c) => c.hasDelivery },
-  { href: "/admin/preparo", label: "Preparo", Icon: IconFlame, show: (c) => c.hasStations },
-  { href: "/admin/eventos", label: "Shows", Icon: IconMusic, show: (c) => c.coverEnabled },
-  { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl },
+  { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai", family: "food" },
+  { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables, family: "food" },
+  { href: "/admin/garcons", label: "Garçons", Icon: IconUsers, show: (c) => c.hasTables, family: "food" },
+  { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt, show: (c) => c.hasDelivery, family: "food" },
+  { href: "/admin/preparo", label: "Preparo", Icon: IconFlame, show: (c) => c.hasStations, family: "food" },
+  { href: "/admin/eventos", label: "Shows", Icon: IconMusic, show: (c) => c.coverEnabled, family: "food" },
+  { href: "/admin/cardapio", label: "Cardápio", Icon: IconBowl, family: "food" },
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox, show: (c) => c.hasEstoque },
-  { href: "/admin/cmv", label: "CMV", Icon: IconChart, show: (c) => c.hasEstoque },
+  { href: "/admin/cmv", label: "CMV", Icon: IconChart, show: (c) => c.hasEstoque, family: "food" },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
   { href: "/admin/cupons", label: "Cupons", Icon: IconGift },
-  { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled },
+  { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled, family: "food" },
   { href: "/admin/clientes", label: "Clientes", Icon: IconUsers },
   { href: "/admin/impressora", label: "Impressora", Icon: IconPrinter },
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
@@ -58,7 +61,7 @@ export default function AdminShell({ children, storeName, nav, billing }: { chil
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <nav className="flex flex-col gap-1">
-      {NAV.filter((n) => (!n.show || n.show(nav)) && canSeeNav(nav.role, n.href)).map(({ href, label, Icon }) => {
+      {NAV.filter((n) => (!n.show || n.show(nav)) && (!n.family || n.family === nav.family) && canSeeNav(nav.role, n.href)).map(({ href, label, Icon }) => {
         const active = href === "/admin" ? path === href : path.startsWith(href);
         return (
           <Link

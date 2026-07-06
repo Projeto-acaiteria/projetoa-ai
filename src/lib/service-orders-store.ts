@@ -1,0 +1,140 @@
+// ComandaPRO — vertical de ASSISTÊNCIA TÉCNICA: ordens de serviço (OS). Server-side, por loja, em centavos.
+// Técnico reusa staff (staff_id). Comissão = service_value da OS QUITADA (peça nunca entra na base).
+import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
+
+const num = (v: unknown) => Number(v ?? 0);
+const str = (v: unknown) => (v == null ? null : String(v));
+
+export type OSStatus = "aguardando" | "em_reparo" | "pronto" | "entregue" | "cancelado";
+export type OSPaymentStatus = "aberta" | "parcial" | "quitada";
+
+export type OSPart = { id: string; sku: string | null; name: string; qty: number; unitCostCents: number };
+
+export type ServiceOrder = {
+  id: string;
+  code: string | null;
+  customerName: string;
+  customerPhone: string;
+  device: string;
+  imei: string | null;
+  problem: string;
+  diagnosis: string | null;
+  status: OSStatus;
+  staffId: string | null;
+  commissionPercent: number;
+  serviceValueCents: number;
+  partsValueCents: number;
+  discountCents: number;
+  totalCents: number;
+  paymentStatus: OSPaymentStatus;
+  paidAt: string | null;
+  createdAt: string;
+};
+
+const STATUSES: OSStatus[] = ["aguardando", "em_reparo", "pronto", "entregue", "cancelado"];
+const asStatus = (v: unknown): OSStatus => (STATUSES.includes(v as OSStatus) ? (v as OSStatus) : "aguardando");
+const asPay = (v: unknown): OSPaymentStatus => (v === "quitada" ? "quitada" : v === "parcial" ? "parcial" : "aberta");
+
+const toOS = (r: Record<string, unknown>): ServiceOrder => ({
+  id: String(r.id),
+  code: str(r.code),
+  customerName: String(r.customer_name ?? ""),
+  customerPhone: String(r.customer_phone ?? ""),
+  device: String(r.device ?? ""),
+  imei: str(r.imei),
+  problem: String(r.problem ?? ""),
+  diagnosis: str(r.diagnosis),
+  status: asStatus(r.status),
+  staffId: str(r.staff_id),
+  commissionPercent: num(r.commission_percent),
+  serviceValueCents: num(r.service_value_cents),
+  partsValueCents: num(r.parts_value_cents),
+  discountCents: num(r.discount_cents),
+  totalCents: num(r.total_cents),
+  paymentStatus: asPay(r.payment_status),
+  paidAt: str(r.paid_at),
+  createdAt: String(r.created_at ?? ""),
+});
+
+/** Comissão da OS em centavos: só nasce quando QUITADA; sempre sobre service_value (nunca peça). */
+export function osCommissionCents(os: ServiceOrder): number {
+  if (os.paymentStatus !== "quitada") return 0;
+  return Math.round((os.serviceValueCents * os.commissionPercent) / 100);
+}
+
+export async function listServiceOrders(
+  opts?: { status?: OSStatus; staffId?: string },
+  storeId?: string,
+): Promise<ServiceOrder[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  let q = db().from("service_orders").select("*").eq("store_id", sid);
+  if (opts?.status) q = q.eq("status", opts.status);
+  if (opts?.staffId) q = q.eq("staff_id", opts.staffId);
+  const { data } = await q.order("created_at", { ascending: false });
+  return ((data ?? []) as Record<string, unknown>[]).map(toOS);
+}
+
+/** OS de um técnico (a "agenda dele"). */
+export async function listByTechnician(staffId: string, storeId?: string): Promise<ServiceOrder[]> {
+  return listServiceOrders({ staffId }, storeId);
+}
+
+export async function getServiceOrder(id: string, storeId?: string): Promise<{ os: ServiceOrder; parts: OSPart[] } | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data } = await db().from("service_orders").select("*").eq("id", id).eq("store_id", sid).maybeSingle();
+  if (!data) return null;
+  const { data: p } = await db().from("os_parts").select("*").eq("os_id", id).eq("store_id", sid);
+  const parts: OSPart[] = ((p ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id), sku: str(r.sku), name: String(r.name ?? ""), qty: num(r.qty), unitCostCents: num(r.unit_cost_cents),
+  }));
+  return { os: toOS(data as Record<string, unknown>), parts };
+}
+
+export type NewOSInput = {
+  customerName: string;
+  customerPhone?: string;
+  device: string;
+  imei?: string;
+  problem?: string;
+  staffId?: string;
+  commissionPercent?: number;
+  serviceValueCents?: number;
+  partsValueCents?: number;
+};
+
+export async function createServiceOrder(input: NewOSInput, storeId?: string): Promise<ServiceOrder> {
+  const sid = storeId ?? (await resolveStoreId());
+  const service = Math.max(0, Math.round(input.serviceValueCents ?? 0));
+  const parts = Math.max(0, Math.round(input.partsValueCents ?? 0));
+  const { data, error } = await db().from("service_orders").insert({
+    store_id: sid,
+    customer_name: input.customerName.trim(),
+    customer_phone: (input.customerPhone ?? "").trim(),
+    device: input.device.trim(),
+    imei: input.imei?.trim() || null,
+    problem: (input.problem ?? "").trim(),
+    staff_id: input.staffId ?? null,
+    commission_percent: Math.max(0, Number(input.commissionPercent ?? 0)),
+    service_value_cents: service,
+    parts_value_cents: parts,
+    total_cents: service + parts,
+    status: "aguardando",
+    payment_status: "aberta",
+  }).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao abrir OS.");
+  return toOS(data);
+}
+
+export async function updateOSStatus(id: string, status: OSStatus, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+export const OS_STATUS_LABEL: Record<OSStatus, string> = {
+  aguardando: "Aguardando",
+  em_reparo: "Em reparo",
+  pronto: "Pronto p/ retirada",
+  entregue: "Entregue",
+  cancelado: "Cancelado",
+};

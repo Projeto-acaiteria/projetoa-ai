@@ -60,6 +60,7 @@ const WA_NOUN: Record<BusinessType, { noun: string; emoji: string }> = {
   pizzaria: { noun: "sua pizza", emoji: "🍕" },
   sushi: { noun: "seu pedido", emoji: "🍣" },
   hamburgueria: { noun: "seu lanche", emoji: "🍔" },
+  assistencia_tecnica: { noun: "seu aparelho", emoji: "🔧" },
   petiscaria: { noun: "seu pedido", emoji: "🍢" },
   bar: { noun: "seu pedido", emoji: "🍻" },
 };

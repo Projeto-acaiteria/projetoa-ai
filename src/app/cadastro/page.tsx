@@ -16,6 +16,7 @@ const SEG_DESC: Record<BusinessType, string> = {
   hamburgueria: "Lanches, combos e adicionais — balcão, mesa e delivery.",
   petiscaria: "Mesas, balcão e estações — comanda estilo bar.",
   bar: "Comanda, couvert de show, dose/garrafa e estações.",
+  assistencia_tecnica: "Ordens de serviço, técnicos, peças e comissão por reparo.",
 };
 
 const FEATURE_LABEL: Partial<Record<keyof Features, string>> = {

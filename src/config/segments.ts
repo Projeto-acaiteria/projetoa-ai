@@ -11,7 +11,14 @@ export type BusinessType =
   | "sushi"
   | "hamburgueria"
   | "petiscaria"
-  | "bar";
+  | "bar"
+  | "assistencia_tecnica"; // 1º vertical NÃO-food (OS/técnico/peças) — ver COMANDAPRO-PAPEIS-PLANO / vertical AT
+
+// Família do vertical: separa food (cardápio/mesas) de serviço (OS/bancada). Gate de nav por vertical.
+export type Family = "food" | "service";
+export function familyOf(bt?: string | null): Family {
+  return bt === "assistencia_tecnica" ? "service" : "food";
+}
 
 // 3 modelos de cardápio público: acai (monta no copo) | bar (comanda estilo Medellín) | grid (foto grande).
 export type MenuTemplate = "acai" | "bar" | "grid";
@@ -72,6 +79,11 @@ export const SEGMENTOS: Record<BusinessType, { label: string; menuTemplate: Menu
     label: "Bar / Choperia",
     menuTemplate: "bar",
     features: { sellsByWeight: false, hasBalcao: true, hasTables: true, hasDelivery: false, coverEnabled: true, stockDose: true, hasStations: true, loyaltyEnabled: false },
+  },
+  assistencia_tecnica: {
+    label: "Assistência Técnica",
+    menuTemplate: "grid", // não usa cardápio público; placeholder (a cara pública da AT vem depois)
+    features: { sellsByWeight: false, hasBalcao: false, hasTables: false, hasDelivery: false, coverEnabled: false, stockDose: false, hasStations: false, loyaltyEnabled: false },
   },
 };
 

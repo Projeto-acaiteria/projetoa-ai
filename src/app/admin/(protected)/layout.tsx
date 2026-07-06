@@ -5,6 +5,7 @@ import { getStore } from "@/lib/settings-store";
 import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { familyOf } from "@/config/segments";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     loyaltyEnabled: !!cfg?.loyalty_enabled,
     hasEstoque: !!cfg?.has_estoque,
     role: role ?? "owner",
+    family: familyOf(cfg?.business_type),
   };
   return (
     <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)}>
