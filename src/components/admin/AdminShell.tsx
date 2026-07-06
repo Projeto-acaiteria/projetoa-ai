@@ -44,6 +44,7 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/minha-area", label: "Minha área", Icon: IconClock },
   { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
+  { href: "/admin/vendas", label: "Vendas", Icon: IconBag, family: "service" },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai", family: "food" },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables, family: "food" },

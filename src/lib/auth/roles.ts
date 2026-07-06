@@ -7,6 +7,7 @@ import type { Role } from "@/lib/auth/store";
 const RECEPTION_NAV = new Set<string>([
   "/admin",
   "/admin/os", // recepção recebe o cliente e monta/abre a OS (assistência técnica)
+  "/admin/vendas", // recepção opera o balcão de peças/periféricos
   "/admin/caixa",
   "/admin/balcao",
   "/admin/mesas",

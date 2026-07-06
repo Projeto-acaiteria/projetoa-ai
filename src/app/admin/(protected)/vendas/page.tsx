@@ -1,0 +1,29 @@
+import { redirect } from "next/navigation";
+import { getCurrentStore } from "@/lib/auth/store";
+import { getStoreConfig } from "@/lib/auth/store-config";
+import { familyOf } from "@/config/segments";
+import { listStock } from "@/lib/stock-store";
+import { listOrders } from "@/lib/orders-store";
+import VendasClient from "./VendasClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function VendasPage() {
+  // tela EXCLUSIVA da vertical de serviço (AT). Food vende pelo Balcão/Caixa.
+  const store = await getCurrentStore();
+  const cfg = store ? await getStoreConfig(store.id) : null;
+  if (familyOf(cfg?.business_type) !== "service") redirect("/admin");
+
+  const [stock, orders] = await Promise.all([listStock(), listOrders()]);
+  const products = stock
+    .filter((s) => Number(s.sellPriceCents ?? 0) > 0)
+    .map((s) => ({ sku: s.id, name: s.name, category: String(s.category), priceCents: Number(s.sellPriceCents), stock: Number(s.qty ?? 0) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const recentes = orders
+    .filter((o) => o.mode === "balcao" && o.status === "entregue" && !o.cancelled)
+    .slice(0, 8)
+    .map((o) => ({ display: o.display, totalCents: o.totalCents, paymentMethod: o.paymentMethod ?? null, count: o.items.reduce((n, i) => n + i.qty, 0) }));
+
+  return <VendasClient products={products} recentes={recentes} />;
+}
