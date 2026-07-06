@@ -1,5 +1,6 @@
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { listServiceOrders, OS_STATUS_LABEL, type OSStatus } from "@/lib/service-orders-store";
+import Link from "next/link";
 import NovaOSButton from "./NovaOSButton";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export default async function OSPage() {
       <PageHeader
         title="Ordens de Serviço"
         sub="Recebimento do aparelho → orçamento → reparo → entrega"
-        action={<div className="flex items-center gap-2"><NovaOSButton /><Badge tone="lime">assistência técnica</Badge></div>}
+        action={<div className="flex items-center gap-2"><Link href="/admin/os/montar" className="rounded-xl border border-line px-4 py-2.5 text-sm font-bold text-ink hover:border-brand-600">Montar PC</Link><NovaOSButton /></div>}
       />
 
       {orders.length === 0 ? (

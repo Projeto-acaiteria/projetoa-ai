@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { createServiceOrder, updateOSStatus, type OSStatus } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, createMontagemOS, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +34,17 @@ export async function POST(req: Request) {
       case "status":
         await updateOSStatus(String(p.id), String(p.status) as OSStatus, storeId);
         return NextResponse.json({ ok: true });
+      case "montagem": {
+        const parts = Array.isArray(p.parts) ? (p.parts as MontagemPart[]) : [];
+        if (!parts.length) return NextResponse.json({ error: "Nenhuma peça na montagem." }, { status: 400 });
+        const os = await createMontagemOS({
+          customerName: String(p.customerName ?? "").trim() || "Cliente",
+          customerPhone: p.customerPhone ? String(p.customerPhone) : undefined,
+          parts,
+          montagemFeeCents: p.montagemFeeCents != null ? Number(p.montagemFeeCents) : undefined,
+        }, storeId);
+        return NextResponse.json({ ok: true, id: os.id });
+      }
       default:
         return NextResponse.json({ error: "ação inválida" }, { status: 400 });
     }

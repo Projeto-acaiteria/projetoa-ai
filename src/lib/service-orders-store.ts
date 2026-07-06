@@ -131,6 +131,43 @@ export async function updateOSStatus(id: string, status: OSStatus, storeId?: str
   await db().from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
+// Peça de uma montagem (componente escolhido no montador). priceCents = preço de venda cobrado.
+export type MontagemPart = { sku: string; name: string; priceCents: number };
+
+/** Gera uma OS de MONTAGEM: cria a service_order + os_parts de cada componente.
+ *  parts_value = soma das peças; service_value = taxa de montagem (mão-de-obra). */
+export async function createMontagemOS(
+  input: { customerName: string; customerPhone?: string; parts: MontagemPart[]; montagemFeeCents?: number; staffId?: string; commissionPercent?: number },
+  storeId?: string,
+): Promise<ServiceOrder> {
+  const sid = storeId ?? (await resolveStoreId());
+  const partsValue = input.parts.reduce((s, p) => s + Math.max(0, Math.round(p.priceCents)), 0);
+  const service = Math.max(0, Math.round(input.montagemFeeCents ?? 0));
+  const { data, error } = await db().from("service_orders").insert({
+    store_id: sid,
+    customer_name: input.customerName.trim(),
+    customer_phone: (input.customerPhone ?? "").trim(),
+    device: `Montagem de PC (${input.parts.length} peças)`,
+    problem: "Montagem de PC / setup",
+    staff_id: input.staffId ?? null,
+    commission_percent: Math.max(0, Number(input.commissionPercent ?? 0)),
+    service_value_cents: service,
+    parts_value_cents: partsValue,
+    total_cents: service + partsValue,
+    status: "aguardando",
+    payment_status: "aberta",
+  }).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao gerar a OS de montagem.");
+  const osId = String((data as Record<string, unknown>).id);
+  if (input.parts.length) {
+    const partRows = input.parts.map((p) => ({
+      store_id: sid, os_id: osId, sku: p.sku, name: p.name, qty: 1, unit_cost_cents: Math.max(0, Math.round(p.priceCents)),
+    }));
+    await db().from("os_parts").insert(partRows);
+  }
+  return toOS(data);
+}
+
 export const OS_STATUS_LABEL: Record<OSStatus, string> = {
   aguardando: "Aguardando",
   em_reparo: "Em reparo",
