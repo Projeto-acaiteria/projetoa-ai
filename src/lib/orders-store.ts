@@ -136,3 +136,11 @@ export async function cancelOrder(id: number, reason: string, by: string | undef
   const sid = storeId ?? (await resolveStoreId());
   return patchOrder(id, sid, (o) => ({ ...o, cancelled: true, cancelledAt: at, cancelReason: reason, cancelledBy: by }));
 }
+
+/** Confirma um pedido de balcão RECEBIDO (vindo do site): vira venda ENTREGUE, grava a forma de
+ *  pagamento e o custo congelado (CMV), marca consumed e move o createdAt pro momento da confirmação
+ *  (é quando o dinheiro entra → bucket de receita no dia certo). O chamador aplica a baixa depois. */
+export async function confirmBalcaoPedido(id: number, paymentMethod: PaymentMethod, consumes: Order["consumes"], at: string, storeId?: string): Promise<Order | null> {
+  const sid = storeId ?? (await resolveStoreId());
+  return patchOrder(id, sid, (o) => ({ ...o, status: "entregue", paymentMethod, consumes: consumes ?? o.consumes, consumed: true, createdAt: at }));
+}

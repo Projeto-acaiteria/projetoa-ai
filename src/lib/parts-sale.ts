@@ -1,4 +1,4 @@
-import { addOrder, type NewOrder, type OrderItem, type PaymentMethod, type Order } from "@/lib/orders-store";
+import { addOrder, getOrder, cancelOrder, confirmBalcaoPedido, type NewOrder, type OrderItem, type PaymentMethod, type Order } from "@/lib/orders-store";
 import { listStock, snapshotConsumes, applyConsumes } from "@/lib/stock-store";
 import { dateBR } from "@/lib/date-br";
 
@@ -76,4 +76,38 @@ export async function createPartsSale(
   }
 
   return { order, stockWarning };
+}
+
+// FASE 2 — o balcão gerencia os pedidos que o site mandou (status "recebido").
+
+/** Confirma um pedido do site (recebido) → vira venda ENTREGUE + baixa de estoque agora. Só pedido
+ *  pendente (idempotente: recusa se já confirmado/cancelado). Congela o custo no momento da confirmação. */
+export async function confirmPedido(
+  storeId: string,
+  id: number,
+  paymentMethod?: PaymentMethod,
+): Promise<{ order: Order; stockWarning: boolean } | { error: string }> {
+  const order = await getOrder(id, storeId);
+  if (!order) return { error: "Pedido não encontrado." };
+  if (order.cancelled) return { error: "Pedido cancelado." };
+  if (order.status !== "recebido") return { error: "Esse pedido já foi confirmado." };
+
+  const pm = PAY.includes(paymentMethod as PaymentMethod) ? (paymentMethod as PaymentMethod) : "dinheiro";
+  const nowIso = new Date().toISOString();
+  const consumes = (order.consumes ?? []).map((c) => ({ stockId: c.stockId, qty: c.qty }));
+  const snapshot = await snapshotConsumes(consumes, storeId); // congela custo (CMV) agora
+  const updated = await confirmBalcaoPedido(id, pm, snapshot, nowIso, storeId);
+  const { failed } = await applyConsumes(consumes, "Venda " + order.display, dateBR(nowIso), storeId);
+  return { order: updated ?? order, stockWarning: failed.length > 0 };
+}
+
+/** Cancela um pedido do site pendente (cliente desistiu / não apareceu). Só pedido recebido — não
+ *  mexe em venda já confirmada (isso seria estorno, outro fluxo). Não baixou estoque, nada a reverter. */
+export async function cancelPedido(storeId: string, id: number): Promise<{ ok: true } | { error: string }> {
+  const order = await getOrder(id, storeId);
+  if (!order) return { error: "Pedido não encontrado." };
+  if (order.status !== "recebido") return { error: "Só dá pra cancelar pedido ainda não confirmado." };
+  const nowIso = new Date().toISOString();
+  await cancelOrder(id, "cancelado no balcão", undefined, nowIso, storeId);
+  return { ok: true };
 }

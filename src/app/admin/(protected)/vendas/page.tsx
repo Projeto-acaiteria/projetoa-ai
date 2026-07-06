@@ -25,5 +25,19 @@ export default async function VendasPage() {
     .slice(0, 8)
     .map((o) => ({ display: o.display, totalCents: o.totalCents, paymentMethod: o.paymentMethod ?? null, count: o.items.reduce((n, i) => n + i.qty, 0) }));
 
-  return <VendasClient products={products} recentes={recentes} />;
+  // pedidos que o SITE mandou (recebido, ainda não confirmados no balcão)
+  const pedidos = orders
+    .filter((o) => o.mode === "balcao" && o.status === "recebido" && !o.cancelled)
+    .sort((a, b) => b.id - a.id)
+    .map((o) => ({
+      id: o.id,
+      display: o.display,
+      code: o.code ?? null,
+      customerName: o.customerName,
+      phone: o.phone,
+      totalCents: o.totalCents,
+      items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
+    }));
+
+  return <VendasClient products={products} recentes={recentes} pedidos={pedidos} />;
 }

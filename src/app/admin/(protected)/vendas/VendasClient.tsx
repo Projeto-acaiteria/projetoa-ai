@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { IconSearch, IconTrash, IconCart } from "@/components/Icons";
+import PedidosPendentes, { type Pedido } from "./PedidosPendentes";
 
 type Product = { sku: string; name: string; category: string; priceCents: number; stock: number };
 type Recente = { display: string; totalCents: number; paymentMethod: string | null; count: number };
@@ -17,7 +18,7 @@ const PAYS: { id: Pay; label: string }[] = [
   { id: "credito", label: "Crédito" },
 ];
 
-export default function VendasClient({ products, recentes }: { products: Product[]; recentes: Recente[] }) {
+export default function VendasClient({ products, recentes, pedidos }: { products: Product[]; recentes: Recente[]; pedidos: Pedido[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
@@ -90,6 +91,8 @@ export default function VendasClient({ products, recentes }: { products: Product
   return (
     <>
       <PageHeader title="Vendas" sub="Venda de peças e periféricos no balcão — entra no caixa, sem comissão de técnico" />
+
+      <PedidosPendentes pedidos={pedidos} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* CATÁLOGO */}
