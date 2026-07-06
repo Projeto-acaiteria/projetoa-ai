@@ -105,12 +105,21 @@ export type NewOSInput = {
   partsValueCents?: number;
 };
 
+// código curto rastreável da OS (mesmo espírito do pedido) — sem O/0/I/1/L pra não confundir ao ditar
+const OS_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function genOSCode(): string {
+  let s = "";
+  for (let i = 0; i < 6; i++) s += OS_CODE_ALPHABET[Math.floor(Math.random() * OS_CODE_ALPHABET.length)];
+  return s;
+}
+
 export async function createServiceOrder(input: NewOSInput, storeId?: string): Promise<ServiceOrder> {
   const sid = storeId ?? (await resolveStoreId());
   const service = Math.max(0, Math.round(input.serviceValueCents ?? 0));
   const parts = Math.max(0, Math.round(input.partsValueCents ?? 0));
   const { data, error } = await db().from("service_orders").insert({
     store_id: sid,
+    code: genOSCode(),
     customer_name: input.customerName.trim(),
     customer_phone: (input.customerPhone ?? "").trim(),
     device: input.device.trim(),
@@ -176,6 +185,7 @@ export async function createMontagemOS(
   const service = Math.max(0, Math.round(input.montagemFeeCents ?? 0));
   const { data, error } = await db().from("service_orders").insert({
     store_id: sid,
+    code: genOSCode(),
     customer_name: input.customerName.trim(),
     customer_phone: (input.customerPhone ?? "").trim(),
     device: `Montagem de PC (${input.parts.length} peças)`,

@@ -50,7 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       parts,
       montagemFeeCents: b.montagemFeeCents != null ? Number(b.montagemFeeCents) : undefined,
     }, storeId);
-    return NextResponse.json({ ok: true, osId: os.id }, { status: 201, headers: CORS });
+    return NextResponse.json({ ok: true, osId: os.id, code: os.code }, { status: 201, headers: CORS });
   } catch (e) {
     console.error("loja/montagem:", e);
     return NextResponse.json({ error: "Não consegui gerar a OS." }, { status: 500, headers: CORS });
