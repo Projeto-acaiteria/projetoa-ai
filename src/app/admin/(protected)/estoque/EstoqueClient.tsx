@@ -26,13 +26,33 @@ const CAT_LABEL: Record<StockCategory, string> = {
   embalagem: "Embalagens e descartáveis",
   limpeza: "Limpeza",
   outro: "Outros",
+  // hardware / informática
+  computadores: "Computadores e notebooks",
+  cpu: "Processadores (CPU)",
+  cooler: "Coolers e water",
+  mobo: "Placas-mãe",
+  ram: "Memórias (RAM)",
+  gpu: "Placas de vídeo (GPU)",
+  ssd: "SSD e armazenamento",
+  gabinete: "Gabinetes",
+  fonte: "Fontes",
+  mouse: "Mouses",
+  teclado: "Teclados",
+  mousepad: "Mousepads",
+  monitor: "Monitores",
+  headset: "Headsets",
+  cadeira: "Cadeiras gamer",
 };
 
-type FamilyKey = "venda" | "producao" | "operacao";
+type FamilyKey = "venda" | "producao" | "operacao" | "pc_pronto" | "componentes" | "perifericos";
 const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: string; soft: string }[] = [
   { key: "venda", label: "Produtos à venda", cats: ["sorvete", "picole", "bebida", "bebida_alcoolica", "salgado", "doce"], color: "#4F46E5", soft: "#EEF2FF" },
   { key: "producao", label: "Insumos de produção", cats: ["polpa", "fruta", "cereal", "cobertura", "adicional", "proteina", "paes_massas", "laticinio", "mercearia"], color: "#0E9488", soft: "#D7F2F0" },
   { key: "operacao", label: "Operação", cats: ["embalagem", "limpeza", "outro"], color: "#7C6E92", soft: "#EFEAF6" },
+  // hardware / informática (loja de PC/games)
+  { key: "pc_pronto", label: "Computadores", cats: ["computadores"], color: "#111827", soft: "#F3F4F6" },
+  { key: "componentes", label: "Componentes", cats: ["cpu", "cooler", "mobo", "ram", "gpu", "ssd", "gabinete", "fonte"], color: "#B45309", soft: "#FEF3C7" },
+  { key: "perifericos", label: "Periféricos", cats: ["mouse", "teclado", "mousepad", "monitor", "headset", "cadeira"], color: "#4338CA", soft: "#EEF2FF" },
 ];
 const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c))!;
 // Ordem das SEÇÕES no estoque — espelha o fluxo do cardápio: açaí primeiro, depois frutas,
@@ -42,6 +62,9 @@ const SECTION_ORDER: StockCategory[] = [
   "sorvete", "picole", "bebida", "bebida_alcoolica", "salgado",
   "proteina", "paes_massas", "laticinio", "mercearia",
   "embalagem", "limpeza", "outro",
+  // hardware
+  "computadores", "cpu", "cooler", "mobo", "ram", "gpu", "ssd", "gabinete", "fonte",
+  "mouse", "teclado", "mousepad", "monitor", "headset", "cadeira",
 ];
 
 function daysTo(expiry?: string): number | null {

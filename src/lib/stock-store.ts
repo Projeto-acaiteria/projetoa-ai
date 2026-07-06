@@ -14,7 +14,10 @@ export type StockCategory =
   | "polpa" | "fruta" | "cereal" | "cobertura" | "adicional"
   | "proteina" | "paes_massas" | "laticinio" | "mercearia"
   // Operação
-  | "embalagem" | "limpeza" | "outro";
+  | "embalagem" | "limpeza" | "outro"
+  // Hardware / informática (loja de PC/games — vertical assistência técnica/varejo)
+  | "computadores" | "cpu" | "cooler" | "mobo" | "ram" | "gpu" | "ssd"
+  | "gabinete" | "fonte" | "mouse" | "teclado" | "mousepad" | "monitor" | "headset" | "cadeira";
 
 // categoria do movimento (pra relatório de perda/desperdício separar do uso normal)
 export type StockMoveKind = "compra" | "uso" | "consumo" | "perda" | "vencido" | "quebra" | "ajuste" | "outro";
@@ -45,6 +48,9 @@ export type StockItem = {
   purchaseFactor?: number; // 1 unidade de compra = purchaseFactor unidades de uso (ex: 1 caixa = 12 un)
   updatedAt: string;
   history: StockMove[];
+  // specs técnicas (hardware: socket, tdp, ram_type, watts, form, length_mm, igpu…) — usado pelo montador de PC
+  specs?: Record<string, string | number | boolean | string[]>;
+  brand?: string; // marca (hardware) — filtro/exibição
 };
 
 // linha da ficha técnica consumida na venda. costCents é o custo CONGELADO no momento da venda
