@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -334,6 +334,16 @@ export default function ConfigClient() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-brand-600/30 bg-bg-base p-3.5">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-ink">Desconto no PIX</div>
+            <div className="text-xs text-[var(--text-muted)]">O cliente paga menos escolhendo PIX (vale no site e no balcão). 0 = sem desconto.</div>
+          </div>
+          <div className="flex w-28 items-center rounded-lg border border-line bg-bg-base px-3">
+            <DecimalInput max={100} value={store.pixDiscountPercent} onChange={(n) => { setS("pixDiscountPercent", n); setSaved(false); }} className="w-full bg-transparent py-2 text-right text-sm font-bold text-ink outline-none" />
+            <span className="text-sm font-semibold text-[var(--text-muted)]">%</span>
+          </div>
         </div>
       </Card>
 

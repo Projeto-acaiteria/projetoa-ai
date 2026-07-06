@@ -4,6 +4,7 @@ import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
 import { listStock } from "@/lib/stock-store";
 import { listOrders } from "@/lib/orders-store";
+import { getCardMachines, getStore } from "@/lib/settings-store";
 import VendasClient from "./VendasClient";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,9 @@ export default async function VendasPage() {
   const cfg = store ? await getStoreConfig(store.id) : null;
   if (familyOf(cfg?.business_type) !== "service") redirect("/admin");
 
-  const [stock, orders] = await Promise.all([listStock(), listOrders()]);
+  const [stock, orders, machinesRaw, storeSettings] = await Promise.all([listStock(), listOrders(), getCardMachines(), getStore()]);
+  const machines = machinesRaw.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name, maxParcelas: m.maxParcelas }));
+  const pixDiscountPercent = Number(storeSettings.pixDiscountPercent ?? 0);
   const products = stock
     .filter((s) => Number(s.sellPriceCents ?? 0) > 0)
     .map((s) => ({ sku: s.id, name: s.name, category: String(s.category), priceCents: Number(s.sellPriceCents), stock: Number(s.qty ?? 0) }))
@@ -39,5 +42,5 @@ export default async function VendasPage() {
       items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
     }));
 
-  return <VendasClient products={products} recentes={recentes} pedidos={pedidos} />;
+  return <VendasClient products={products} recentes={recentes} pedidos={pedidos} machines={machines} pixDiscountPercent={pixDiscountPercent} />;
 }

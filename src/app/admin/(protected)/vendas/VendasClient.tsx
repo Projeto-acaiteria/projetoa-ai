@@ -8,6 +8,7 @@ import PedidosPendentes, { type Pedido } from "./PedidosPendentes";
 type Product = { sku: string; name: string; category: string; priceCents: number; stock: number };
 type Recente = { display: string; totalCents: number; paymentMethod: string | null; count: number };
 type Line = { sku: string; name: string; priceCents: number; qty: number; stock: number };
+type Machine = { id: string; name: string; maxParcelas: number };
 type Pay = "dinheiro" | "pix" | "debito" | "credito";
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
@@ -18,7 +19,7 @@ const PAYS: { id: Pay; label: string }[] = [
   { id: "credito", label: "Crédito" },
 ];
 
-export default function VendasClient({ products, recentes, pedidos }: { products: Product[]; recentes: Recente[]; pedidos: Pedido[] }) {
+export default function VendasClient({ products, recentes, pedidos, machines, pixDiscountPercent }: { products: Product[]; recentes: Recente[]; pedidos: Pedido[]; machines: Machine[]; pixDiscountPercent: number }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
@@ -28,6 +29,8 @@ export default function VendasClient({ products, recentes, pedidos }: { products
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const [machineId, setMachineId] = useState(machines[0]?.id ?? "");
+  const [parcelas, setParcelas] = useState(1);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -37,7 +40,8 @@ export default function VendasClient({ products, recentes, pedidos }: { products
 
   const subtotal = cart.reduce((n, l) => n + l.priceCents * l.qty, 0);
   const discountCents = Math.max(0, Math.min(subtotal, Math.round((parseFloat(discInput.replace(",", ".")) || 0) * 100)));
-  const total = subtotal - discountCents;
+  const pixDiscount = pay === "pix" ? Math.round(((subtotal - discountCents) * pixDiscountPercent) / 100) : 0;
+  const total = subtotal - discountCents - pixDiscount;
 
   function add(p: Product) {
     setErr("");
@@ -71,6 +75,8 @@ export default function VendasClient({ products, recentes, pedidos }: { products
           paymentMethod: pay,
           customerName: customer.trim() || undefined,
           discountCents: discountCents || undefined,
+          machineId: (pay === "debito" || pay === "credito") && machineId ? machineId : undefined,
+          parcelas: pay === "credito" ? parcelas : undefined,
         }),
       });
       const d = await r.json();
@@ -206,15 +212,36 @@ export default function VendasClient({ products, recentes, pedidos }: { products
                 </button>
               ))}
             </div>
+            {(pay === "debito" || pay === "credito") && (
+              <div className="mt-2 space-y-1.5">
+                {machines.length === 0 ? (
+                  <p className="text-[10px] text-[var(--text-faded)]">Nenhuma maquininha cadastrada — cadastre em Ajustes pra descontar a taxa.</p>
+                ) : (
+                  <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-brand-600">
+                    {machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                )}
+                {pay === "credito" && machines.length > 0 && (
+                  <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-lg border border-line bg-bg-base px-2 py-1.5 text-xs text-ink outline-none focus:border-brand-600">
+                    {Array.from({ length: Math.max(1, machines.find((m) => m.id === machineId)?.maxParcelas ?? 12) }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n}x{n === 1 ? " à vista" : ""}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+            {pay === "pix" && pixDiscountPercent > 0 && (
+              <div className="mt-2 text-[10px] font-bold text-[var(--green-ok)]">PIX −{pixDiscountPercent}% aplicado</div>
+            )}
           </div>
 
           <div className="flex items-center justify-between border-t border-line pt-3">
             <span className="text-sm text-[var(--text-muted)]">Total</span>
             <span className="font-mono text-xl font-bold text-ink">{brl(total)}</span>
           </div>
-          {discountCents > 0 && (
+          {(discountCents > 0 || pixDiscount > 0) && (
             <div className="-mt-2 text-right text-[10px] text-[var(--text-faded)]">
-              subtotal {brl(subtotal)} − {brl(discountCents)}
+              subtotal {brl(subtotal)}{discountCents > 0 ? ` − ${brl(discountCents)}` : ""}{pixDiscount > 0 ? ` − PIX ${brl(pixDiscount)}` : ""}
             </div>
           )}
 
