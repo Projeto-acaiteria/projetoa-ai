@@ -1,5 +1,6 @@
 import { addOrder, getOrder, cancelOrder, confirmBalcaoPedido, type NewOrder, type OrderItem, type PaymentMethod, type Order } from "@/lib/orders-store";
 import { listStock, snapshotConsumes, applyConsumes } from "@/lib/stock-store";
+import { getStore, resolveCardFee } from "@/lib/settings-store";
 import { dateBR } from "@/lib/date-br";
 
 // VENDA DE PEÇA da assistência técnica (peças/periféricos), separada da OS.
@@ -15,9 +16,33 @@ export type PartsSaleInput = {
   customerName?: string;
   customerPhone?: string;
   discountCents?: number;
+  machineId?: string; // maquininha escolhida (débito/crédito) — resolve a taxa no servidor
+  parcelas?: number; // parcelas do crédito (1–12) — >1 usa a taxa de "parcelado"
 };
 
 const PAY: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
+
+// Ajustes na hora de RECEBER. Desconto PIX (config do Adm) reduz o que o CLIENTE paga (bruto cai).
+// Taxa da maquininha é CUSTO da loja (net = total − taxa; sobe com parcelas). São coisas distintas.
+async function paymentPricing(
+  storeId: string,
+  subtotalCents: number,
+  manualDiscountCents: number,
+  paymentMethod: PaymentMethod,
+  opts: { machineId?: string; parcelas?: number },
+): Promise<{ totalDiscountCents: number; totalCents: number; card: Awaited<ReturnType<typeof resolveCardFee>> }> {
+  const afterManual = subtotalCents - manualDiscountCents;
+  let pixDiscount = 0;
+  if (paymentMethod === "pix") {
+    const store = await getStore(storeId);
+    const pct = Math.max(0, Math.min(100, Number(store.pixDiscountPercent ?? 0)));
+    pixDiscount = Math.round((afterManual * pct) / 100);
+  }
+  const totalDiscountCents = manualDiscountCents + pixDiscount;
+  const totalCents = subtotalCents - totalDiscountCents;
+  const card = await resolveCardFee(paymentMethod, totalCents, storeId, opts);
+  return { totalDiscountCents, totalCents, card };
+}
 
 export async function createPartsSale(
   storeId: string,
@@ -43,10 +68,21 @@ export async function createPartsSale(
   if (!items.length) return { error: "Nenhum item válido (sem preço de venda)." };
 
   const subtotalCents = items.reduce((sum, i) => sum + i.paidCents, 0);
-  const discountCents = Math.max(0, Math.min(subtotalCents, Math.floor(Number(input.discountCents ?? 0))));
-  const totalCents = subtotalCents - discountCents;
+  const manualDiscount = Math.max(0, Math.min(subtotalCents, Math.floor(Number(input.discountCents ?? 0))));
   const paymentMethod = PAY.includes(input.paymentMethod as PaymentMethod) ? (input.paymentMethod as PaymentMethod) : "dinheiro";
   const nowIso = new Date().toISOString();
+
+  // entregue: aplica desconto PIX + taxa de máquina/parcelas AGORA. Pedido pendente ainda não tem
+  // pagamento escolhido → só o desconto manual (PIX/taxa entram na confirmação, em confirmPedido).
+  let totalDiscountCents = manualDiscount;
+  let totalCents = subtotalCents - manualDiscount;
+  let card: Awaited<ReturnType<typeof resolveCardFee>> | null = null;
+  if (opts.deliver) {
+    const p = await paymentPricing(storeId, subtotalCents, manualDiscount, paymentMethod, { machineId: input.machineId, parcelas: input.parcelas });
+    totalDiscountCents = p.totalDiscountCents;
+    totalCents = p.totalCents;
+    card = p.card;
+  }
 
   // entregue congela o custo (CMV histórico); pedido pendente guarda só o que baixar depois
   const snapshot = opts.deliver ? await snapshotConsumes(consumes, storeId) : consumes.map((c) => ({ ...c }));
@@ -60,8 +96,13 @@ export async function createPartsSale(
     subtotalCents,
     feeCents: 0,
     totalCents,
-    discountCents: discountCents || undefined,
+    discountCents: totalDiscountCents || undefined,
     paymentMethod: opts.deliver ? paymentMethod : undefined,
+    cardFeeCents: card?.feeCents || undefined,
+    cardMachineId: card?.machineId,
+    cardMachineName: card?.machineName,
+    cardFeePercent: card?.feePercent || undefined,
+    parcelas: card && card.parcelas > 1 ? card.parcelas : undefined,
     consumes: snapshot,
     consumed: opts.deliver, // entregue já baixou; pedido pendente ainda não
   };
@@ -86,6 +127,7 @@ export async function confirmPedido(
   storeId: string,
   id: number,
   paymentMethod?: PaymentMethod,
+  opts?: { machineId?: string; parcelas?: number },
 ): Promise<{ order: Order; stockWarning: boolean } | { error: string }> {
   const order = await getOrder(id, storeId);
   if (!order) return { error: "Pedido não encontrado." };
@@ -94,9 +136,16 @@ export async function confirmPedido(
 
   const pm = PAY.includes(paymentMethod as PaymentMethod) ? (paymentMethod as PaymentMethod) : "dinheiro";
   const nowIso = new Date().toISOString();
+  // recalcula o preço no momento da confirmação: o desconto do pedido pendente era só o manual;
+  // agora que o pagamento foi escolhido, entram o desconto PIX e a taxa de máquina/parcelas.
+  const p = await paymentPricing(storeId, order.subtotalCents, order.discountCents ?? 0, pm, { machineId: opts?.machineId, parcelas: opts?.parcelas });
   const consumes = (order.consumes ?? []).map((c) => ({ stockId: c.stockId, qty: c.qty }));
   const snapshot = await snapshotConsumes(consumes, storeId); // congela custo (CMV) agora
-  const updated = await confirmBalcaoPedido(id, pm, snapshot, nowIso, storeId);
+  const updated = await confirmBalcaoPedido(id, pm, snapshot, nowIso, storeId, {
+    totalCents: p.totalCents,
+    discountCents: p.totalDiscountCents,
+    card: p.card,
+  });
   const { failed } = await applyConsumes(consumes, "Venda " + order.display, dateBR(nowIso), storeId);
   return { order: updated ?? order, stockWarning: failed.length > 0 };
 }

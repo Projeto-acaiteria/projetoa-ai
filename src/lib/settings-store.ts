@@ -33,6 +33,7 @@ export type StoreSettings = {
   cnpj: string; // CNPJ ou CPF do negócio (sai no cabeçalho do cupom)
   cupomRodape: string; // mensagem do rodapé do cupom (vazio = "Obrigado! Volte sempre :)")
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
+  pixDiscountPercent: number; // % de desconto quando o cliente paga no PIX (o Adm define; 0 = sem)
 };
 
 // taxas padrão de mercado (editáveis pelo adm)
@@ -94,6 +95,7 @@ const DEFAULT_STORE: StoreSettings = {
   cnpj: "",
   cupomRodape: "",
   waMsgs: WA_MSG_DEFAULTS,
+  pixDiscountPercent: 0,
 };
 
 // Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
@@ -146,6 +148,7 @@ export async function setStore(
   if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);
   if (typeof store.cnpj === "string") clean.cnpj = store.cnpj.trim().slice(0, 24);
   if (typeof store.cupomRodape === "string") clean.cupomRodape = store.cupomRodape.trim().slice(0, 120);
+  if (store.pixDiscountPercent != null) clean.pixDiscountPercent = Math.max(0, Math.min(100, Number(store.pixDiscountPercent) || 0));
   if (store.waMsgs && typeof store.waMsgs === "object") {
     const m = store.waMsgs as Partial<WaMsgs>;
     const pick = (v: unknown, def: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 280) : def);

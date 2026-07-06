@@ -22,7 +22,10 @@ export async function POST(req: Request) {
   if (!Number.isFinite(id)) return NextResponse.json({ error: "id inválido" }, { status: 400 });
   try {
     if (b.action === "confirm") {
-      const r = await confirmPedido(storeId, id, p.paymentMethod as PaymentMethod | undefined);
+      const r = await confirmPedido(storeId, id, p.paymentMethod as PaymentMethod | undefined, {
+        machineId: p.machineId ? String(p.machineId) : undefined,
+        parcelas: p.parcelas != null ? Number(p.parcelas) : undefined,
+      });
       if ("error" in r) return NextResponse.json({ error: r.error }, { status: 400 });
       return NextResponse.json({ ok: true, display: r.order.display, stockWarning: r.stockWarning });
     }

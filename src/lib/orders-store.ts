@@ -140,7 +140,36 @@ export async function cancelOrder(id: number, reason: string, by: string | undef
 /** Confirma um pedido de balcão RECEBIDO (vindo do site): vira venda ENTREGUE, grava a forma de
  *  pagamento e o custo congelado (CMV), marca consumed e move o createdAt pro momento da confirmação
  *  (é quando o dinheiro entra → bucket de receita no dia certo). O chamador aplica a baixa depois. */
-export async function confirmBalcaoPedido(id: number, paymentMethod: PaymentMethod, consumes: Order["consumes"], at: string, storeId?: string): Promise<Order | null> {
+export async function confirmBalcaoPedido(
+  id: number,
+  paymentMethod: PaymentMethod,
+  consumes: Order["consumes"],
+  at: string,
+  storeId?: string,
+  pricing?: {
+    totalCents?: number;
+    discountCents?: number;
+    card?: { feeCents: number; feePercent: number; machineId?: string; machineName?: string; parcelas: number };
+  },
+): Promise<Order | null> {
   const sid = storeId ?? (await resolveStoreId());
-  return patchOrder(id, sid, (o) => ({ ...o, status: "entregue", paymentMethod, consumes: consumes ?? o.consumes, consumed: true, createdAt: at }));
+  return patchOrder(id, sid, (o) => ({
+    ...o,
+    status: "entregue",
+    paymentMethod,
+    consumes: consumes ?? o.consumes,
+    consumed: true,
+    createdAt: at,
+    ...(pricing?.totalCents != null ? { totalCents: pricing.totalCents } : {}),
+    ...(pricing?.discountCents != null ? { discountCents: pricing.discountCents || undefined } : {}),
+    ...(pricing?.card
+      ? {
+          cardFeeCents: pricing.card.feeCents || undefined,
+          cardMachineId: pricing.card.machineId,
+          cardMachineName: pricing.card.machineName,
+          cardFeePercent: pricing.card.feePercent || undefined,
+          parcelas: pricing.card.parcelas > 1 ? pricing.card.parcelas : undefined,
+        }
+      : {}),
+  }));
 }
