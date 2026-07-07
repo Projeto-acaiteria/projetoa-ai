@@ -41,6 +41,12 @@ export async function POST(req: Request) {
       supplier: b.supplier?.trim() || undefined,
       purchaseUnit: b.purchaseUnit?.trim() || undefined,
       purchaseFactor: b.purchaseFactor ? Math.max(0, Number(b.purchaseFactor)) || undefined : undefined,
+      // vertical AT: specs do montador + vitrine (marca/selo/destaque/foto)
+      specs: b.specs && typeof b.specs === "object" ? b.specs : undefined,
+      brand: b.brand?.trim() || undefined,
+      badge: b.badge?.trim() || undefined,
+      highlight: b.highlight === true || undefined,
+      image: b.image?.trim() || undefined,
     },
     todayBR(),
   );

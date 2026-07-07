@@ -5,6 +5,8 @@ import { StatCard } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
 import { IconBox, IconAlert, IconClock, IconPlus, IconMinus, IconTrash, IconGear, IconBowl } from "@/components/Icons";
 import type { StockItem, StockCategory } from "@/lib/stock-store";
+import AtSpecsFields from "@/components/admin/AtSpecsFields";
+import ImageUpload from "@/components/admin/ImageUpload";
 import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
 
 const CAT_LABEL: Record<StockCategory, string> = {
@@ -81,7 +83,7 @@ const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionD
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-export default function EstoqueClient() {
+export default function EstoqueClient({ family }: { family: "food" | "service" }) {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<FamilyKey | "todos">("todos");
@@ -262,7 +264,7 @@ export default function EstoqueClient() {
         ))}
       </div>
 
-      {modal?.kind === "add" && <AddModal onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.kind === "add" && <AddModal family={family} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal?.kind === "inventory" && <InventoryModal items={items} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal?.kind === "move" && (
         <MoveModal item={modal.item} dir={modal.dir} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
@@ -368,9 +370,10 @@ function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; o
   );
 }
 
-function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; onClose: () => void; onSaved: () => void }) {
+  const isService = family === "service";
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<StockCategory>("sorvete");
+  const [category, setCategory] = useState<StockCategory>(isService ? "cpu" : "sorvete");
   const [qty, setQty] = useState("0");
   const [unit, setUnit] = useState("un");
   const [minQty, setMinQty] = useState("0");
@@ -381,10 +384,19 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [supplier, setSupplier] = useState("");
   const [purchaseUnit, setPurchaseUnit] = useState(""); // unidade de compra (caixa, fardo...)
   const [purchaseFactor, setPurchaseFactor] = useState(""); // 1 unidade de compra = N unidades de uso
+  // vertical AT (hardware): specs do montador + vitrine
+  const [specs, setSpecs] = useState<Record<string, string | number | boolean | string[]>>({});
+  const [brand, setBrand] = useState("");
+  const [badge, setBadge] = useState("");
+  const [highlight, setHighlight] = useState(false);
+  const [image, setImage] = useState("");
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
   const isBebida = category === "bebida";
+  const sellable = isVenda || isService; // hardware é sempre vendável
+  const AT_KEYS = ["pc_pronto", "componentes", "perifericos"];
+  const fams = FAMILIES.filter((f) => AT_KEYS.includes(f.key) === isService); // service vê só cats AT; food vê food
 
   async function save() {
     if (!name.trim()) return;
@@ -401,7 +413,7 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         unit: doses > 0 ? "dose" : unit,
         minQty: +minQty,
         expiry: expiry || undefined,
-        sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : undefined,
+        sellPriceCents: sellable && sell ? Math.round(parseFloat(sell) * 100) : undefined,
         dosesPerBottle: doses > 0 ? doses : undefined,
         // custo p/ CMV: dose → por garrafa; demais → por unidade
         costPerBottleCents: doses > 0 && costC ? costC : undefined,
@@ -409,6 +421,12 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         supplier: supplier.trim() || undefined,
         purchaseUnit: purchaseUnit.trim() || undefined,
         purchaseFactor: purchaseFactor ? parseFloat(purchaseFactor.replace(",", ".")) || undefined : undefined,
+        // AT: specs + vitrine (só service)
+        specs: isService && Object.keys(specs).length ? specs : undefined,
+        brand: isService ? brand.trim() || undefined : undefined,
+        badge: isService ? badge.trim() || undefined : undefined,
+        highlight: isService ? highlight || undefined : undefined,
+        image: isService ? image || undefined : undefined,
       }),
     });
     onSaved();
@@ -416,9 +434,9 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
 
   return (
     <Overlay onClose={onClose} title="Novo item">
-      <input className={inp} placeholder="Nome (ex: Sorvete pote 2L)" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <select className={inp} value={category} onChange={(e) => setCategory(e.target.value as StockCategory)}>
-        {FAMILIES.map((f) => (
+      <input className={inp} placeholder={isService ? "Nome (ex: AMD Ryzen 5 5600)" : "Nome (ex: Sorvete pote 2L)"} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <select className={inp} value={category} onChange={(e) => { setCategory(e.target.value as StockCategory); setSpecs({}); }}>
+        {fams.map((f) => (
           <optgroup key={f.key} label={f.label}>
             {f.cats.map((c) => (
               <option key={c} value={c}>{CAT_LABEL[c]}</option>
@@ -426,11 +444,34 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           </optgroup>
         ))}
       </select>
+      {isService && <input className={inp} placeholder="Marca (ex: AMD, Kingston, Corsair)" value={brand} onChange={(e) => setBrand(e.target.value)} />}
       <div className="grid grid-cols-3 gap-2">
         <input className={inp} type="number" min={0} placeholder={isBebida && dpb ? "Doses" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
         <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={isBebida && !!dpb} />
         <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
       </div>
+      {isService && <AtSpecsFields category={category} value={specs} onChange={setSpecs} />}
+      {isService && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Selo (vitrine)</label>
+            <select className={`${inp} mt-1`} value={badge} onChange={(e) => setBadge(e.target.value)}>
+              <option value="">Sem selo</option>
+              {["Lançamento", "Mais Vendido", "Promo", "OpenBox"].map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 self-end rounded-lg border border-line bg-bg-base px-3 py-2.5">
+            <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} />
+            <span className="text-sm text-ink">Destaque na home</span>
+          </label>
+        </div>
+      )}
+      {isService && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Foto real (opcional — senão o site usa SVG por categoria)</label>
+          <div className="mt-1"><ImageUpload value={image} onChange={setImage} hint="A foto que o cliente vê no site" /></div>
+        </div>
+      )}
       {isBebida && (
         <div>
           <label className="text-xs font-semibold text-[var(--text-muted)]">Doses por garrafa (destilado — opcional)</label>
@@ -438,7 +479,7 @@ function AddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           <p className="mt-1 text-[11px] text-[var(--text-faded)]">Preenchendo, o estoque conta em DOSES; a entrada é por garrafa (= esse nº de doses).</p>
         </div>
       )}
-      {isVenda && (
+      {sellable && (
         <div>
           <label className="text-xs font-semibold text-[var(--text-muted)]">Preço de venda</label>
           <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">

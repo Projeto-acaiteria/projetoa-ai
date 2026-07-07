@@ -51,6 +51,10 @@ export type StockItem = {
   // specs técnicas (hardware: socket, tdp, ram_type, watts, form, length_mm, igpu…) — usado pelo montador de PC
   specs?: Record<string, string | number | boolean | string[]>;
   brand?: string; // marca (hardware) — filtro/exibição
+  // vitrine (site headless AT): destaque, selo e foto real do produto
+  highlight?: boolean;
+  badge?: string; // ex: "Lançamento", "Mais Vendido", "Promo", "OpenBox"
+  image?: string; // URL da foto real (Storage) — senão o site usa SVG por categoria
 };
 
 // linha da ficha técnica consumida na venda. costCents é o custo CONGELADO no momento da venda
