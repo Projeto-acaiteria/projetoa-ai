@@ -89,6 +89,19 @@ export async function listServiceOrders(
 }
 
 /** OS de um técnico (a "agenda dele"). */
+/** Busca de balcão: acha OS por código, nome do cliente ou telefone. Store-scoped, top 12. */
+export async function searchServiceOrders(query: string, storeId?: string): Promise<ServiceOrder[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  // sanitiza: o filtro .or() do PostgREST quebra com vírgula/parênteses — deixa só alfanumérico e espaço
+  const q = query.trim().replace(/[^\p{L}\p{N}\s@.-]/gu, "").slice(0, 40);
+  if (q.length < 2) return [];
+  const { data } = await db().from("service_orders").select("*").eq("store_id", sid)
+    .or(`code.ilike.%${q}%,customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  return ((data ?? []) as Record<string, unknown>[]).map(toOS);
+}
+
 export async function listByTechnician(staffId: string, storeId?: string): Promise<ServiceOrder[]> {
   return listServiceOrders({ staffId }, storeId);
 }

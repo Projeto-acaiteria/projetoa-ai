@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +9,18 @@ export const dynamic = "force-dynamic";
 const TEC_ACTIONS = new Set(["status", "diagnosis", "notes", "estimate", "photo-add", "photo-remove"]);
 // Status que o técnico pode setar (fluxo de bancada; entregue/cancelado são da recepção).
 const TEC_STATUSES = new Set(["aguardando", "em_reparo", "pronto"]);
+
+// Busca de balcão (recepção): GET ?q= → OS por código/nome/telefone. Técnico só vê as dele.
+export async function GET(req: Request) {
+  const m = await getCurrentMembership();
+  if (!m) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const q = new URL(req.url).searchParams.get("q") ?? "";
+  let results = await searchServiceOrders(q, m.store.id);
+  if (m.role === "technician") results = results.filter((o) => o.staffId === m.technicianId);
+  return NextResponse.json({
+    results: results.map((o) => ({ id: o.id, code: o.code, customerName: o.customerName, device: o.device, status: o.status, paymentStatus: o.paymentStatus })),
+  });
+}
 
 // Ordens de serviço (assistência técnica). POST {action,payload}.
 // GUARD DE PAPEL (server-side): owner/recepção = full; técnico só status/laudo/foto na PRÓPRIA OS.

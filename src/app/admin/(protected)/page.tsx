@@ -12,6 +12,7 @@ import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { weightSoldPeriods, type WeightSoldReport } from "@/lib/weight-report";
 import SetupChecklist from "@/components/admin/SetupChecklist";
 import RecepcaoProntaAcoes from "@/components/admin/RecepcaoProntaAcoes";
+import BuscaOS from "@/components/admin/BuscaOS";
 import NovaOSButton from "./os/NovaOSButton";
 import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -254,6 +255,9 @@ async function ReceptionHome() {
   return (
     <>
       <PageHeader title="Início" sub="Atendimento, vendas e caixa" action={<Badge tone="lime">recepção</Badge>} />
+
+      {/* BUSCA de balcão — acha a OS na hora que o cliente chega */}
+      <BuscaOS />
 
       {/* CAIXA — abrir/fechar (recepção opera o dinheiro do dia) */}
       <Link href="/admin/caixa" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-3.5 transition hover:border-brand-400">
