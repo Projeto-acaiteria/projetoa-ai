@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import OrderWatcher from "@/components/admin/OrderWatcher";
+import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import { getStore } from "@/lib/settings-store";
 import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
@@ -35,6 +36,9 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
       <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
+      {/* offline (resiliência a quedas): motor de plataforma, ativado por ora só no vertical service
+          (Starteq) — food/Cantinho NÃO recebe agora (não é cobaia; entra depois, com impacto). */}
+      {nav.family === "service" && <OfflineIndicator />}
       {children}
     </AdminShell>
   );

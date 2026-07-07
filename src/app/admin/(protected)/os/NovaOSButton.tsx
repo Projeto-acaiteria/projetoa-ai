@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { submitOrQueue } from "@/lib/offline-queue";
 
 const inputCls = "w-full rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
@@ -10,37 +11,37 @@ export default function NovaOSButton() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
   const [f, setF] = useState({ customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function salvar() {
     if (!f.customerName.trim() || !f.device.trim() || saving) return;
-    setSaving(true); setErr("");
+    setSaving(true); setErr(""); setInfo("");
     try {
-      const r = await fetch("/api/os", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", payload: {
-          customerName: f.customerName.trim(),
-          customerPhone: f.customerPhone.trim() || undefined,
-          device: f.device.trim(),
-          imei: f.imei.trim() || undefined,
-          devicePassword: f.devicePassword.trim() || undefined,
-          problem: f.problem.trim() || undefined,
-          serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
-        } }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Falha ao abrir a OS.");
+      const nome = f.customerName.trim();
+      // online envia direto; offline enfileira (resiliência a quedas) — sync ao reconectar
+      const res = await submitOrQueue("/api/os", { action: "create", payload: {
+        customerName: nome,
+        customerPhone: f.customerPhone.trim() || undefined,
+        device: f.device.trim(),
+        imei: f.imei.trim() || undefined,
+        devicePassword: f.devicePassword.trim() || undefined,
+        problem: f.problem.trim() || undefined,
+        serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
+      } }, `Check-in ${nome}`);
       setF({ customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
-      setOpen(false);
-      router.refresh();
+      if ("queued" in res) {
+        // offline: fica pendente (λ.prova-na-fonte) — avisa sem fechar, o indicador mostra a fila
+        setInfo("Sem conexão — o check-in ficou salvo aqui e sobe sozinho quando a internet voltar.");
+      } else { setOpen(false); router.refresh(); }
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao abrir a OS."); }
     finally { setSaving(false); }
   }
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white">
+      <button onClick={() => { setErr(""); setInfo(""); setOpen(true); }} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white">
         + Nova OS
       </button>
 
@@ -58,6 +59,7 @@ export default function NovaOSButton() {
               <input value={f.servico} onChange={(e) => set("servico", e.target.value)} inputMode="decimal" placeholder="Valor do serviço R$ (opcional)" className={inputCls} />
             </div>
             {err && <p className="mt-2 text-xs text-red-500">{err}</p>}
+            {info && <p className="mt-2 rounded-lg bg-gold/10 px-3 py-2 text-xs font-semibold text-gold">{info}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setOpen(false)} className="rounded-xl border border-line px-4 py-2.5 text-sm font-bold text-[var(--text-muted)]">Cancelar</button>
               <button onClick={salvar} disabled={saving || !f.customerName.trim() || !f.device.trim()} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
