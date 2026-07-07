@@ -11,6 +11,9 @@ export type OSPaymentStatus = "aberta" | "parcial" | "quitada";
 
 export type OSPart = { id: string; sku: string | null; name: string; qty: number; unitCostCents: number };
 
+// Foto do aparelho anexada pelo técnico (antes/depois do reparo). url = pública do Storage.
+export type OSPhoto = { url: string; label: string; at: string };
+
 export type ServiceOrder = {
   id: string;
   code: string | null;
@@ -30,6 +33,7 @@ export type ServiceOrder = {
   paymentStatus: OSPaymentStatus;
   paidAt: string | null;
   paymentMethod: string | null;
+  photos: OSPhoto[];
   createdAt: string;
 };
 
@@ -56,6 +60,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   paymentStatus: asPay(r.payment_status),
   paidAt: str(r.paid_at),
   paymentMethod: str(r.payment_method),
+  photos: Array.isArray(r.photos) ? (r.photos as OSPhoto[]) : [],
   createdAt: String(r.created_at ?? ""),
 });
 
@@ -140,6 +145,28 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
 export async function updateOSStatus(id: string, status: OSStatus, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Laudo técnico (diagnosis) — o que o técnico achou/fez. Texto livre. */
+export async function updateOSDiagnosis(id: string, diagnosis: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ diagnosis: diagnosis.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Anexa 1 foto do aparelho (antes/depois). Lê o array atual e faz append (patch por-linha). */
+export async function addOSPhoto(id: string, photo: OSPhoto, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: row } = await db().from("service_orders").select("photos").eq("id", id).eq("store_id", sid).maybeSingle();
+  const cur = Array.isArray((row as { photos?: unknown })?.photos) ? ((row as { photos: OSPhoto[] }).photos) : [];
+  await db().from("service_orders").update({ photos: [...cur, photo], updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Remove 1 foto da OS pela url. */
+export async function removeOSPhoto(id: string, url: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: row } = await db().from("service_orders").select("photos").eq("id", id).eq("store_id", sid).maybeSingle();
+  const cur = Array.isArray((row as { photos?: unknown })?.photos) ? ((row as { photos: OSPhoto[] }).photos) : [];
+  await db().from("service_orders").update({ photos: cur.filter((p) => p.url !== url), updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Quita a OS: marca paga (nasce a comissão, via osCommissionCents) e dá BAIXA no estoque das peças.

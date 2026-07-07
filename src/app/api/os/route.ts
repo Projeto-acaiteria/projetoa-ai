@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
-import { resolveStoreId } from "@/lib/auth/current";
-import { createServiceOrder, updateOSStatus, createMontagemOS, quitarOS, assignTechnician, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { getCurrentMembership } from "@/lib/auth/store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Ordens de serviço (assistência técnica). POST {action,payload}: create (check-in) | status.
+// Ações que o TÉCNICO pode fazer (só na OS DELE): trabalhar a bancada, nunca cobrar/atribuir.
+const TEC_ACTIONS = new Set(["status", "diagnosis", "photo-add", "photo-remove"]);
+// Status que o técnico pode setar (fluxo de bancada; entregue/cancelado são da recepção).
+const TEC_STATUSES = new Set(["aguardando", "em_reparo", "pronto"]);
+
+// Ordens de serviço (assistência técnica). POST {action,payload}.
+// GUARD DE PAPEL (server-side): owner/recepção = full; técnico só status/laudo/foto na PRÓPRIA OS.
 export async function POST(req: Request) {
-  const storeId = await resolveStoreId();
+  const m = await getCurrentMembership();
+  if (!m) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const storeId = m.store.id;
   let b: { action?: string; payload?: Record<string, unknown> };
   try {
     b = await req.json();
@@ -15,6 +23,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "body inválido" }, { status: 400 });
   }
   const p = b.payload ?? {};
+
+  // Cerca do técnico: só ações de bancada, só na OS atribuída a ele, status só de bancada.
+  if (m.role === "technician") {
+    if (!b.action || !TEC_ACTIONS.has(b.action)) return NextResponse.json({ error: "Sem permissão para esta ação." }, { status: 403 });
+    const res = await getServiceOrder(String(p.id ?? ""), storeId);
+    if (!res || !m.technicianId || res.os.staffId !== m.technicianId) return NextResponse.json({ error: "Essa OS não é sua." }, { status: 403 });
+    if (b.action === "status" && !TEC_STATUSES.has(String(p.status))) return NextResponse.json({ error: "Você não pode definir esse status." }, { status: 403 });
+  }
+
   try {
     switch (b.action) {
       case "create": {
@@ -33,6 +50,18 @@ export async function POST(req: Request) {
       }
       case "status":
         await updateOSStatus(String(p.id), String(p.status) as OSStatus, storeId);
+        return NextResponse.json({ ok: true });
+      case "diagnosis":
+        await updateOSDiagnosis(String(p.id), String(p.diagnosis ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "photo-add": {
+        const url = String(p.url ?? "").trim();
+        if (!url) return NextResponse.json({ error: "URL da foto ausente." }, { status: 400 });
+        await addOSPhoto(String(p.id), { url, label: String(p.label ?? "").trim(), at: new Date().toISOString() }, storeId);
+        return NextResponse.json({ ok: true });
+      }
+      case "photo-remove":
+        await removeOSPhoto(String(p.id), String(p.url ?? ""), storeId);
         return NextResponse.json({ ok: true });
       case "quitar":
         await quitarOS(String(p.id), p.paymentMethod ? String(p.paymentMethod) : undefined, storeId);

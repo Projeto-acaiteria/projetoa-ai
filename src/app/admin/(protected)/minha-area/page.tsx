@@ -3,14 +3,15 @@ import { requireNavAccess } from "@/lib/auth/guard";
 import Link from "next/link";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getCurrentMembership } from "@/lib/auth/store";
-import { listByTechnician, osCommissionCents, OS_STATUS_LABEL, type ServiceOrder } from "@/lib/service-orders-store";
+import { listByTechnician, osCommissionCents, type ServiceOrder } from "@/lib/service-orders-store";
 
 export const dynamic = "force-dynamic";
 
 const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const potentialCommission = (o: ServiceOrder) => Math.round((o.serviceValueCents * o.commissionPercent) / 100);
 
 // Área do TÉCNICO: só as OS dele + a comissão dele (λ.garcom-app-so-pedidos — vê o próprio trabalho
-// e o próprio ganho, nunca o financeiro da loja).
+// e o próprio ganho, nunca o financeiro da loja). A fila é agrupada por etapa de bancada.
 export default async function MinhaAreaPage() {
   await requireNavAccess("/admin/minha-area");
   const m = await getCurrentMembership();
@@ -18,11 +19,14 @@ export default async function MinhaAreaPage() {
 
   const isTec = m.role === "technician" && !!m.technicianId;
   const orders = isTec ? await listByTechnician(m.technicianId as string) : [];
-  const abertas = orders.filter((o) => o.status !== "entregue" && o.status !== "cancelado");
+  const aFazer = orders.filter((o) => o.status === "aguardando");
+  const emReparo = orders.filter((o) => o.status === "em_reparo");
+  const prontas = orders.filter((o) => o.status === "pronto");
+  const abertas = aFazer.length + emReparo.length + prontas.length;
   const comissaoApurada = orders.filter((o) => o.paymentStatus === "quitada").reduce((s, o) => s + osCommissionCents(o), 0);
   const potencial = orders
     .filter((o) => o.paymentStatus !== "quitada" && o.status !== "cancelado")
-    .reduce((s, o) => s + Math.round((o.serviceValueCents * o.commissionPercent) / 100), 0);
+    .reduce((s, o) => s + potentialCommission(o), 0);
 
   return (
     <>
@@ -33,17 +37,18 @@ export default async function MinhaAreaPage() {
       ) : (
         <div className="max-w-3xl space-y-5">
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="OS abertas" value={String(abertas.length)} />
+            <Stat label="OS abertas" value={String(abertas)} />
             <Stat label="Comissão apurada" value={brl(comissaoApurada)} accent="ok" />
             <Stat label="A apurar (não quitadas)" value={brl(potencial)} />
           </div>
 
-          {orders.length === 0 ? (
-            <Card className="p-6 text-center text-sm text-[var(--text-muted)]">Nenhuma OS atribuída a você ainda.</Card>
+          {abertas === 0 ? (
+            <Card className="p-6 text-center text-sm text-[var(--text-muted)]">Nenhuma OS aberta pra você agora. 🔧</Card>
           ) : (
-            <div className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Minhas ordens</h2>
-              {orders.map((o) => <OSRow key={o.id} os={o} />)}
+            <div className="space-y-5">
+              <Fila titulo="A fazer" tone="gold" orders={aFazer} />
+              <Fila titulo="Em reparo" tone="brand" orders={emReparo} />
+              <Fila titulo="Prontas p/ retirada" tone="ok" orders={prontas} />
             </div>
           )}
         </div>
@@ -52,15 +57,28 @@ export default async function MinhaAreaPage() {
   );
 }
 
-function OSRow({ os }: { os: ServiceOrder }) {
-  const com = os.paymentStatus === "quitada" ? osCommissionCents(os) : Math.round((os.serviceValueCents * os.commissionPercent) / 100);
+function Fila({ titulo, tone, orders }: { titulo: string; tone: "gold" | "brand" | "ok"; orders: ServiceOrder[] }) {
+  if (orders.length === 0) return null;
+  const dot = tone === "ok" ? "bg-[var(--green-ok)]" : tone === "gold" ? "bg-gold" : "bg-brand-600";
   return (
-    <Link href={`/admin/os/${os.id}`} className="block">
+    <div className="space-y-2">
+      <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} /> {titulo} <span className="text-[var(--text-faded)]">· {orders.length}</span>
+      </h2>
+      {orders.map((o) => <OSRow key={o.id} os={o} />)}
+    </div>
+  );
+}
+
+function OSRow({ os }: { os: ServiceOrder }) {
+  const com = os.paymentStatus === "quitada" ? osCommissionCents(os) : potentialCommission(os);
+  return (
+    <Link href={`/admin/minha-area/${os.id}`} className="block">
       <Card className="flex items-center justify-between gap-3 p-4 transition hover:border-brand-600">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-brand-600">{os.code ?? os.id.slice(0, 8)}</span>
-            <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">{OS_STATUS_LABEL[os.status]}</span>
+            {os.photos.length > 0 && <span className="text-[10px] text-[var(--text-faded)]">📷 {os.photos.length}</span>}
           </div>
           <div className="truncate text-sm text-ink">{os.customerName || "—"} · {os.device || "—"}</div>
         </div>
