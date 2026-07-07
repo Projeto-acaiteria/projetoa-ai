@@ -34,6 +34,8 @@ export type ServiceOrder = {
   paidAt: string | null;
   paymentMethod: string | null;
   photos: OSPhoto[];
+  devicePassword: string | null; // senha p/ destravar o aparelho (recepção captura, técnico usa)
+  notes: string | null; // anotações de bancada do técnico (separado do laudo oficial)
   createdAt: string;
 };
 
@@ -61,6 +63,8 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   paidAt: str(r.paid_at),
   paymentMethod: str(r.payment_method),
   photos: Array.isArray(r.photos) ? (r.photos as OSPhoto[]) : [],
+  devicePassword: str(r.device_password),
+  notes: str(r.notes),
   createdAt: String(r.created_at ?? ""),
 });
 
@@ -103,6 +107,7 @@ export type NewOSInput = {
   customerPhone?: string;
   device: string;
   imei?: string;
+  devicePassword?: string;
   problem?: string;
   staffId?: string;
   commissionPercent?: number;
@@ -129,6 +134,7 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     customer_phone: (input.customerPhone ?? "").trim(),
     device: input.device.trim(),
     imei: input.imei?.trim() || null,
+    device_password: input.devicePassword?.trim() || null,
     problem: (input.problem ?? "").trim(),
     staff_id: input.staffId ?? null,
     commission_percent: Math.max(0, Number(input.commissionPercent ?? 0)),
@@ -151,6 +157,12 @@ export async function updateOSStatus(id: string, status: OSStatus, storeId?: str
 export async function updateOSDiagnosis(id: string, diagnosis: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("service_orders").update({ diagnosis: diagnosis.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Anotações de bancada do técnico (notes) — rascunho de trabalho, não o laudo oficial. */
+export async function updateOSNotes(id: string, notes: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Anexa 1 foto do aparelho (antes/depois). Lê o array atual e faz append (patch por-linha). */

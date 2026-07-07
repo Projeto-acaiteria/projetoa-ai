@@ -10,7 +10,7 @@ export default function NovaOSButton() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [f, setF] = useState({ customerName: "", customerPhone: "", device: "", imei: "", problem: "", servico: "" });
+  const [f, setF] = useState({ customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function salvar() {
@@ -24,13 +24,14 @@ export default function NovaOSButton() {
           customerPhone: f.customerPhone.trim() || undefined,
           device: f.device.trim(),
           imei: f.imei.trim() || undefined,
+          devicePassword: f.devicePassword.trim() || undefined,
           problem: f.problem.trim() || undefined,
           serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
         } }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao abrir a OS.");
-      setF({ customerName: "", customerPhone: "", device: "", imei: "", problem: "", servico: "" });
+      setF({ customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
       setOpen(false);
       router.refresh();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao abrir a OS."); }
@@ -52,6 +53,7 @@ export default function NovaOSButton() {
               <input value={f.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="WhatsApp" className={inputCls} />
               <input value={f.device} onChange={(e) => set("device", e.target.value)} placeholder="Aparelho * (ex: iPhone 12, Notebook Acer)" className={inputCls} />
               <input value={f.imei} onChange={(e) => set("imei", e.target.value)} placeholder="IMEI / série" className={`${inputCls} font-mono`} />
+              <input value={f.devicePassword} onChange={(e) => set("devicePassword", e.target.value)} placeholder="Senha do aparelho (pra o técnico testar)" className={inputCls} />
               <textarea value={f.problem} onChange={(e) => set("problem", e.target.value)} placeholder="Defeito relatado" rows={2} className={inputCls} />
               <input value={f.servico} onChange={(e) => set("servico", e.target.value)} inputMode="decimal" placeholder="Valor do serviço R$ (opcional)" className={inputCls} />
             </div>

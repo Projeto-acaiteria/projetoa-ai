@@ -14,10 +14,11 @@ const STATUSES = [
 
 // Bancada do técnico: mudar status, escrever o laudo e anexar fotos (antes/depois). Tudo via /api/os
 // (que tem o guard de papel). Fotos comprimidas no client (compressImage) antes de subir.
-export default function TecOSWork({ id, status, diagnosis, photos }: { id: string; status: string; diagnosis: string; photos: OSPhoto[] }) {
+export default function TecOSWork({ id, status, diagnosis, notes, photos }: { id: string; status: string; diagnosis: string; notes: string; photos: OSPhoto[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [laudo, setLaudo] = useState(diagnosis);
+  const [nota, setNota] = useState(notes);
   const [err, setErr] = useState("");
   const beforeRef = useRef<HTMLInputElement>(null);
   const afterRef = useRef<HTMLInputElement>(null);
@@ -47,6 +48,7 @@ export default function TecOSWork({ id, status, diagnosis, photos }: { id: strin
   }
 
   const laudoDirty = laudo.trim() !== (diagnosis ?? "").trim();
+  const notaDirty = nota.trim() !== (notes ?? "").trim();
 
   return (
     <Card className="space-y-5 p-5">
@@ -73,6 +75,18 @@ export default function TecOSWork({ id, status, diagnosis, photos }: { id: strin
         <button disabled={busy || !laudoDirty} onClick={() => api("diagnosis", { id, diagnosis: laudo })}
           className="mt-2 rounded-lg brand-gradient px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
           {laudoDirty ? "Salvar laudo" : "Laudo salvo"}
+        </button>
+      </div>
+
+      {/* ANOTAÇÕES DE BANCADA (rascunho do técnico, separado do laudo) */}
+      <div className="border-t border-line pt-4">
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Anotações de bancada</h3>
+        <textarea value={nota} onChange={(e) => setNota(e.target.value)} disabled={busy} rows={3}
+          placeholder="Rascunho: acessórios que vieram, senha testada, o que o cliente autorizou…"
+          className="w-full resize-y rounded-lg border border-line bg-bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600 disabled:opacity-50" />
+        <button disabled={busy || !notaDirty} onClick={() => api("notes", { id, notes: nota })}
+          className="mt-2 rounded-lg border border-line px-4 py-2 text-xs font-bold text-ink hover:border-brand-600 disabled:opacity-50">
+          {notaDirty ? "Salvar anotações" : "Anotações salvas"}
         </button>
       </div>
 

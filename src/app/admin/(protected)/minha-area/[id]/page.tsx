@@ -10,6 +10,16 @@ export const dynamic = "force-dynamic";
 
 const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+function haDias(iso: string): string {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return d <= 0 ? "hoje" : d === 1 ? "há 1 dia" : `há ${d} dias`;
+}
+function waLink(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const full = digits.length <= 11 ? "55" + digits : digits;
+  return `https://wa.me/${full}`;
+}
+
 // Detalhe da OS na visão do TÉCNICO: só o trabalho de bancada (status, laudo, fotos) + a comissão
 // DELE nessa OS. Sem total da loja, sem quitar, sem atribuir. Só a OS atribuída a ele.
 export default async function TecOSPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,11 +52,21 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
       <div className="grid max-w-4xl gap-4 lg:grid-cols-[1fr_1.1fr]">
         <div className="space-y-4">
           <Card className="p-5">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Aparelho</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Aparelho</h3>
+              <span className="text-[10px] font-semibold text-[var(--text-faded)]">entrou {haDias(os.createdAt)}</span>
+            </div>
             <Row label="Cliente" value={os.customerName || "—"} />
             <Row label="Aparelho" value={os.device || "—"} />
             {os.imei && <Row label="IMEI / série" value={os.imei} mono />}
+            {os.devicePassword && <Row label="Senha do aparelho" value={os.devicePassword} mono />}
             {os.problem && <Row label="Defeito / pedido" value={os.problem} />}
+            {os.customerPhone && (
+              <a href={waLink(os.customerPhone)} target="_blank" rel="noopener noreferrer"
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--green-ok)]/40 bg-[var(--green-ok)]/10 px-3 py-2 text-xs font-bold text-[var(--green-ok)] transition hover:bg-[var(--green-ok)]/20">
+                Chamar {os.customerName?.split(" ")[0] || "cliente"} no WhatsApp
+              </a>
+            )}
           </Card>
 
           {parts.length > 0 && (
@@ -73,7 +93,7 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
 
-        <TecOSWork id={os.id} status={os.status} diagnosis={os.diagnosis ?? ""} photos={os.photos} />
+        <TecOSWork id={os.id} status={os.status} diagnosis={os.diagnosis ?? ""} notes={os.notes ?? ""} photos={os.photos} />
       </div>
     </>
   );
