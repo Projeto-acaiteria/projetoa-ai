@@ -10,6 +10,9 @@ const CATS: StockCategory[] = [
   "polpa", "fruta", "cereal", "cobertura", "adicional",
   "proteina", "paes_massas", "laticinio", "mercearia",
   "embalagem", "limpeza", "outro",
+  // vertical AT (hardware/informática)
+  "computadores", "cpu", "cooler", "mobo", "ram", "gpu", "ssd",
+  "gabinete", "fonte", "mouse", "teclado", "mousepad", "monitor", "headset", "cadeira",
 ];
 
 export async function GET() {
