@@ -73,6 +73,20 @@ export async function POST(req: Request) {
       case "quitar":
         await quitarOS(String(p.id), p.paymentMethod ? String(p.paymentMethod) : undefined, storeId);
         return NextResponse.json({ ok: true });
+      case "entregar": {
+        // Recepção entrega a OS pronta: se ainda não quitou, cobra agora (precisa da forma) e
+        // dá baixa; depois marca entregue. OS já quitada só marca entregue. (não é ação do técnico)
+        const osId = String(p.id);
+        const cur = await getServiceOrder(osId, storeId);
+        if (!cur) return NextResponse.json({ error: "OS não encontrada" }, { status: 404 });
+        if (cur.os.paymentStatus !== "quitada") {
+          const pm = p.paymentMethod ? String(p.paymentMethod) : "";
+          if (!pm) return NextResponse.json({ error: "Informe a forma de pagamento pra entregar." }, { status: 400 });
+          await quitarOS(osId, pm, storeId);
+        }
+        await updateOSStatus(osId, "entregue", storeId);
+        return NextResponse.json({ ok: true });
+      }
       case "assign":
         await assignTechnician(String(p.id), String(p.staffId), storeId);
         return NextResponse.json({ ok: true });

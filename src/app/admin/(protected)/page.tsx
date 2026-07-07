@@ -8,9 +8,11 @@ import { listOrders } from "@/lib/orders-store";
 import { listMesaPayments } from "@/lib/tables-store";
 import { listExpenses } from "@/lib/expense-store";
 import { getStore } from "@/lib/settings-store";
-import { getCurrentStore } from "@/lib/auth/store";
+import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { weightSoldPeriods, type WeightSoldReport } from "@/lib/weight-report";
 import SetupChecklist from "@/components/admin/SetupChecklist";
+import RecepcaoProntaAcoes from "@/components/admin/RecepcaoProntaAcoes";
+import NovaOSButton from "./os/NovaOSButton";
 import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
@@ -27,7 +29,12 @@ export default async function AdminHome() {
   // vertical-aware: assistência técnica (serviço) tem Início de OS, não o dashboard de food.
   const store0 = await getCurrentStore();
   const cfg0 = store0 ? await getStoreConfig(store0.id) : null;
-  if (familyOf(cfg0?.business_type) === "service") return <ATHome />;
+  if (familyOf(cfg0?.business_type) === "service") {
+    // recepção tem cockpit de OPERAÇÃO (sem o faturamento da loja — ela é bloqueada do Financeiro);
+    // owner segue no dashboard AT com o número-herói de faturamento.
+    const role = await getCurrentRole();
+    return role === "reception" ? <ReceptionHome /> : <ATHome />;
+  }
 
   // caixa fechado NÃO bloqueia mais — vira um aviso suave (login cai no painel, não na tela de abrir caixa)
   const semCaixa = !(await getOpenSession());
@@ -232,6 +239,90 @@ async function ATHome() {
         <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">Ver OS</span>
       </Link>
     </>
+  );
+}
+
+// Cockpit da RECEPÇÃO (assistência técnica): operação de front-desk — vender, montar PC, abrir OS,
+// receber/entregar, caixa. SEM o faturamento da loja (recepção é bloqueada do Financeiro).
+async function ReceptionHome() {
+  const [orders, os, session, store] = await Promise.all([listOrders(), listServiceOrders(), getOpenSession(), getStore()]);
+  const prontas = os.filter((o) => o.status === "pronto");
+  const aguardando = os.filter((o) => o.status === "aguardando");
+  const emReparo = os.filter((o) => o.status === "em_reparo").length;
+  const pedidosSite = orders.filter((o) => o.mode === "balcao" && o.status === "recebido" && !o.cancelled);
+
+  return (
+    <>
+      <PageHeader title="Início" sub="Atendimento, vendas e caixa" action={<Badge tone="lime">recepção</Badge>} />
+
+      {/* CAIXA — abrir/fechar (recepção opera o dinheiro do dia) */}
+      <Link href="/admin/caixa" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg-elevated p-3.5 transition hover:border-brand-400">
+        <span className="flex items-center gap-2.5">
+          <span className={`grid h-9 w-9 place-items-center rounded-lg bg-bg-surface-2 ${session ? "text-[var(--green-ok)]" : "text-brand-600"}`}><IconWallet width={18} height={18} /></span>
+          <span className="text-sm">
+            <span className="block font-bold text-ink">{session ? "Caixa aberto" : "Caixa fechado"}</span>
+            <span className="text-[var(--text-muted)]">{session ? "Registrar vendas e fechar o caixa no fim do dia." : "Abra o caixa pra começar a vender."}</span>
+          </span>
+        </span>
+        <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">{session ? "Ir pro caixa" : "Abrir caixa"}</span>
+      </Link>
+
+      {/* AÇÕES RÁPIDAS — o que a recepção faz o dia todo */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <NovaOSButton />
+        <AcaoCard href="/admin/vendas" label="Nova venda" hint="peça / balcão" />
+        <AcaoCard href="/admin/os/montar" label="Montar PC" hint="montador" />
+        <AcaoCard href="/admin/os" label="Ver OS" hint="agenda completa" />
+      </div>
+
+      {/* PRONTAS P/ RETIRADA — avisar cliente + receber e entregar */}
+      <Card className="mt-6 p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Prontas p/ retirada</h2>
+          <Badge tone={prontas.length ? "lime" : "muted"}>{prontas.length}</Badge>
+        </div>
+        {prontas.length === 0 ? (
+          <div className="py-6 text-center text-sm text-[var(--text-muted)]">Nada pra entregar agora.</div>
+        ) : (
+          <div className="space-y-3">
+            {prontas.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
+                <Link href={`/admin/os/${o.id}`} className="min-w-0">
+                  <span className="font-mono text-xs text-brand-600">{o.code ?? o.id.slice(0, 8)}</span>
+                  <span className="block truncate text-sm text-ink">{o.customerName || "—"} · {o.device || "—"}</span>
+                </Link>
+                <RecepcaoProntaAcoes id={o.id} customerName={o.customerName} customerPhone={o.customerPhone} device={o.device} quitada={o.paymentStatus === "quitada"} storeName={store.name} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* FILAS — pedidos do site (confirmar/fechar venda) + novas OS (atribuir técnico) */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+        <Link href="/admin/vendas" className="card flex items-center justify-between p-4 transition hover:border-brand-400">
+          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Pedidos do site</span><span className="text-xs text-[var(--text-muted)]">confirmar venda</span></span>
+          <span className="text-2xl font-bold tabular-nums text-ink">{pedidosSite.length}</span>
+        </Link>
+        <Link href="/admin/os" className="card flex items-center justify-between p-4 transition hover:border-brand-400">
+          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Aguardando</span><span className="text-xs text-[var(--text-muted)]">novas OS</span></span>
+          <span className="text-2xl font-bold tabular-nums text-ink">{aguardando.length}</span>
+        </Link>
+        <div className="card flex items-center justify-between p-4">
+          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Em reparo</span><span className="text-xs text-[var(--text-muted)]">com o técnico</span></span>
+          <span className="text-2xl font-bold tabular-nums text-ink">{emReparo}</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AcaoCard({ href, label, hint }: { href: string; label: string; hint: string }) {
+  return (
+    <Link href={href} className="card flex flex-col justify-between gap-2 p-4 transition hover:border-brand-400">
+      <span className="text-sm font-bold text-ink">{label}</span>
+      <span className="text-[11px] text-[var(--text-muted)]">{hint}</span>
+    </Link>
   );
 }
 
