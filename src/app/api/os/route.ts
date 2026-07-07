@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Ações que o TÉCNICO pode fazer (só na OS DELE): trabalhar a bancada, nunca cobrar/atribuir.
-const TEC_ACTIONS = new Set(["status", "diagnosis", "notes", "photo-add", "photo-remove"]);
+const TEC_ACTIONS = new Set(["status", "diagnosis", "notes", "estimate", "photo-add", "photo-remove"]);
 // Status que o técnico pode setar (fluxo de bancada; entregue/cancelado são da recepção).
 const TEC_STATUSES = new Set(["aguardando", "em_reparo", "pronto"]);
 
@@ -57,6 +57,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "notes":
         await updateOSNotes(String(p.id), String(p.notes ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "estimate":
+        await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);
         return NextResponse.json({ ok: true });
       case "photo-add": {
         const url = String(p.url ?? "").trim();

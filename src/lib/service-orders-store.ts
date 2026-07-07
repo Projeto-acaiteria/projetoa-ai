@@ -36,6 +36,7 @@ export type ServiceOrder = {
   photos: OSPhoto[];
   devicePassword: string | null; // senha p/ destravar o aparelho (recepção captura, técnico usa)
   notes: string | null; // anotações de bancada do técnico (separado do laudo oficial)
+  estimatedAt: string | null; // prazo estimado de conclusão (o técnico define) — ISO fim-do-dia BR
   createdAt: string;
 };
 
@@ -65,6 +66,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   photos: Array.isArray(r.photos) ? (r.photos as OSPhoto[]) : [],
   devicePassword: str(r.device_password),
   notes: str(r.notes),
+  estimatedAt: str(r.estimated_at),
   createdAt: String(r.created_at ?? ""),
 });
 
@@ -163,6 +165,14 @@ export async function updateOSDiagnosis(id: string, diagnosis: string, storeId?:
 export async function updateOSNotes(id: string, notes: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("service_orders").update({ notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Prazo estimado de conclusão. Recebe YYYY-MM-DD (ou vazio pra limpar). Guarda no FIM do dia BR
+ *  (23:59:59-03:00) — só fica "atrasada" depois que o dia passa de verdade (λ.fuso-vercel-utc). */
+export async function updateOSEstimate(id: string, ymd: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(ymd.trim()) ? new Date(`${ymd.trim()}T23:59:59-03:00`).toISOString() : null;
+  await db().from("service_orders").update({ estimated_at: iso, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Anexa 1 foto do aparelho (antes/depois). Lê o array atual e faz append (patch por-linha). */

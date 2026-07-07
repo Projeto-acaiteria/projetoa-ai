@@ -88,6 +88,8 @@ function Fila({ titulo, tone, orders }: { titulo: string; tone: "gold" | "brand"
 
 function OSRow({ os, historico }: { os: ServiceOrder; historico?: boolean }) {
   const com = os.paymentStatus === "quitada" ? osCommissionCents(os) : potentialCommission(os);
+  const ativa = os.status !== "pronto" && os.status !== "entregue" && os.status !== "cancelado";
+  const atrasada = !!os.estimatedAt && ativa && new Date(os.estimatedAt).getTime() < Date.now();
   return (
     <Link href={`/admin/minha-area/${os.id}`} className="block">
       <Card className={`flex items-center justify-between gap-3 p-4 transition hover:border-brand-600 ${historico ? "opacity-70" : ""}`}>
@@ -95,6 +97,7 @@ function OSRow({ os, historico }: { os: ServiceOrder; historico?: boolean }) {
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-brand-600">{os.code ?? os.id.slice(0, 8)}</span>
             {!historico && <span className="text-[10px] text-[var(--text-faded)]">· há {haDias(os.createdAt)}</span>}
+            {atrasada && <span className="text-[10px] font-bold text-red-500">⚠ atrasada</span>}
             {os.photos.length > 0 && <span className="text-[10px] text-[var(--text-faded)]">📷 {os.photos.length}</span>}
           </div>
           <div className="truncate text-sm text-ink">{os.customerName || "—"} · {os.device || "—"}</div>

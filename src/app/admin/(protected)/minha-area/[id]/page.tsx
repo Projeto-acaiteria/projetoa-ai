@@ -4,6 +4,7 @@ import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getServiceOrder, OS_STATUS_LABEL } from "@/lib/service-orders-store";
+import { dateBR } from "@/lib/date-br";
 import TecOSWork from "./TecOSWork";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,9 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
   if (os.staffId !== m.technicianId) redirect("/admin/minha-area");
 
   const minhaComissao = Math.round((os.serviceValueCents * os.commissionPercent) / 100);
+  const ativa = os.status !== "pronto" && os.status !== "entregue" && os.status !== "cancelado";
+  const atrasada = !!os.estimatedAt && ativa && new Date(os.estimatedAt).getTime() < Date.now();
+  const prazoFmt = os.estimatedAt ? new Date(os.estimatedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }) : "";
 
   return (
     <>
@@ -54,7 +58,10 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
           <Card className="p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Aparelho</h3>
-              <span className="text-[10px] font-semibold text-[var(--text-faded)]">entrou {haDias(os.createdAt)}</span>
+              <div className="flex items-center gap-2">
+                {prazoFmt && <span className={`text-[10px] font-bold ${atrasada ? "text-red-500" : "text-[var(--text-muted)]"}`}>{atrasada ? "⚠ atrasada" : `prazo ${prazoFmt}`}</span>}
+                <span className="text-[10px] font-semibold text-[var(--text-faded)]">entrou {haDias(os.createdAt)}</span>
+              </div>
             </div>
             <Row label="Cliente" value={os.customerName || "—"} />
             <Row label="Aparelho" value={os.device || "—"} />
@@ -93,7 +100,7 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
 
-        <TecOSWork id={os.id} status={os.status} diagnosis={os.diagnosis ?? ""} notes={os.notes ?? ""} photos={os.photos} />
+        <TecOSWork id={os.id} status={os.status} diagnosis={os.diagnosis ?? ""} notes={os.notes ?? ""} estimatedYmd={os.estimatedAt ? dateBR(os.estimatedAt) : ""} photos={os.photos} />
       </div>
     </>
   );
