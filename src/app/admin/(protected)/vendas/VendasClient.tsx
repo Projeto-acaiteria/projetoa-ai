@@ -31,6 +31,7 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
   const [err, setErr] = useState("");
   const [machineId, setMachineId] = useState(machines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
+  const [showPedidos, setShowPedidos] = useState(false); // pedidos do site colapsados (foco = PDV)
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -98,7 +99,19 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
     <>
       <PageHeader title="Vendas" sub="Venda de peças e periféricos no balcão — entra no caixa, sem comissão de técnico" />
 
-      <PedidosPendentes pedidos={pedidos} />
+      {/* Pedidos do site colapsados: aparecem só quando há, sem empurrar o PDV pra baixo da dobra */}
+      {pedidos.length > 0 && (
+        <div className="mb-4 overflow-hidden rounded-xl border border-brand-400 bg-brand-600/5">
+          <button onClick={() => setShowPedidos((v) => !v)} className="flex w-full items-center justify-between px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-bold text-ink">
+              <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">{pedidos.length}</span>
+              Pedidos do site pra confirmar
+            </span>
+            <span className="text-xs font-bold text-brand-600">{showPedidos ? "esconder ▾" : "confirmar ▸"}</span>
+          </button>
+          {showPedidos && <div className="px-4 pb-2"><PedidosPendentes pedidos={pedidos} /></div>}
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* CATÁLOGO */}
