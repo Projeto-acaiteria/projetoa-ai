@@ -37,6 +37,8 @@ export type ServiceOrder = {
   devicePassword: string | null; // senha p/ destravar o aparelho (recepção captura, técnico usa)
   notes: string | null; // anotações de bancada do técnico (separado do laudo oficial)
   estimatedAt: string | null; // prazo estimado de conclusão (o técnico define) — ISO fim-do-dia BR
+  readyAt: string | null; // quando ficou PRONTA (p/ "pronta há X dias" no balcão)
+  notifiedAt: string | null; // quando a recepção avisou o cliente (WhatsApp)
   createdAt: string;
 };
 
@@ -67,6 +69,8 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   devicePassword: str(r.device_password),
   notes: str(r.notes),
   estimatedAt: str(r.estimated_at),
+  readyAt: str(r.ready_at),
+  notifiedAt: str(r.notified_at),
   createdAt: String(r.created_at ?? ""),
 });
 
@@ -165,7 +169,18 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
 
 export async function updateOSStatus(id: string, status: OSStatus, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
-  await db().from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status, updated_at: now };
+  // carimba quando ficou PRONTA (p/ "pronta há X dias"); volta atrás no reparo limpa o carimbo.
+  if (status === "pronto") patch.ready_at = now;
+  else if (status === "em_reparo" || status === "aguardando") patch.ready_at = null;
+  await db().from("service_orders").update(patch).eq("id", id).eq("store_id", sid);
+}
+
+/** Marca que a recepção avisou o cliente (WhatsApp) — carimbo p/ não avisar de novo à toa. */
+export async function markOSNotified(id: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ notified_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Laudo técnico (diagnosis) — o que o técnico achou/fez. Texto livre. */

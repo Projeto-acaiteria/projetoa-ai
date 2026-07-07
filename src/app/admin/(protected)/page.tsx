@@ -13,6 +13,9 @@ import { weightSoldPeriods, type WeightSoldReport } from "@/lib/weight-report";
 import SetupChecklist from "@/components/admin/SetupChecklist";
 import RecepcaoProntaAcoes from "@/components/admin/RecepcaoProntaAcoes";
 import BuscaOS from "@/components/admin/BuscaOS";
+import AtribuirTecnico from "@/components/admin/AtribuirTecnico";
+import PedidosPendentes from "./vendas/PedidosPendentes";
+import { listStaff } from "@/lib/staff-store";
 import NovaOSButton from "./os/NovaOSButton";
 import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -20,6 +23,8 @@ import { familyOf } from "@/config/segments";
 import { listServiceOrders } from "@/lib/service-orders-store";
 
 const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const prontaDias = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+const prontaHa = (iso: string) => { const d = prontaDias(iso); return d <= 0 ? "hoje" : d === 1 ? "há 1 dia" : `há ${d} dias`; };
 
 const statusTone = { recebido: "accent", preparo: "gold", saiu: "brand", entregue: "lime" } as const;
 
@@ -246,11 +251,19 @@ async function ATHome() {
 // Cockpit da RECEPÇÃO (assistência técnica): operação de front-desk — vender, montar PC, abrir OS,
 // receber/entregar, caixa. SEM o faturamento da loja (recepção é bloqueada do Financeiro).
 async function ReceptionHome() {
-  const [orders, os, session, store] = await Promise.all([listOrders(), listServiceOrders(), getOpenSession(), getStore()]);
+  const [orders, os, session, store, staffRaw] = await Promise.all([listOrders(), listServiceOrders(), getOpenSession(), getStore(), listStaff()]);
+  const staff = staffRaw.map((s) => ({ id: s.id, name: s.name }));
   const prontas = os.filter((o) => o.status === "pronto");
   const aguardando = os.filter((o) => o.status === "aguardando");
-  const emReparo = os.filter((o) => o.status === "em_reparo").length;
-  const pedidosSite = orders.filter((o) => o.mode === "balcao" && o.status === "recebido" && !o.cancelled);
+  const emReparo = os.filter((o) => o.status === "em_reparo");
+  const pedidosSiteOrders = orders.filter((o) => o.mode === "balcao" && o.status === "recebido" && !o.cancelled);
+  const pedidosSite = pedidosSiteOrders.map((o) => ({ id: o.id, display: o.display, code: o.code ?? null, customerName: o.customerName, phone: o.phone, totalCents: o.totalCents, items: o.items.map((i) => ({ name: i.name, qty: i.qty })) }));
+
+  // PAINEL DE ATENÇÃO (Fase D): o que precisa de ação agora
+  const now = Date.now();
+  const atrasadas = os.filter((o) => o.estimatedAt && (o.status === "aguardando" || o.status === "em_reparo") && new Date(o.estimatedAt).getTime() < now);
+  const encalhadas = prontas.filter((o) => o.readyAt && prontaDias(o.readyAt) >= 3);
+  const temAtencao = atrasadas.length > 0 || encalhadas.length > 0 || pedidosSite.length > 0;
 
   return (
     <>
@@ -270,6 +283,16 @@ async function ReceptionHome() {
         </span>
         <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">{session ? "Ir pro caixa" : "Abrir caixa"}</span>
       </Link>
+
+      {/* PAINEL DE ATENÇÃO — o que precisa de ação agora (Fase D) */}
+      {temAtencao && (
+        <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-gold/40 bg-gold/5 p-3">
+          <span className="text-xs font-bold uppercase tracking-wide text-gold">⚠ Precisa de atenção</span>
+          {atrasadas.length > 0 && <Badge tone="accent">{atrasadas.length} OS atrasada{atrasadas.length === 1 ? "" : "s"}</Badge>}
+          {encalhadas.length > 0 && <Badge tone="gold">{encalhadas.length} pronta{encalhadas.length === 1 ? "" : "s"} há 3+ dias</Badge>}
+          {pedidosSite.length > 0 && <Badge tone="brand">{pedidosSite.length} pedido{pedidosSite.length === 1 ? "" : "s"} do site pra confirmar</Badge>}
+        </div>
+      )}
 
       {/* AÇÕES RÁPIDAS — o que a recepção faz o dia todo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -292,30 +315,51 @@ async function ReceptionHome() {
             {prontas.map((o) => (
               <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
                 <Link href={`/admin/os/${o.id}`} className="min-w-0">
-                  <span className="font-mono text-xs text-brand-600">{o.code ?? o.id.slice(0, 8)}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-brand-600">{o.code ?? o.id.slice(0, 8)}</span>
+                    {o.readyAt && <span className={`text-[10px] font-semibold ${prontaDias(o.readyAt) >= 3 ? "text-gold" : "text-[var(--text-faded)]"}`}>pronta {prontaHa(o.readyAt)}</span>}
+                    {o.notifiedAt && <span className="text-[10px] font-bold text-[var(--green-ok)]">✓ avisado</span>}
+                  </span>
                   <span className="block truncate text-sm text-ink">{o.customerName || "—"} · {o.device || "—"}</span>
                 </Link>
-                <RecepcaoProntaAcoes id={o.id} customerName={o.customerName} customerPhone={o.customerPhone} device={o.device} quitada={o.paymentStatus === "quitada"} storeName={store.name} />
+                <RecepcaoProntaAcoes id={o.id} customerName={o.customerName} customerPhone={o.customerPhone} device={o.device} quitada={o.paymentStatus === "quitada"} notified={!!o.notifiedAt} storeName={store.name} />
               </div>
             ))}
           </div>
         )}
       </Card>
 
-      {/* FILAS — pedidos do site (confirmar/fechar venda) + novas OS (atribuir técnico) */}
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        <Link href="/admin/vendas" className="card flex items-center justify-between p-4 transition hover:border-brand-400">
-          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Pedidos do site</span><span className="text-xs text-[var(--text-muted)]">confirmar venda</span></span>
-          <span className="text-2xl font-bold tabular-nums text-ink">{pedidosSite.length}</span>
-        </Link>
-        <Link href="/admin/os" className="card flex items-center justify-between p-4 transition hover:border-brand-400">
-          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Aguardando</span><span className="text-xs text-[var(--text-muted)]">novas OS</span></span>
-          <span className="text-2xl font-bold tabular-nums text-ink">{aguardando.length}</span>
-        </Link>
-        <div className="card flex items-center justify-between p-4">
-          <span><span className="block text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Em reparo</span><span className="text-xs text-[var(--text-muted)]">com o técnico</span></span>
-          <span className="text-2xl font-bold tabular-nums text-ink">{emReparo}</span>
+      {/* PEDIDOS DO SITE — confirmar venda direto (inline, reusa o componente do Vendas) */}
+      <div className="mt-6">
+        <PedidosPendentes pedidos={pedidosSite} />
+      </div>
+
+      {/* AGUARDANDO — novas OS, atribuir técnico sem sair do cockpit */}
+      <Card className="mt-2 p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Aguardando · atribuir técnico</h2>
+          <Badge tone={aguardando.length ? "gold" : "muted"}>{aguardando.length}</Badge>
         </div>
+        {aguardando.length === 0 ? (
+          <div className="py-6 text-center text-sm text-[var(--text-muted)]">Nenhuma OS esperando.</div>
+        ) : (
+          <div className="space-y-3">
+            {aguardando.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
+                <Link href={`/admin/os/${o.id}`} className="min-w-0">
+                  <span className="font-mono text-xs text-brand-600">{o.code ?? o.id.slice(0, 8)}</span>
+                  <span className="block truncate text-sm text-ink">{o.customerName || "—"} · {o.device || "—"}</span>
+                </Link>
+                <AtribuirTecnico id={o.id} staffId={o.staffId} staff={staff} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-4 py-3 text-sm">
+        <IconClock width={15} height={15} className="text-brand-600" />
+        <span className="text-ink-2"><b className="text-ink">{emReparo.length}</b> em reparo com o técnico agora</span>
       </div>
     </>
   );

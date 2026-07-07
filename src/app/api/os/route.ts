@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,6 +101,9 @@ export async function POST(req: Request) {
       }
       case "assign":
         await assignTechnician(String(p.id), String(p.staffId), storeId);
+        return NextResponse.json({ ok: true });
+      case "notify":
+        await markOSNotified(String(p.id), storeId);
         return NextResponse.json({ ok: true });
       case "montagem": {
         const parts = Array.isArray(p.parts) ? (p.parts as MontagemPart[]) : [];

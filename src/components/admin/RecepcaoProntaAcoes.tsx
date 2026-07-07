@@ -12,13 +12,21 @@ function waLink(phone: string, msg: string): string {
 }
 
 // Ações da recepção numa OS PRONTA: avisar o cliente (WhatsApp) e entregar (quita se faltar).
-export default function RecepcaoProntaAcoes({ id, customerName, customerPhone, device, quitada, storeName }: {
-  id: string; customerName: string; customerPhone: string; device: string; quitada: boolean; storeName: string;
+export default function RecepcaoProntaAcoes({ id, customerName, customerPhone, device, quitada, notified, storeName }: {
+  id: string; customerName: string; customerPhone: string; device: string; quitada: boolean; notified?: boolean; storeName: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [avisado, setAvisado] = useState(!!notified);
   const [err, setErr] = useState("");
+
+  // ao abrir o WhatsApp, carimba "avisado" (otimista) — não bloqueia o link
+  function marcarAvisado() {
+    setAvisado(true);
+    fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "notify", payload: { id } }) })
+      .then(() => router.refresh()).catch(() => {});
+  }
 
   async function entregar(paymentMethod?: string) {
     setBusy(true); setErr("");
@@ -35,9 +43,9 @@ export default function RecepcaoProntaAcoes({ id, customerName, customerPhone, d
   return (
     <div className="flex flex-wrap items-center gap-2">
       {customerPhone && (
-        <a href={waLink(customerPhone, msg)} target="_blank" rel="noopener noreferrer"
+        <a href={waLink(customerPhone, msg)} target="_blank" rel="noopener noreferrer" onClick={marcarAvisado}
           className="rounded-lg border border-[var(--green-ok)]/40 bg-[var(--green-ok)]/10 px-3 py-1.5 text-xs font-bold text-[var(--green-ok)] hover:bg-[var(--green-ok)]/20">
-          Avisar no WhatsApp
+          {avisado ? "Avisar de novo" : "Avisar no WhatsApp"}
         </a>
       )}
       {!payOpen ? (
