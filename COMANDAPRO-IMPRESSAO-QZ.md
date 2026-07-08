@@ -35,9 +35,11 @@ Criar `C:\Program Files\QZ Tray\override.crt` com o cert-mãe → **reiniciar o 
 - [x] **Instalador de 1 clique** — `installer/comandapro-impressao.ps1` + `INSTALAR-IMPRESSAO.bat` (auto-eleva → QZ x86_64 silencioso → override.crt cert-mãe → auto-start → porta TMUSB001). ⏳ **falta TESTE no PC real (DELL c/ impressora)** — prova-na-fonte de hardware.
 - [x] Atalho **Chrome `--kiosk-printing`** — passo 6 (opcional) do instalador.
 - [x] Checklist de go-live — `installer/CHECKLIST-IMPRESSAO.md` (as 3 pegadinhas).
+- [x] **Empacotado + publicado p/ download** — `public/ComandaPRO-Impressao.zip` no ar em https://comandapro.net.br/ComandaPRO-Impressao.zip (cert do `.ps1` == `override.crt` byte-a-byte).
 
-## Como instalar (cliente novo)
-Copiar a pasta `installer/` pro PC → **duplo-clique em `INSTALAR-IMPRESSAO.bat`** → confirmar "Administrador" → abrir o sistema e imprimir um teste. Passo a passo + troubleshooting em `installer/CHECKLIST-IMPRESSAO.md`.
+## Como instalar (cliente novo) — DISTRIBUIÇÃO PUBLICADA (07/07)
+Cliente baixa **https://comandapro.net.br/ComandaPRO-Impressao.zip** (servido de `public/ComandaPRO-Impressao.zip`; provado no ar HTTP 200) → extrai → **duplo-clique em `INSTALAR-IMPRESSAO.bat`** → confirma "Administrador" → abre o sistema e imprime um teste. (Pendrive com a pasta `installer/` = mesmo efeito.) Passo a passo + troubleshooting em `installer/CHECKLIST-IMPRESSAO.md`.
+**Se re-empacotar o installer:** `Compress-Archive` dos 3 arquivos de `installer/` → `public/ComandaPRO-Impressao.zip`, commit + push na `main` (auto-deploya pra comandapro.net.br). Conferir na fonte que a URL responde 200 antes de mandar pro cliente.
 Notas técnicas: o `.ps1` é UTF-8 **com BOM** (PS 5.1 lê acento sem quebrar); o cert embutido = `QZ_CERT` de `src/lib/qz-cert.ts` (verificado byte-a-byte idêntico); um cert pra TODOS os clientes (não gera par por cliente).
 
 Ref completa (arquitetura, cupom 72mm, conexão-por-aba, par-tem-que-casar): memória `reference_impressao_termica_qz_tray`.
