@@ -3,7 +3,7 @@
 > Objetivo: imprimir **sem popup** no PC do cliente, em 1 passo. O instalador resolve 90%; este checklist cobre as 3 pegadinhas e o que conferir.
 
 ## Caminho rápido (90% dos casos)
-1. Copie a pasta `installer/` pro PC do cliente (pendrive ou download).
+1. Cliente baixa o zip: **https://comandapro.net.br/ComandaPRO-Impressao.zip** (ou pendrive com a pasta `installer/`). Extrai a pasta.
 2. **Duplo-clique em `INSTALAR-IMPRESSAO.bat`** → confirme o "Administrador".
 3. O instalador: baixa+instala o QZ Tray (x86_64), joga o `override.crt` (cert-mãe), liga auto-start, reinicia o QZ e tenta ajustar a impressora.
 4. No fim, abra o sistema no Chrome e **imprima um teste**. Não deve aparecer popup do QZ.
@@ -38,4 +38,6 @@ Não precisa de QZ se a loja tem 1 impressora só e não roteia cozinha/bar:
 ## Status
 - [x] Instalador 1 clique construído (`installer/comandapro-impressao.ps1` + `.bat`).
 - [x] Checklist com as 3 pegadinhas.
-- [ ] **TESTADO em PC real (DELL c/ impressora) → imprime SEM popup** ← prova-na-fonte pendente (hardware).
+- [x] Cert do `.ps1` == `override.crt` byte-a-byte (confere com a chave-mãe Impulso).
+- [x] **Empacotado e publicado** → `public/ComandaPRO-Impressao.zip` no ar em https://comandapro.net.br/ComandaPRO-Impressao.zip (HTTP 200, provado 07/07).
+- [ ] **TESTADO em PC real (DELL c/ impressora) → imprime SEM popup** ← prova-na-fonte pendente (hardware; só o campo fecha).
