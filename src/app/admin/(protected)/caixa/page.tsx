@@ -4,6 +4,7 @@ import { readMenu } from "@/lib/menu-store";
 import { listStock } from "@/lib/stock-store";
 import { getFees, getStore, getCardMachines, hasCashPin } from "@/lib/settings-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { familyOf } from "@/config/segments";
 import { resolveStoreId } from "@/lib/auth/current";
 import CaixaClient from "./CaixaClient";
 
@@ -21,6 +22,7 @@ export default async function CaixaPage() {
   // PDV de copo (montagem açaí) só pra loja template "acai"; bar/grid vendem pelo Balcão
   const cfg = await getStoreConfig(await resolveStoreId());
   const showPdv = cfg?.menu_template === "acai";
+  const family = familyOf(cfg?.business_type); // service (AT) vende no balcão de peças, não em mesas
   const cashPinSet = await hasCashPin();
   const produtos = stock
     .filter((i) => VENDA_CATS.includes(i.category) && i.sellPriceCents)
@@ -29,7 +31,7 @@ export default async function CaixaPage() {
   return (
     <>
       <PageHeader title="Caixa" sub="Frente de caixa · abra o caixa e venda" />
-      <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} showPdv={showPdv} pricePerKgCents={store.pricePerKgCents} cashPinSet={cashPinSet} />
+      <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} showPdv={showPdv} pricePerKgCents={store.pricePerKgCents} cashPinSet={cashPinSet} family={family} />
     </>
   );
 }

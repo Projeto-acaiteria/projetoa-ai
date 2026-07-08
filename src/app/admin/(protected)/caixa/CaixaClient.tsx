@@ -30,7 +30,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service" }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -70,7 +70,17 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
           <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />
         </div>
       ) : (
-        <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>
+        family === "service" ? (
+          <div className="card p-4">
+            <p className="mb-3 text-center text-sm text-[var(--text-muted)]">Caixa aberto. Registre a venda ou monte um PC — cai direto no caixa.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <a href="/admin/vendas" className="flex items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3 text-sm font-bold text-white">🛒 Vender no balcão</a>
+              <a href="/admin/os/montar" className="flex items-center justify-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink hover:border-brand-600">🧩 Montar PC</a>
+            </div>
+          </div>
+        ) : (
+          <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>
+        )
       )}
     </div>
   );
