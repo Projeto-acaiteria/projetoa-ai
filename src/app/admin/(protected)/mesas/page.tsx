@@ -10,6 +10,7 @@ import { listStaff } from "@/lib/staff-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import MesasClient from "./MesasClient";
 import MesasBarClient from "./MesasBarClient";
+import CallsAlert from "@/components/admin/CallsAlert";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,10 @@ export default async function MesasPage() {
   const staff = (await listStaff(storeId)).filter((s) => s.active).map((s) => ({ id: s.id, name: s.name }));
 
   const header = (
-    <PageHeader title="Mesas" sub="Salão · abra a comanda, lance itens e feche a conta" action={<Badge tone="lime">tempo real</Badge>} />
+    <>
+      <PageHeader title="Mesas" sub="Salão · abra a comanda, lance itens e feche a conta" action={<Badge tone="lime">tempo real</Badge>} />
+      <CallsAlert />
+    </>
   );
 
   // bar/grid (menu relacional): comanda do operador espelhada do Medellín

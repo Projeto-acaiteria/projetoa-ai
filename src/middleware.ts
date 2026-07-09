@@ -5,7 +5,7 @@ import { updateSession } from "@/lib/auth/middleware";
 // /api exige login. As rotas MISTAS (público + admin) ficam aqui e gateiam o lado admin DENTRO
 // da própria rota (pedidos: POST público/GET admin; pontos: GET?phone público/listar+POST admin).
 const API_PUBLICAS = [
-  "/api/mesa-pedido", "/api/delivery-pedido", "/api/cadastro", "/api/cadastro/check",
+  "/api/mesa-pedido", "/api/mesa-chamado", "/api/delivery-pedido", "/api/cadastro", "/api/cadastro/check",
   "/api/webhooks/asaas", "/api/cron/billing-check", "/api/qz-sign",
   "/api/pedidos", "/api/pontos",
   "/api/loja", // vitrine headless: catálogo/montagem/pedido do site (público por slug)

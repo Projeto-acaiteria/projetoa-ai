@@ -116,6 +116,8 @@ export default function TemplateBar({
   const [errorMsg, setErrorMsg] = useState("");
   const [customizing, setCustomizing] = useState<{ product: BarProduct; station: string } | null>(null);
   const [openCat, setOpenCat] = useState<BarCategory | null>(null);
+  const [calling, setCalling] = useState<"" | "atendente" | "conta">("");
+  const [calledMsg, setCalledMsg] = useState("");
   // delivery (cardápio público sem mesa)
   const [dMode, setDMode] = useState<"retirada" | "entrega">("retirada");
   const [dName, setDName] = useState("");
@@ -235,6 +237,23 @@ export default function TemplateBar({
     return encodeURIComponent(L.join("\n"));
   }
 
+  // chamar garçom / pedir a conta — cai no cockpit de Mesas (adm/garçom) via CallsAlert
+  async function chamar(type: "atendente" | "conta") {
+    if (!tableNumber || calling) return;
+    setCalling(type);
+    setCalledMsg("");
+    try {
+      const r = await fetch("/api/mesa-chamado", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, tableNumber, type }) });
+      if (!r.ok) throw new Error();
+      setCalledMsg(type === "atendente" ? "Garçom a caminho!" : "Anotado — a conta está a caminho.");
+    } catch {
+      setCalledMsg("Não consegui agora. Tenta de novo.");
+    } finally {
+      setCalling("");
+      setTimeout(() => setCalledMsg(""), 4000);
+    }
+  }
+
   return (
     <main className="min-h-screen text-white" style={{ ...brandVars(branding?.primaryColor), background: "radial-gradient(1100px 520px at 50% -8%, rgba(255,59,78,0.16), transparent 60%), #0B0A09" }}>
       <header className="relative flex min-h-[42vh] flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
@@ -265,6 +284,21 @@ export default function TemplateBar({
           <div className="relative z-10 mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur" style={{ borderColor: "rgba(255,59,78,0.35)", background: "rgba(255,59,78,0.1)", color: ACCENT_HI }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
             Couvert {brl(coverNotice.coverCents)}/pessoa · ao vivo: {coverNotice.artist}
+          </div>
+        )}
+        {tableNumber != null && (
+          <div className="relative z-10 mt-6 flex flex-col items-center gap-2">
+            <div className="flex gap-2.5">
+              <button onClick={() => chamar("atendente")} disabled={!!calling} className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-bold backdrop-blur transition active:scale-95 disabled:opacity-50">
+                <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                {calling === "atendente" ? "Chamando…" : "Chamar garçom"}
+              </button>
+              <button onClick={() => chamar("conta")} disabled={!!calling} className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-bold backdrop-blur transition active:scale-95 disabled:opacity-50">
+                <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+                {calling === "conta" ? "Pedindo…" : "Pedir a conta"}
+              </button>
+            </div>
+            {calledMsg && <p className="text-sm font-semibold" style={{ color: ACCENT_HI }}>{calledMsg}</p>}
           </div>
         )}
         <div className="mt-7 h-px w-24" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }} />
