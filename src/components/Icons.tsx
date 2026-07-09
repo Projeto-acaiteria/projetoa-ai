@@ -69,6 +69,14 @@ export const IconTable = (p: I) => (
     <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
   </svg>
 );
+export const IconQr = (p: I) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 14h3v3M20 17v4M17 20h4" />
+  </svg>
+);
 export const IconGift = (p: I) => (
   <svg {...base(p)}>
     <rect x="3.5" y="8" width="17" height="4" rx="1" />

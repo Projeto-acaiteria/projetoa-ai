@@ -235,8 +235,16 @@ textarea:focus-visible,
   #print-cartaz,
   #print-cartaz *,
   #print-cupom,
-  #print-cupom * {
+  #print-cupom *,
+  #print-qr-mesas,
+  #print-qr-mesas * {
     visibility: visible !important;
+  }
+  #print-qr-mesas {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
   }
   #print-cartaz {
     left: 0 !important;

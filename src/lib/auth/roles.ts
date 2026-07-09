@@ -11,6 +11,7 @@ const RECEPTION_NAV = new Set<string>([
   "/admin/caixa",
   "/admin/balcao",
   "/admin/mesas",
+  "/admin/qr-mesas",
   "/admin/preparo",
   "/admin/pedidos",
   "/admin/clientes",

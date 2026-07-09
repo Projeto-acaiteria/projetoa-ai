@@ -21,6 +21,7 @@ import {
   IconGear,
   IconPrinter,
   IconTable,
+  IconQr,
   IconClock,
 } from "@/components/Icons";
 import type { Role } from "@/lib/auth/store";
@@ -48,6 +49,7 @@ const NAV: NavItem[] = [
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai", family: "food" },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables, family: "food" },
+  { href: "/admin/qr-mesas", label: "QR das mesas", Icon: IconQr, show: (c) => c.hasTables, family: "food" },
   { href: "/admin/garcons", label: "Garçons", Icon: IconUsers, show: (c) => c.hasTables, family: "food" },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt, show: (c) => c.hasDelivery, family: "food" },
   { href: "/admin/preparo", label: "Preparo", Icon: IconFlame, show: (c) => c.hasStations, family: "food" },
