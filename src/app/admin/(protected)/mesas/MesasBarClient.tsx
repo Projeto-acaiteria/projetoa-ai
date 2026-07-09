@@ -45,6 +45,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [view, setView] = useState<"pick" | "comanda">("pick");
   const [comanda, setComanda] = useState<Comanda | null>(null);
   const [temp, setTemp] = useState<TempLine[]>([]);
+  const [pickedCat, setPickedCat] = useState<string | null>(null); // picker category-first: null = grade de categorias
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -77,7 +78,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -328,37 +329,57 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                   </div>
                 )}
 
-                {/* picker grid: categorias → produtos. peso/modificador abrem modal; simples soma inline */}
-                <div className="space-y-4">
-                  {cats.map((cat) => (
-                    <div key={cat.id}>
-                      <p className="mb-1.5 text-xs font-bold uppercase text-[var(--text-muted)]">{cat.name}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {cat.products.map((p) => {
-                          const monta = (p.groups && p.groups.length > 0) || p.by_weight;
-                          const q = qtyOf(p);
-                          return (
-                            <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-bg-base p-2.5">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-ink">{p.name}</div>
-                                <div className="text-xs font-bold text-brand-600">{brl(p.price_cents)}{p.by_weight && <span className="font-medium text-[var(--text-faded)]">/kg</span>}{monta && <span className="ml-1 rounded bg-bg-surface-2 px-1 text-[9px] font-bold text-[var(--text-muted)]">{p.by_weight ? "pesar" : "monta"}</span>}</div>
-                              </div>
-                              {!monta && q > 0 ? (
-                                <div className="flex shrink-0 items-center gap-1.5">
-                                  <button onClick={() => { const u = temp.find((l) => l.product.id === p.id && !l.grams && !l.modifierIds)?.uid; if (u) decLine(u); }} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
-                                  <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>
-                                  <button onClick={() => onProduct(p)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
-                                </div>
-                              ) : (
-                                <button onClick={() => onProduct(p)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-xl leading-none text-white">+</button>
-                              )}
-                            </div>
-                          );
-                        })}
+                {/* picker CATEGORY-FIRST: grade de categorias → produtos da escolhida (lista não fica gigante) */}
+                {(() => {
+                  const renderProduct = (p: BarProduct) => {
+                    const monta = (p.groups && p.groups.length > 0) || p.by_weight;
+                    const q = qtyOf(p);
+                    return (
+                      <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-bg-base p-2.5">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-ink">{p.name}</div>
+                          <div className="text-xs font-bold text-brand-600">{brl(p.price_cents)}{p.by_weight && <span className="font-medium text-[var(--text-faded)]">/kg</span>}{monta && <span className="ml-1 rounded bg-bg-surface-2 px-1 text-[9px] font-bold text-[var(--text-muted)]">{p.by_weight ? "pesar" : "monta"}</span>}</div>
+                        </div>
+                        {!monta && q > 0 ? (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <button onClick={() => { const u = temp.find((l) => l.product.id === p.id && !l.grams && !l.modifierIds)?.uid; if (u) decLine(u); }} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-lg leading-none">−</button>
+                            <span className="w-4 text-center text-sm font-bold tabular-nums">{q}</span>
+                            <button onClick={() => onProduct(p)} className="grid h-7 w-7 place-items-center rounded-lg brand-gradient text-lg leading-none text-white">+</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => onProduct(p)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg brand-gradient text-xl leading-none text-white">+</button>
+                        )}
                       </div>
+                    );
+                  };
+                  const active = cats.find((c) => c.id === pickedCat);
+                  if (active) {
+                    return (
+                      <div>
+                        <button onClick={() => setPickedCat(null)} className="mb-2.5 inline-flex items-center gap-1 text-sm font-bold text-brand-600">‹ Categorias</button>
+                        <p className="mb-1.5 text-xs font-bold uppercase text-[var(--text-muted)]">{active.name}</p>
+                        <div className="grid grid-cols-2 gap-2">{active.products.map(renderProduct)}</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {cats.map((cat) => {
+                        const n = temp.filter((l) => cat.products.some((p) => p.id === l.product.id)).reduce((s, l) => s + l.qty, 0);
+                        return (
+                          <button key={cat.id} onClick={() => setPickedCat(cat.id)} className="relative flex items-center justify-between gap-2 rounded-xl border border-line bg-bg-base p-3 text-left">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-bold text-ink">{cat.name}</div>
+                              <div className="text-[11px] text-[var(--text-faded)]">{cat.products.length} {cat.products.length === 1 ? "item" : "itens"}</div>
+                            </div>
+                            {n > 0 && <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand-600 px-1.5 text-xs font-bold text-white">{n}</span>}
+                            <IconArrowRight width={15} height={15} className="shrink-0 text-[var(--text-faded)]" />
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
 
                 {/* a lançar: linhas do temp com obs por linha (diferencial) */}
                 {temp.length > 0 && (
