@@ -36,6 +36,47 @@ function ProductThumb({ p, station }: { p: BarProduct; station: string }) {
   );
 }
 
+// Linha de produto (usada dentro do modal da categoria). Espelha a linha antiga inline.
+function ProductRow({ p, station, cart, onPlus, incKey, decKey }: {
+  p: BarProduct;
+  station: string;
+  cart: Record<string, Line>;
+  onPlus: (p: BarProduct, station: string) => void;
+  incKey: (key: string) => void;
+  decKey: (key: string) => void;
+}) {
+  const hasGroups = !!(p.groups && p.groups.length > 0);
+  const q = hasGroups ? 0 : cart[p.id]?.qty ?? 0;
+  return (
+    <li className="flex items-center gap-3 rounded-2xl border border-white/10 p-3 backdrop-blur transition" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))" }}>
+      <ProductThumb p={p} station={station} />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold leading-tight">
+          {p.name}
+          {p.size_label && <span className="ml-1.5 text-sm font-normal text-white/40">· {p.size_label}</span>}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <p className="font-bold" style={{ color: ACCENT_HI }}>
+            {(() => { const fp = fromPrice(p); return <>{fp.from && <span className="text-[10px] font-medium text-white/40">a partir de </span>}{brl(fp.cents)}{fp.perKg && <span className="text-[11px] font-medium text-white/40">/kg</span>}</>; })()}
+          </p>
+          {hasGroups && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,59,78,0.15)", color: ACCENT_HI }}>monta</span>}
+        </div>
+      </div>
+      {p.by_weight ? (
+        <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">pesado no balcão</span>
+      ) : q > 0 ? (
+        <div className="flex items-center gap-2.5">
+          <button onClick={() => decKey(p.id)} aria-label="menos" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-lg leading-none active:scale-95">−</button>
+          <span className="w-4 text-center font-bold tabular-nums">{q}</span>
+          <button onClick={() => incKey(p.id)} aria-label="mais" className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})` }}>+</button>
+        </div>
+      ) : (
+        <button onClick={() => onPlus(p, station)} aria-label={`adicionar ${p.name}`} className="flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none text-white shadow-lg active:scale-95" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})`, boxShadow: "0 8px 22px -10px rgba(255,59,78,0.6)" }}>+</button>
+      )}
+    </li>
+  );
+}
+
 export default function TemplateBar({
   storeName,
   tagline,
@@ -74,6 +115,7 @@ export default function TemplateBar({
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [customizing, setCustomizing] = useState<{ product: BarProduct; station: string } | null>(null);
+  const [openCat, setOpenCat] = useState<BarCategory | null>(null);
   // delivery (cardápio público sem mesa)
   const [dMode, setDMode] = useState<"retirada" | "entrega">("retirada");
   const [dName, setDName] = useState("");
@@ -228,56 +270,33 @@ export default function TemplateBar({
         <div className="mt-7 h-px w-24" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }} />
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-10 px-4 pb-40">
-        {categories.map((cat) => (
-          <section key={cat.id}>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: ACCENT_HI, background: "rgba(255,59,78,0.12)" }}>
-                <StationIcon station={cat.station} />
-              </span>
-              <div>
-                <h2 className="text-xl font-bold leading-tight">{cat.name}</h2>
-                {cat.description && <p className="text-sm text-white/45">{cat.description}</p>}
+      <div className="mx-auto max-w-2xl space-y-2.5 px-4 pb-40">
+        {categories.map((cat) => {
+          const inCart = lines.filter((l) => cat.products.some((p) => p.id === l.product.id)).reduce((s, l) => s + l.qty, 0);
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setOpenCat(cat)}
+              className="relative flex h-32 w-full flex-col items-center justify-center overflow-hidden rounded-2xl text-center ring-1 ring-white/10"
+              style={{ background: "#1b1012" }}
+            >
+              {cat.img && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={cat.img} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} className="absolute inset-0 h-full w-full object-cover" />
+              )}
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78), rgba(0,0,0,0.30) 60%, rgba(0,0,0,0.15))" }} />
+              <div className="relative px-4">
+                <div className="text-2xl font-bold leading-tight text-white drop-shadow" style={{ fontFamily: "Georgia, serif" }}>{cat.name}</div>
+                {cat.description && <div className="mt-0.5 text-xs text-white/80">{cat.description}</div>}
               </div>
-            </div>
-
-            <ul className="space-y-2">
-              {cat.products.map((p) => {
-                const hasGroups = p.groups && p.groups.length > 0;
-                const q = hasGroups ? 0 : cart[p.id]?.qty ?? 0;
-                return (
-                  <li key={p.id} className="flex items-center gap-3 rounded-2xl border border-white/10 p-3 backdrop-blur transition" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))" }}>
-                    <ProductThumb p={p} station={cat.station} />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-tight">
-                        {p.name}
-                        {p.size_label && <span className="ml-1.5 text-sm font-normal text-white/40">· {p.size_label}</span>}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <p className="font-bold" style={{ color: ACCENT_HI }}>
-                          {(() => { const fp = fromPrice(p); return <>{fp.from && <span className="text-[10px] font-medium text-white/40">a partir de </span>}{brl(fp.cents)}{fp.perKg && <span className="text-[11px] font-medium text-white/40">/kg</span>}</>; })()}
-                        </p>
-                        {hasGroups && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,59,78,0.15)", color: ACCENT_HI }}>monta</span>}
-                      </div>
-                    </div>
-                    {p.by_weight ? (
-                      // vendido por peso = pesado no balcão; não é pedível online
-                      <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">pesado no balcão</span>
-                    ) : q > 0 ? (
-                      <div className="flex items-center gap-2.5">
-                        <button onClick={() => decKey(p.id)} aria-label="menos" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-lg leading-none active:scale-95">−</button>
-                        <span className="w-4 text-center font-bold tabular-nums">{q}</span>
-                        <button onClick={() => incKey(p.id)} aria-label="mais" className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-white active:scale-95" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})` }}>+</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => onPlus(p, cat.station)} aria-label={`adicionar ${p.name}`} className="flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none text-white shadow-lg active:scale-95" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})`, boxShadow: "0 8px 22px -10px rgba(255,59,78,0.6)" }}>+</button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
+              {inCart > 0 && (
+                <span className="absolute right-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-sm font-bold text-white shadow-lg" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})` }}>
+                  {inCart}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {count > 0 && !open && (
@@ -285,6 +304,39 @@ export default function TemplateBar({
           <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/25 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
           <span className="tabular-nums">{brl(total)}</span>
         </button>
+      )}
+
+      {openCat && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setOpenCat(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative flex w-full max-w-md flex-col rounded-t-3xl border-t border-white/10" style={{ background: "#17130E", maxHeight: "85vh" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: ACCENT_HI, background: "rgba(255,59,78,0.12)" }}>
+                  <StationIcon station={openCat.station} />
+                </span>
+                <div>
+                  <h3 className="text-xl font-extrabold" style={{ fontFamily: "Georgia, serif" }}>{openCat.name}</h3>
+                  {openCat.description && <p className="text-xs text-white/45">{openCat.description}</p>}
+                </div>
+              </div>
+              <button onClick={() => setOpenCat(null)} aria-label="fechar" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-lg">✕</button>
+            </div>
+            <ul className="flex-1 space-y-2 overflow-y-auto p-4">
+              {openCat.products.map((p) => (
+                <ProductRow key={p.id} p={p} station={openCat.station} cart={cart} onPlus={onPlus} incKey={incKey} decKey={decKey} />
+              ))}
+            </ul>
+            {count > 0 && (
+              <div className="border-t border-white/10 p-3">
+                <button onClick={() => { setOpenCat(null); setOpen(true); }} className="flex w-full items-center justify-between rounded-2xl px-5 py-3.5 font-bold text-white active:scale-[0.99]" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})` }}>
+                  <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/25 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
+                  <span className="tabular-nums">{brl(total)}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {customizing && (
