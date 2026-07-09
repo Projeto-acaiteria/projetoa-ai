@@ -25,8 +25,6 @@ export async function POST(req: Request) {
   if (!cfg) return NextResponse.json({ error: "plano inválido" }, { status: 400 });
   if (body.forma !== "cartao" && body.forma !== "pix")
     return NextResponse.json({ error: "forma inválida" }, { status: 400 });
-  if (!body.nome || !body.cpfCnpj)
-    return NextResponse.json({ error: "nome e CPF/CNPJ obrigatórios" }, { status: 400 });
 
   const { data: sub } = await db().from("subscriptions").select("*").eq("store_id", loja.id).maybeSingle();
   if (!sub) return NextResponse.json({ error: "loja sem assinatura" }, { status: 400 });
@@ -38,6 +36,8 @@ export async function POST(req: Request) {
     customerId = found.data?.data?.[0]?.id;
   }
   if (!customerId) {
+    // 1ª vez: precisa dos dados pra emitir a cobrança. O front mostra os campos e reenvia.
+    if (!body.nome || !body.cpfCnpj) return NextResponse.json({ needs_customer_data: true });
     const created = await asaas.createCustomer({
       name: body.nome,
       cpfCnpj: body.cpfCnpj,
@@ -65,11 +65,20 @@ export async function POST(req: Request) {
     });
     if (!r.ok || !r.data)
       return NextResponse.json({ error: r.error ?? "falha na assinatura" }, { status: 502 });
+    // a subscription não traz URL — a 1ª cobrança dela tem a invoiceUrl (página segura de cartão do Asaas)
+    const pays = await asaas.listSubscriptionPayments(r.data.id);
+    const first = pays.data?.data?.[0];
     await db()
       .from("subscriptions")
-      .update({ asaas_customer_id: customerId, asaas_subscription_id: r.data.id, plano: body.plano })
+      .update({
+        asaas_customer_id: customerId,
+        asaas_subscription_id: r.data.id,
+        asaas_payment_id_atual: first?.id ?? null,
+        pix_link_atual: first?.invoiceUrl ?? null,
+        plano: body.plano,
+      })
       .eq("store_id", loja.id);
-    return NextResponse.json({ ok: true, tipo: "cartao", subscriptionId: r.data.id });
+    return NextResponse.json({ ok: true, tipo: "cartao", url: first?.invoiceUrl ?? null, subscriptionId: r.data.id });
   }
 
   // PIX avulso pelo período do plano
