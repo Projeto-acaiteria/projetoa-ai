@@ -7,6 +7,7 @@ import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
 import { resolveStoreId } from "@/lib/auth/current";
 import CaixaClient from "./CaixaClient";
+import CallsAlert from "@/components/admin/CallsAlert";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function CaixaPage() {
   return (
     <>
       <PageHeader title="Caixa" sub="Frente de caixa · abra o caixa e venda" />
+      {cfg?.has_tables && <CallsAlert />}
       <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} showPdv={showPdv} pricePerKgCents={store.pricePerKgCents} cashPinSet={cashPinSet} family={family} />
     </>
   );
