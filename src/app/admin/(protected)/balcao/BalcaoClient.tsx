@@ -28,7 +28,7 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 let seq = 0;
 const uid = () => `l${++seq}`;
 
-export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, cupomRodape, loyaltyEnabled }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; loyaltyEnabled: boolean }) {
+export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, cupomRodape, loyaltyEnabled, onSold }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; loyaltyEnabled: boolean; onSold?: () => void }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [query, setQuery] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -194,7 +194,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         }
       }
       const pts = d.pointsAwarded ?? 0;
-      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput(""); setCouponId(null); setCouponCode(""); setCouponMsg("");
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput(""); setCouponId(null); setCouponCode(""); setCouponMsg(""); onSold?.();
       setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {

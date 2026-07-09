@@ -41,14 +41,16 @@ function BrandMark({ logoUrl, name }: { logoUrl?: string; name: string }) {
 export type NavCtx = { template: string; hasTables: boolean; hasDelivery: boolean; coverEnabled: boolean; hasStations: boolean; loyaltyEnabled: boolean; hasEstoque: boolean; role: Role; family: Family };
 // family: "food" = cardápio/mesas; "service" = OS/bancada (assistência técnica). Item sem family = core (todo vertical).
 type NavItem = { href: string; label: string; Icon: typeof IconHome; show?: (c: NavCtx) => boolean; family?: Family };
+// Bar/grid COM mesas → o Caixa vira o hub PDV (mesas + venda avulsa embutidas); Mesas/Balcão sofrem do menu.
+const isPdvHub = (c: NavCtx) => c.hasTables && c.template !== "acai";
 const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/minha-area", label: "Minha área", Icon: IconClock },
   { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
   { href: "/admin/vendas", label: "Vendas", Icon: IconBag, family: "service" },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
-  { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai", family: "food" },
-  { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables, family: "food" },
+  { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai" && !isPdvHub(c), family: "food" },
+  { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables && c.template === "acai", family: "food" },
   { href: "/admin/qr-mesas", label: "QR das mesas", Icon: IconQr, show: (c) => c.hasTables, family: "food" },
   { href: "/admin/garcons", label: "Garçons", Icon: IconUsers, show: (c) => c.hasTables, family: "food" },
   { href: "/admin/pedidos", label: "Pedidos", Icon: IconReceipt, show: (c) => c.hasDelivery, family: "food" },

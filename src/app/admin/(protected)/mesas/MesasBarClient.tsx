@@ -26,7 +26,7 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -36,6 +36,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   cnpj: string;
   tel: string;
   cupomRodape: string;
+  onSaleClosed?: () => void; // ressincroniza o saldo do Caixa quando a grade está embutida no hub PDV
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -199,6 +200,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
       await loadComanda(drawer.tabId);
+      onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
     finally { setBusy(false); }
   }
@@ -225,7 +227,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         ],
         totalCents: d.totalCents ?? grand,
       }));
-      closeDrawer(); loadTables();
+      closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
   }

@@ -11,7 +11,10 @@ import type { CardMachine } from "@/lib/settings-store";
 import { printTicket } from "@/lib/print";
 import QzStatus from "@/components/admin/QzStatus";
 import { leituraXHtml, movTicketHtml } from "@/lib/ticket";
-import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter, IconTrash } from "@/components/Icons";
+import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, IconAlert, IconStar, IconPrinter, IconTrash, IconBag } from "@/components/Icons";
+import type { BarCategory } from "@/lib/menu-bar-store";
+import MesasBarClient from "../mesas/MesasBarClient";
+import BalcaoClient from "../balcao/BalcaoClient";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -30,8 +33,9 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service" }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family, pdvHub = false, barCategories = [], coverShow = null, staff = [], loyaltyEnabled = false }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service"; pdvHub?: boolean; barCategories?: BarCategory[]; coverShow?: { artist: string; coverCents: number } | null; staff?: { id: string; name: string }[]; loyaltyEnabled?: boolean }) {
   const [session, setSession] = useState<CashSession | null>(null);
+  const [avulsa, setAvulsa] = useState(false);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [closeResult, setCloseResult] = useState<CashSession | null>(null);
@@ -78,9 +82,32 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
               <a href="/admin/os/montar" className="flex items-center justify-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink hover:border-brand-600">🧩 Montar PC</a>
             </div>
           </div>
+        ) : pdvHub ? (
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+            <div className="flex justify-end">
+              <button onClick={() => setAvulsa(true)} className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white">
+                <IconBag width={17} height={17} /> Venda avulsa
+              </button>
+            </div>
+            <MesasBarClient categories={barCategories} coverShow={coverShow} staff={staff} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} onSaleClosed={load} />
+          </div>
         ) : (
           <p className="card p-4 text-center text-sm text-[var(--text-muted)]">Pra vender, use o <b className="text-ink">Balcão</b> ou as <b className="text-ink">Mesas</b>. Aqui é a gestão do caixa (abrir, sangria, suprimento e fechamento).</p>
         )
+      )}
+
+      {avulsa && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-bg-base">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <h2 className="text-lg font-extrabold text-ink">Venda avulsa · balcão</h2>
+            <button onClick={() => setAvulsa(false)} className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-sm font-bold text-ink hover:border-brand-600">
+              Fechar ✕
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <BalcaoClient categories={barCategories} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} loyaltyEnabled={loyaltyEnabled} onSold={load} />
+          </div>
+        </div>
       )}
     </div>
   );
