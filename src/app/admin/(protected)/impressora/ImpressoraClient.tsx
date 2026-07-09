@@ -218,10 +218,23 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
           </button>
         </div>
         {active === false && (
-          <p className="mt-3 rounded-xl bg-bg-surface-2 p-3 text-sm text-[var(--text-secondary)]">
-            Pra impressão automática, instale o QZ Tray (grátis):{" "}
-            <a href="https://qz.io/download/" target="_blank" rel="noreferrer" className="font-bold text-brand-600 underline">qz.io/download</a>.
-            Sem ele, os pedidos ainda imprimem abrindo a janela de impressão do navegador.
+          <div className="mt-3 space-y-3 rounded-xl bg-bg-surface-2 p-3.5">
+            <p className="text-sm font-bold text-ink">Ative a impressão neste computador (só 1 vez)</p>
+            <a href="/ComandaPRO-Impressao.zip" download className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
+              <IconPrinter width={16} height={16} /> Baixar instalador
+            </a>
+            <ol className="space-y-1.5 text-sm text-[var(--text-secondary)]">
+              <li><b className="text-ink">1.</b> Baixe e <b className="text-ink">extraia</b> o arquivo (botão direito → Extrair tudo).</li>
+              <li><b className="text-ink">2.</b> Clique direito no <b className="text-ink">INSTALAR-IMPRESSAO.bat</b> → <b className="text-ink">Executar como administrador</b> → aguarde ~1 min.</li>
+              <li><b className="text-ink">3.</b> Volte aqui e clique <b className="text-ink">Conectar</b>. Pronto — imprime sem aquele aviso de permissão.</li>
+            </ol>
+            <p className="text-xs text-[var(--text-faded)]">O instalador coloca tudo sozinho (o app de impressão + o certificado que libera a impressão automática). Sem ele, os pedidos ainda imprimem abrindo a janela do navegador.</p>
+          </div>
+        )}
+        {active && (
+          <p className="mt-3 text-xs text-[var(--text-faded)]">
+            Configurar em outro computador?{" "}
+            <a href="/ComandaPRO-Impressao.zip" download className="font-bold text-brand-600 underline">Baixar instalador</a>
           </p>
         )}
       </Card>
