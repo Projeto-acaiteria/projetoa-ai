@@ -282,10 +282,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   return (
     <>
-      {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez) */}
+      {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez).
+          Garçom (canClose=false) não vê QZ (não imprime — quem imprime é o caixa) nem gerencia mesas. */}
       <div className="mb-4 flex items-center justify-between gap-2">
-        <QzStatus />
-        <div className="flex items-center gap-2">
+        {canClose ? <QzStatus /> : <span />}
+        {canClose && <div className="flex items-center gap-2">
         {addOpen ? (
           <>
             <input autoFocus type="number" min={1} value={addN} onChange={(e) => setAddN(e.target.value)} placeholder="total de mesas" className="w-36 rounded-lg border border-line bg-bg-base px-3 py-2 text-sm text-ink outline-none focus:border-brand-600" />
@@ -295,7 +296,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         ) : (
           <button onClick={() => setAddOpen(true)} className="rounded-lg border border-line px-3 py-2 text-sm font-bold text-brand-600 hover:border-brand-400">+ Adicionar mesas</button>
         )}
-        </div>
+        </div>}
       </div>
 
       {/* GRID de mesas por área */}
