@@ -203,7 +203,6 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
       await loadComanda(drawer.tabId);
-      if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
     finally { setBusy(false); }
