@@ -117,6 +117,8 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [prepAuto, setPrepAuto] = useState(false);
   // imprimir comprovante de sangria/suprimento — POR-MÁQUINA, default LIGADO (rastro físico assinável)
   const [movComp, setMovComp] = useState(true);
+  // Caixa como estação de impressão: imprime vias de preparo (cozinha/bar) de pedidos de QUALQUER fonte — POR-MÁQUINA, default LIGADO
+  const [prepCaixa, setPrepCaixa] = useState(true);
   // largura do cupom (mm) — CALIBRÁVEL por máquina; o sistema imprime nesta largura (se adapta à impressora)
   const [widthMm, setWidthMm] = useState(72);
 
@@ -126,6 +128,7 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
   useEffect(() => { setPrepAuto(localStorage.getItem("autoprint:preparo") === "1"); }, []);
   useEffect(() => { setMovComp(localStorage.getItem("mov:comprovante") !== "0"); }, []);
+  useEffect(() => { setPrepCaixa(localStorage.getItem("autoprint:caixa-preparo") !== "0"); }, []);
   useEffect(() => { setWidthMm(getPrintWidthMm()); }, []);
 
   function changeWidth(mm: number) {
@@ -149,6 +152,7 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
   const togglePrep = () => setPrepAuto((v) => { const n = !v; localStorage.setItem("autoprint:preparo", n ? "1" : "0"); return n; });
   const toggleMovComp = () => setMovComp((v) => { const n = !v; localStorage.setItem("mov:comprovante", n ? "1" : "0"); return n; });
+  const togglePrepCaixa = () => setPrepCaixa((v) => { const n = !v; localStorage.setItem("autoprint:caixa-preparo", n ? "1" : "0"); return n; });
 
   // dispara o pulso da gaveta isolado (sem fazer venda) — pra testar o hardware
   async function testDrawer() {
@@ -298,6 +302,20 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${prepAuto ? "brand-gradient" : "bg-bg-surface-2"}`}
           >
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${prepAuto ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+          <div>
+            <div className="font-bold text-ink">Imprimir vias de preparo neste caixa</div>
+            <div className="mt-0.5 text-xs text-[var(--text-muted)]">Este caixa vira a estação de impressão: imprime a via da cozinha/bar de <b>qualquer pedido</b> (mesa, garçom ou QR) na impressora de cada estação. Deixe <b>ligado</b> se as impressoras estão neste computador. Desligue se cada estação tem a tela Preparo própria (evita imprimir 2×).</div>
+          </div>
+          <button
+            onClick={togglePrepCaixa}
+            role="switch"
+            aria-checked={prepCaixa}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${prepCaixa ? "brand-gradient" : "bg-bg-surface-2"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${prepCaixa ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
       </Card>

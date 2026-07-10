@@ -15,6 +15,7 @@ import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, 
 import type { BarCategory } from "@/lib/menu-bar-store";
 import MesasBarClient from "../mesas/MesasBarClient";
 import BalcaoClient from "../balcao/BalcaoClient";
+import CaixaPrepPrinter from "@/components/admin/CaixaPrepPrinter";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -33,7 +34,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family, pdvHub = false, barCategories = [], coverShow = null, staff = [], loyaltyEnabled = false }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service"; pdvHub?: boolean; barCategories?: BarCategory[]; coverShow?: { artist: string; coverCents: number } | null; staff?: { id: string; name: string }[]; loyaltyEnabled?: boolean }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family, pdvHub = false, barCategories = [], coverShow = null, staff = [], loyaltyEnabled = false, stations = [] }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service"; pdvHub?: boolean; barCategories?: BarCategory[]; coverShow?: { artist: string; coverCents: number } | null; staff?: { id: string; name: string }[]; loyaltyEnabled?: boolean; stations?: string[] }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [avulsa, setAvulsa] = useState(false);
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -84,6 +85,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
           </div>
         ) : pdvHub ? (
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+            <CaixaPrepPrinter stations={stations} loja={storeName} />
             <div className="flex justify-end">
               <button onClick={() => setAvulsa(true)} className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white">
                 <IconBag width={17} height={17} /> Venda avulsa
