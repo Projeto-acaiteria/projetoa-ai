@@ -11,7 +11,7 @@ export async function requireNavAccess(href: string): Promise<void> {
   const role = await getCurrentRole();
   if (!role) redirect("/login");
   if (!canSeeNav(role, href)) {
-    // técnico só tem a área dele; recepção/owner-bloqueado voltam pro início
-    redirect(role === "technician" ? "/admin/minha-area" : "/admin");
+    // técnico → área dele; garçom → mesas (não vê o dashboard); recepção/owner → início
+    redirect(role === "technician" ? "/admin/minha-area" : role === "waiter" ? "/admin/mesas" : "/admin");
   }
 }

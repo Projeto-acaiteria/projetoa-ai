@@ -26,7 +26,7 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -37,6 +37,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   tel: string;
   cupomRodape: string;
   onSaleClosed?: () => void; // ressincroniza o saldo do Caixa quando a grade está embutida no hub PDV
+  canClose?: boolean; // GARÇOM (false): abre e lança, mas NÃO fecha/recebe — quem fecha é o caixa
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -505,7 +506,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                   {paid > grand && <div className="flex justify-between text-base font-extrabold text-brand-600"><span>Troco</span><span className="tabular-nums">{brl(paid - grand)}</span></div>}
                 </div>
 
-                {paying ? (
+                {canClose && paying ? (
                   <>
                     <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
                     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -574,7 +575,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                       <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
                       {grand > 0 && <button onClick={conferir} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconReceipt width={15} height={15} /> Imprimir conta</button>}
                       <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
-                      {grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
+                      {canClose && grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
                     </div>
                   </>
                 )}

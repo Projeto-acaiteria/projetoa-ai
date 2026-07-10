@@ -41,7 +41,7 @@ export const getCurrentStore = cache(async (): Promise<Store | null> => {
   return null;
 });
 
-export type Role = "owner" | "reception" | "technician";
+export type Role = "owner" | "reception" | "technician" | "waiter";
 export type Membership = { store: Store; role: Role; technicianId: string | null };
 
 // Papel do usuário logado na loja resolvida. Owner = dono (owner_id) OU member role=owner.
@@ -55,7 +55,7 @@ export const getCurrentMembership = cache(async (): Promise<Membership | null> =
     .eq("store_id", store.id).eq("user_id", user.id).eq("active", true)
     .maybeSingle();
   const row = m as { role?: string; technician_id?: string | null } | null;
-  const role: Role = row?.role === "owner" ? "owner" : row?.role === "technician" ? "technician" : "reception";
+  const role: Role = row?.role === "owner" ? "owner" : row?.role === "technician" ? "technician" : row?.role === "waiter" ? "waiter" : "reception";
   return { store, role, technicianId: row?.technician_id ?? null };
 });
 
