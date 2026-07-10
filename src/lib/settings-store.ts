@@ -24,6 +24,7 @@ export type StoreSettings = {
   deliveryZones: DeliveryZone[]; // taxa por bairro (modo zones)
   hours: OpenHours[]; // 7 posições, domingo→sábado
   pricePerKgCents: number; // preço do açaí por kg (modo balança no balcão/mesa)
+  doseMl: number; // BAR: tamanho da dose em ml (ex.: 50). doses/garrafa = garrafa(ml) ÷ doseMl
   // identidade visual da loja (cardápio público) — opt-in, cada loja com a própria cara
   logoUrl: string; // logo no header (vazio = só o nome)
   bannerUrl: string; // foto de fundo do header/hero (vazio = gradiente padrão do template)
@@ -88,6 +89,7 @@ const DEFAULT_STORE: StoreSettings = {
   deliveryZones: [],
   hours: Array.from({ length: 7 }, () => ({ open: "10:00", close: "22:00", closed: false })),
   pricePerKgCents: 4990, // R$ 49,90/kg (placeholder — confirmar com o Vidal)
+  doseMl: 50, // dose padrão do bar: 50ml (o dono ajusta em Configurações)
   logoUrl: "",
   bannerUrl: "",
   primaryColor: "",
@@ -143,6 +145,7 @@ export async function setStore(
   if (store.deliveryFeeCents != null) clean.deliveryFeeCents = Math.max(0, Math.round(Number(store.deliveryFeeCents)));
   if (store.minOrderCents != null) clean.minOrderCents = Math.max(0, Math.round(Number(store.minOrderCents)));
   if (store.pricePerKgCents != null) clean.pricePerKgCents = Math.max(0, Math.round(Number(store.pricePerKgCents)));
+  if (store.doseMl != null) clean.doseMl = Math.max(1, Math.round(Number(store.doseMl) || 50));
   if (store.deliveryMode === "fixed" || store.deliveryMode === "zones") clean.deliveryMode = store.deliveryMode;
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
   if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);

@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -135,6 +135,16 @@ export default function ConfigClient() {
                 <span className="text-sm text-[var(--text-muted)]">/kg</span>
               </div>
               <p className="mt-1 text-[11px] text-[var(--text-faded)]">Self-service no balcão: pesa e cobra por kg.</p>
+            </div>
+          )}
+          {config?.stock_dose && (
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Tamanho da dose (ml)</label>
+              <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-line bg-bg-base px-3">
+                <input type="number" min={1} value={store.doseMl || 50} onChange={(e) => setS("doseMl", Math.max(1, Math.round(Number(e.target.value) || 50)))} className="w-full bg-transparent py-2.5 text-sm font-bold text-ink outline-none" />
+                <span className="text-sm text-[var(--text-muted)]">ml</span>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">Dose padrão do bar (ex: 50ml). Doses por garrafa = tamanho da garrafa ÷ este valor.</p>
             </div>
           )}
         </div>
