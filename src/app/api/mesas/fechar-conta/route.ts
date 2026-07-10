@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
+import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 
@@ -27,9 +28,17 @@ export async function POST(req: Request) {
     if (full.tab.status === "fechada") return NextResponse.json({ ok: true, alreadyClosed: true });
 
     const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0; // taxa só sobre consumo
-    // COUVERT: cobrado por padrão; se o cliente recusar (applyCover === false) zera aqui E persiste 0 na comanda,
-    // pra o total, o cupom e o repasse do artista (coverReport lê tabs.cover_cents) baterem.
-    const coverCents = b.applyCover === false ? 0 : full.coverCents;
+    // COUVERT: cobrado por padrão; se o cliente recusar (applyCover === false) zera E persiste 0.
+    // Se o snapshot ainda é 0 (comanda antiga/QR aberta sem pax) mas há show ativo, calcula cover/pessoa
+    // × pessoas — assim o couvert do checkbox marcado sempre cobra, mesmo sem ter passado pelo ajuste.
+    let coverCents = 0;
+    if (b.applyCover !== false) {
+      coverCents = full.coverCents;
+      if (coverCents === 0) {
+        const ev = await getActiveEvent(sid);
+        if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1);
+      }
+    }
     const grand = full.consumoCents + coverCents + serviceFeeCents;
     const falta = Math.max(0, grand - full.paidCents);
 
@@ -37,7 +46,7 @@ export async function POST(req: Request) {
       const card = await resolveCardFee(method, falta, sid, { machineId: b.machineId, parcelas: b.parcelas });
       await addPayment(b.tabId, method, falta, card.feePercent); // valida dono + grava taxa da máquina escolhida
     }
-    const r = await closeTab(b.tabId, { serviceFeeCents, coverCents: b.applyCover === false ? 0 : undefined, customerPhone: b.customerPhone, customerName: b.customerName });
+    const r = await closeTab(b.tabId, { serviceFeeCents, coverCents, customerPhone: b.customerPhone, customerName: b.customerName });
     await markTabCallsAttended(b.tabId); // ao fechar, quita o "pediu a conta" (some o âmbar do tile)
     return NextResponse.json({ ok: true, totalCents: grand, paidNowCents: falta, pointsAwarded: r.pointsAwarded });
   } catch (e) {

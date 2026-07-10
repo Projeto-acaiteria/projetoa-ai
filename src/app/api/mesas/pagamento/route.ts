@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addPayment, getTabFull } from "@/lib/tables-store";
+import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import type { PaymentMethod } from "@/lib/orders-store";
@@ -33,7 +34,11 @@ export async function POST(req: Request) {
     // que o cliente deu em dinheiro é troco e volta pra ele — não pode inflar caixa/faturamento.
     const full = await getTabFull(b.tabId, sid);
     const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0;
-    const coverCents = b.applyCover === false ? 0 : full.coverCents;
+    let coverCents = 0;
+    if (b.applyCover !== false) {
+      coverCents = full.coverCents;
+      if (coverCents === 0) { const ev = await getActiveEvent(sid); if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1); }
+    }
     const grand = full.consumoCents + coverCents + serviceFeeCents;
     const falta = Math.max(0, grand - full.paidCents);
     const recorded = Math.min(b.amountCents, falta);
