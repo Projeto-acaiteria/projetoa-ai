@@ -493,16 +493,6 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                       </div>
                     )}
 
-                    {/* split: registra pagamento parcial (vazio = paga a falta toda) sem fechar */}
-                    {grand > 0 && (
-                      <div className="mt-2 flex gap-1.5">
-                        <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
-                          <span className="text-xs font-semibold text-[var(--text-muted)]">R$</span>
-                          <input type="number" min={0} step="0.5" value={parcial} onChange={(e) => setParcial(e.target.value)} placeholder={falta > 0 ? `parcial (vazio = ${brl(falta)})` : "parcial"} className="w-full bg-transparent px-1.5 py-2 text-sm font-bold text-ink outline-none" />
-                        </div>
-                        <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar pagamento</button>
-                      </div>
-                    )}
                     {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                     <div className="mt-3 flex gap-2">
                       <button onClick={() => { setPaying(false); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">‹ Voltar</button>
