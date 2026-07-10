@@ -351,9 +351,19 @@ function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; o
       </div>
 
       <div className="shrink-0 text-right">
-        <span className={`text-lg font-extrabold ${isLow ? "text-[var(--red-no)]" : "text-ink"}`}>{it.qty}</span>
-        <span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">{it.unit}</span>
-        {it.dosesPerBottle ? <div className="text-[11px] text-[var(--text-faded)]">≈ {(it.qty / it.dosesPerBottle).toFixed(1)} garrafa(s)</div> : null}
+        {it.dosesPerBottle ? (
+          // destilado: o controle é em GARRAFAS (o dono cadastra a garrafa); as doses são o que baixa por venda
+          <>
+            <span className={`text-lg font-extrabold ${isLow ? "text-[var(--red-no)]" : "text-ink"}`}>{(it.qty / it.dosesPerBottle).toFixed(1)}</span>
+            <span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">garrafa(s)</span>
+            <div className="text-[11px] text-[var(--text-faded)]">{it.qty} doses restantes</div>
+          </>
+        ) : (
+          <>
+            <span className={`text-lg font-extrabold ${isLow ? "text-[var(--red-no)]" : "text-ink"}`}>{it.qty}</span>
+            <span className="ml-0.5 text-xs font-bold text-[var(--text-muted)]">{it.unit}</span>
+          </>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -555,15 +565,21 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
   const [expiry, setExpiry] = useState(item.expiry ?? ""); // entrada: validade do lote que está chegando
   const [saving, setSaving] = useState(false);
 
+  // destilado: o dono lança em GARRAFAS; converte pra doses (× doses/garrafa)
+  const isDose = !!item.dosesPerBottle && item.dosesPerBottle > 0;
+  const dpb = item.dosesPerBottle ?? 1;
+  const [byBottle, setByBottle] = useState(isDose); // dose: entrada/saída em garrafas por padrão
   const canConvert = dir === "entrada" && !!item.purchaseFactor && item.purchaseFactor > 0;
   const factor = item.purchaseFactor ?? 1;
   const typed = parseFloat(qty.replace(",", ".")) || 0;
-  const useQty = +(byPurchase ? typed * factor : typed).toFixed(3); // sempre na unidade de USO
+  const useQty = +((byBottle && isDose ? typed * dpb : byPurchase ? typed * factor : typed)).toFixed(3); // sempre em doses/unidade de USO
 
   async function save() {
     if (!(useQty > 0)) return;
     setSaving(true);
-    const costC = dir === "entrada" && cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : undefined;
+    // dose: o dono digita o custo POR GARRAFA; o CMV trabalha por dose → divide por doses/garrafa
+    const costRaw = dir === "entrada" && cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : undefined;
+    const costC = costRaw != null && isDose ? Math.round(costRaw / dpb) : costRaw;
     await fetch(`/api/estoque/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -575,18 +591,25 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
   return (
     <Overlay onClose={onClose} title={`${dir === "entrada" ? "Entrada" : "Saída"} · ${item.name}`}>
       <div className="rounded-xl bg-bg-surface-2 px-3 py-2 text-sm text-ink-2">
-        Saldo atual: <b className="text-ink">{item.qty} {item.unit}</b>
+        Saldo atual: <b className="text-ink">{isDose ? `${(item.qty / dpb).toFixed(1)} garrafa(s)` : `${item.qty} ${item.unit}`}</b>{isDose && <span className="text-[var(--text-faded)]"> · {item.qty} doses</span>}
       </div>
 
-      {canConvert && (
+      {isDose && (
+        <div className="flex gap-1.5">
+          <button onClick={() => setByBottle(true)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${byBottle ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em garrafas (×{dpb})</button>
+          <button onClick={() => setByBottle(false)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${!byBottle ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em doses</button>
+        </div>
+      )}
+      {canConvert && !isDose && (
         <div className="flex gap-1.5">
           <button onClick={() => setByPurchase(false)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${!byPurchase ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em {item.unit}</button>
           <button onClick={() => setByPurchase(true)} className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition ${byPurchase ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>Em {item.purchaseUnit || "compra"} (×{factor})</button>
         </div>
       )}
 
-      <input className={inp} type="number" min={0} step="0.1" placeholder={`Quantidade (${byPurchase ? item.purchaseUnit || "compra" : item.unit})`} value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
-      {byPurchase && typed > 0 && <p className="-mt-1 text-[11px] text-[var(--text-faded)]">= {useQty} {item.unit} no estoque</p>}
+      <input className={inp} type="number" min={0} step="0.1" placeholder={`Quantidade (${isDose ? (byBottle ? "garrafas" : "doses") : byPurchase ? item.purchaseUnit || "compra" : item.unit})`} value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
+      {isDose && byBottle && typed > 0 && <p className="-mt-1 text-[11px] text-[var(--text-faded)]">= {useQty} doses no estoque</p>}
+      {byPurchase && !isDose && typed > 0 && <p className="-mt-1 text-[11px] text-[var(--text-faded)]">= {useQty} {item.unit} no estoque</p>}
 
       {dir === "saida" ? (
         <div>
@@ -601,7 +624,7 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
         <>
           <input className={inp} placeholder="Motivo (ex: Compra fornecedor)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div>
-            <label className="text-xs font-semibold text-[var(--text-muted)]">Custo por {item.unit} nesta compra (opcional)</label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Custo por {isDose ? "garrafa" : item.unit} nesta compra (opcional)</label>
             <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
               <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
               <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} />
