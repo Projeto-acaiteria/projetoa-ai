@@ -56,6 +56,8 @@ const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: s
   { key: "componentes", label: "Componentes", cats: ["cpu", "cooler", "mobo", "ram", "gpu", "ssd", "gabinete", "fonte"], color: "#B45309", soft: "#FEF3C7" },
   { key: "perifericos", label: "Periféricos", cats: ["mouse", "teclado", "mousepad", "monitor", "headset", "cadeira"], color: "#4338CA", soft: "#EEF2FF" },
 ];
+// famílias da assistência técnica (informática) — só aparecem no vertical service, nunca em food/bar
+const AT_KEYS: FamilyKey[] = ["pc_pronto", "componentes", "perifericos"];
 // famOf TOTAL: categorias custom de um tenant (ex.: bar usa "Destilado"/"Cerveja"/"Refrigerante")
 // não estão nas FAMILIES fixas → caem no fallback "à venda" em vez de virar undefined e quebrar a tela.
 const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c)) ?? FAMILIES[0];
@@ -218,7 +220,7 @@ export default function EstoqueClient({ family, doseMl = 50, stockDose = false }
       {/* Filtro por família */}
       <div className="no-scrollbar mt-6 flex gap-2 overflow-x-auto pb-1">
         <Chip active={filter === "todos"} onClick={() => setFilter("todos")} label="Todos" count={items.length} />
-        {FAMILIES.map((f) => (
+        {FAMILIES.filter((f) => AT_KEYS.includes(f.key) === (family === "service")).map((f) => (
           <Chip key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} label={f.label} count={famCount(f.key)} color={f.color} />
         ))}
       </div>
@@ -278,7 +280,7 @@ export default function EstoqueClient({ family, doseMl = 50, stockDose = false }
       {modal?.kind === "move" && (
         <MoveModal item={modal.item} dir={modal.dir} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
       )}
-      {modal?.kind === "edit" && <EditModal item={modal.item} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.kind === "edit" && <EditModal item={modal.item} family={family} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal?.kind === "history" && <HistoryModal item={modal.item} onClose={() => setModal(null)} />}
     </>
   );
@@ -418,7 +420,6 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
   // doses/garrafa = tamanho da garrafa ÷ dose padrão da loja. Entrada e contagem em GARRAFAS.
   const doseCapable = stockDose && sellable && !isService;
   const dosesPerBottle = byDose && bottleMl ? Math.max(0, Math.round((parseFloat(bottleMl.replace(",", ".")) || 0) / (doseMl || 50))) : 0;
-  const AT_KEYS = ["pc_pronto", "componentes", "perifericos"];
   const fams = FAMILIES.filter((f) => AT_KEYS.includes(f.key) === isService); // service vê só cats AT; food vê food
 
   async function save() {
@@ -646,7 +647,8 @@ function MoveModal({ item, dir, onClose, onSaved }: { item: StockItem; dir: "ent
   );
 }
 
-function EditModal({ item, onClose, onSaved }: { item: StockItem; onClose: () => void; onSaved: () => void }) {
+function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family: "food" | "service"; onClose: () => void; onSaved: () => void }) {
+  const editFams = FAMILIES.filter((f) => AT_KEYS.includes(f.key) === (family === "service")); // não vaza família AT no food
   const isDose = !!item.dosesPerBottle && item.dosesPerBottle > 0;
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<StockCategory>(item.category);
@@ -692,7 +694,7 @@ function EditModal({ item, onClose, onSaved }: { item: StockItem; onClose: () =>
     <Overlay onClose={onClose} title={`Editar · ${item.name}`}>
       <input className={inp} placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       <select className={inp} value={category} onChange={(e) => setCategory(e.target.value as StockCategory)}>
-        {FAMILIES.map((f) => (
+        {editFams.map((f) => (
           <optgroup key={f.key} label={f.label}>
             {f.cats.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
           </optgroup>
