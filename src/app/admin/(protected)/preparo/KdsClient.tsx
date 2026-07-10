@@ -106,6 +106,15 @@ export default function KdsClient({ stations, loja, kitchenScreen = true }: { st
     }
   }
 
+  // modo "só ticket": marca o pedido como ENTREGUE (garçom/caixa clica quando leva na mesa) → sai do quadro.
+  async function markDelivered(o: KdsOrder) {
+    setBusy(o.id);
+    setOrders((cur) => cur.filter((x) => x.id !== o.id)); // otimista: some na hora
+    try {
+      await fetch("/api/kds", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: o.id, status: "entregue" }) });
+    } finally { setBusy(null); load(); }
+  }
+
   // "pronto pra servir" (cerveja/refri) some do QUADRO de preparo — mas imprime/cobra normal.
   // Card só renderiza se sobrar algum item de PREPARO.
   function renderCard(o: KdsOrder, showAdvance: boolean) {
@@ -144,9 +153,14 @@ export default function KdsClient({ stations, loja, kitchenScreen = true }: { st
           ))}
         </ul>
         {o.note && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Obs: {o.note}</p>}
-        {showAdvance && (
+        {showAdvance ? (
           <button onClick={() => advance(o)} disabled={busy === o.id} className="mt-3 w-full rounded-lg py-2 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-50" style={{ background: COLS.find((c) => c.key === o.status)?.accent }}>
             {NEXT_LABEL[o.status]}
+          </button>
+        ) : (
+          // só ticket: um clique "Entregue" (garçom/caixa) → sai do quadro
+          <button onClick={() => markDelivered(o)} disabled={busy === o.id} className="mt-3 w-full rounded-lg brand-gradient py-2 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-50">
+            ✓ Entregue
           </button>
         )}
       </article>
