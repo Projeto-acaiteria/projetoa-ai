@@ -15,12 +15,10 @@ function caixaTest(loja: string) {
     modeLabel: "Cupom de teste",
     customerName: "Cliente Teste",
     items: [
-      { qty: 1, name: "Açaí 500ml" },
-      { qty: 1, name: "Granola" },
-      { qty: 1, name: "Leite condensado", totalCents: 200 },
+      { qty: 2, name: "Item de teste", totalCents: 1000 },
+      { qty: 1, name: "Produto exemplo", totalCents: 800 },
     ],
     totalCents: 1800,
-    pointsInfo: "Você ganhou +18 pontos\nSaldo: 118 pontos\nFaltam 32 pra Açaí 300ml grátis",
     origem: "balcao",
   });
 }
@@ -220,21 +218,21 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
         {active === false && (
           <div className="mt-3 space-y-3 rounded-xl bg-bg-surface-2 p-3.5">
             <p className="text-sm font-bold text-ink">Ative a impressão neste computador (só 1 vez)</p>
-            <a href="/ComandaPRO-Impressao.zip" download className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
+            <a href="/ComandaPRO-Impressao.bat" download className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
               <IconPrinter width={16} height={16} /> Baixar instalador
             </a>
             <ol className="space-y-1.5 text-sm text-[var(--text-secondary)]">
-              <li><b className="text-ink">1.</b> Baixe e <b className="text-ink">extraia</b> o arquivo (botão direito → Extrair tudo).</li>
-              <li><b className="text-ink">2.</b> Clique direito no <b className="text-ink">INSTALAR-IMPRESSAO.bat</b> → <b className="text-ink">Executar como administrador</b> → aguarde ~1 min.</li>
+              <li><b className="text-ink">1.</b> Baixe o arquivo <b className="text-ink">ComandaPRO-Impressao</b> (não precisa extrair nada).</li>
+              <li><b className="text-ink">2.</b> <b className="text-ink">Duplo-clique</b> nele → o Windows pede permissão → clique <b className="text-ink">Sim</b> → aguarde ~1 min.</li>
               <li><b className="text-ink">3.</b> Volte aqui e clique <b className="text-ink">Conectar</b>. Pronto — imprime sem aquele aviso de permissão.</li>
             </ol>
-            <p className="text-xs text-[var(--text-faded)]">O instalador coloca tudo sozinho (o app de impressão + o certificado que libera a impressão automática). Sem ele, os pedidos ainda imprimem abrindo a janela do navegador.</p>
+            <p className="text-xs text-[var(--text-faded)]">Se o Windows avisar que o arquivo pode ser perigoso, clique em <b>Mais informações → Executar assim mesmo</b> — é o nosso instalador, é seguro. Ele coloca tudo sozinho (o app de impressão + o certificado).</p>
           </div>
         )}
         {active && (
           <p className="mt-3 text-xs text-[var(--text-faded)]">
             Configurar em outro computador?{" "}
-            <a href="/ComandaPRO-Impressao.zip" download className="font-bold text-brand-600 underline">Baixar instalador</a>
+            <a href="/ComandaPRO-Impressao.bat" download className="font-bold text-brand-600 underline">Baixar instalador</a>
           </p>
         )}
       </Card>
