@@ -85,7 +85,7 @@ const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionD
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-export default function EstoqueClient({ family }: { family: "food" | "service" }) {
+export default function EstoqueClient({ family, doseMl = 50, stockDose = false }: { family: "food" | "service"; doseMl?: number; stockDose?: boolean }) {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<FamilyKey | "todos">("todos");
@@ -273,7 +273,7 @@ export default function EstoqueClient({ family }: { family: "food" | "service" }
         ))}
       </div>
 
-      {modal?.kind === "add" && <AddModal family={family} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.kind === "add" && <AddModal family={family} doseMl={doseMl} stockDose={stockDose} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal?.kind === "inventory" && <InventoryModal items={items} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal?.kind === "move" && (
         <MoveModal item={modal.item} dir={modal.dir} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
@@ -379,7 +379,7 @@ function ItemRow({ it, onMove, onEdit, onHistory, onRemove }: { it: StockItem; o
   );
 }
 
-function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; onClose: () => void; onSaved: () => void }) {
+function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: { family: "food" | "service"; doseMl?: number; stockDose?: boolean; onClose: () => void; onSaved: () => void }) {
   const isService = family === "service";
   const [name, setName] = useState("");
   const [category, setCategory] = useState<StockCategory>(isService ? "cpu" : "sorvete");
@@ -388,7 +388,8 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
   const [minQty, setMinQty] = useState("0");
   const [expiry, setExpiry] = useState("");
   const [sell, setSell] = useState("");
-  const [dpb, setDpb] = useState(""); // doses por garrafa (destilado)
+  const [byDose, setByDose] = useState(false); // controlar por dose (destilado/garrafa)
+  const [bottleMl, setBottleMl] = useState(""); // tamanho da garrafa (ml) → doses/garrafa = garrafa ÷ doseMl
   const [cost, setCost] = useState(""); // custo (CMV): por garrafa se dose, senão por unidade
   const [supplier, setSupplier] = useState("");
   const [purchaseUnit, setPurchaseUnit] = useState(""); // unidade de compra (caixa, fardo...)
@@ -402,15 +403,18 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
-  const isBebida = category === "bebida";
   const sellable = isVenda || isService; // hardware é sempre vendável
+  // dose (bar): a feature dose vale pra QUALQUER item vendável (não só a categoria açaí "bebida").
+  // doses/garrafa = tamanho da garrafa ÷ dose padrão da loja. Entrada e contagem em GARRAFAS.
+  const doseCapable = stockDose && sellable && !isService;
+  const dosesPerBottle = byDose && bottleMl ? Math.max(0, Math.round((parseFloat(bottleMl.replace(",", ".")) || 0) / (doseMl || 50))) : 0;
   const AT_KEYS = ["pc_pronto", "componentes", "perifericos"];
   const fams = FAMILIES.filter((f) => AT_KEYS.includes(f.key) === isService); // service vê só cats AT; food vê food
 
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
-    const doses = isBebida && dpb ? Math.round(parseFloat(dpb.replace(",", ".")) || 0) : 0;
+    const doses = dosesPerBottle; // doses por garrafa (0 = item normal)
     const costC = cost ? Math.round((parseFloat(cost.replace(",", ".")) || 0) * 100) : 0;
     await fetch("/api/estoque", {
       method: "POST",
@@ -418,7 +422,8 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
       body: JSON.stringify({
         name,
         category,
-        qty: +qty,
+        // com dose, a Qtd digitada é em GARRAFAS → grava em doses (garrafas × doses/garrafa)
+        qty: doses > 0 ? Math.round((+qty || 0) * doses) : +qty,
         unit: doses > 0 ? "dose" : unit,
         minQty: +minQty,
         expiry: expiry || undefined,
@@ -455,8 +460,8 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
       </select>
       {isService && <input className={inp} placeholder="Marca (ex: AMD, Kingston, Corsair)" value={brand} onChange={(e) => setBrand(e.target.value)} />}
       <div className="grid grid-cols-3 gap-2">
-        <input className={inp} type="number" min={0} placeholder={isBebida && dpb ? "Doses" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
-        <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={isBebida && !!dpb} />
+        <input className={inp} type="number" min={0} placeholder={byDose ? "Garrafas" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
+        <input className={inp} placeholder="Unid" value={byDose ? "dose" : unit} onChange={(e) => setUnit(e.target.value)} disabled={byDose} />
         <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
       </div>
       {isService && <AtSpecsFields category={category} value={specs} onChange={setSpecs} />}
@@ -481,11 +486,21 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
           <div className="mt-1"><ImageUpload value={image} onChange={setImage} hint="A foto que o cliente vê no site" /></div>
         </div>
       )}
-      {isBebida && (
-        <div>
-          <label className="text-xs font-semibold text-[var(--text-muted)]">Doses por garrafa (destilado — opcional)</label>
-          <input className={`${inp} mt-1`} type="number" min={0} placeholder="ex: 20 (garrafa 1L ÷ dose 50ml)" value={dpb} onChange={(e) => setDpb(e.target.value)} />
-          <p className="mt-1 text-[11px] text-[var(--text-faded)]">Preenchendo, o estoque conta em DOSES; a entrada é por garrafa (= esse nº de doses).</p>
+      {doseCapable && (
+        <div className="rounded-lg border border-line bg-bg-base p-2.5">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={byDose} onChange={(e) => setByDose(e.target.checked)} />
+            <span className="text-sm font-semibold text-ink">Controlar por dose (destilado)</span>
+          </label>
+          {byDose && (
+            <div className="mt-2">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Tamanho da garrafa (ml)</label>
+              <input className={`${inp} mt-1`} type="number" min={0} placeholder="ex: 1000" value={bottleMl} onChange={(e) => setBottleMl(e.target.value)} />
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">
+                Dose de {doseMl}ml → <b className="text-ink">{dosesPerBottle || "—"} doses/garrafa</b>. A Qtd acima é em GARRAFAS; o estoque conta e baixa em doses. Custo abaixo = por garrafa.
+              </p>
+            </div>
+          )}
         </div>
       )}
       {sellable && (
@@ -499,7 +514,7 @@ function AddModal({ family, onClose, onSaved }: { family: "food" | "service"; on
       )}
       <div>
         <label className="text-xs font-semibold text-[var(--text-muted)]">
-          {isBebida && dpb ? "Custo por garrafa (CMV — opcional)" : "Custo por unidade (CMV — opcional)"}
+          {byDose ? "Custo por garrafa (CMV — opcional)" : "Custo por unidade (CMV — opcional)"}
         </label>
         <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
           <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
