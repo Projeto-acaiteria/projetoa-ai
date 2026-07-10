@@ -56,7 +56,9 @@ const FAMILIES: { key: FamilyKey; label: string; cats: StockCategory[]; color: s
   { key: "componentes", label: "Componentes", cats: ["cpu", "cooler", "mobo", "ram", "gpu", "ssd", "gabinete", "fonte"], color: "#B45309", soft: "#FEF3C7" },
   { key: "perifericos", label: "Periféricos", cats: ["mouse", "teclado", "mousepad", "monitor", "headset", "cadeira"], color: "#4338CA", soft: "#EEF2FF" },
 ];
-const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c))!;
+// famOf TOTAL: categorias custom de um tenant (ex.: bar usa "Destilado"/"Cerveja"/"Refrigerante")
+// não estão nas FAMILIES fixas → caem no fallback "à venda" em vez de virar undefined e quebrar a tela.
+const famOf = (c: StockCategory) => FAMILIES.find((f) => f.cats.includes(c)) ?? FAMILIES[0];
 // Ordem das SEÇÕES no estoque — espelha o fluxo do cardápio: açaí primeiro, depois frutas,
 // crocantes, cremes, adicionais, doces; por fim revenda e operação.
 const SECTION_ORDER: StockCategory[] = [
@@ -145,7 +147,14 @@ export default function EstoqueClient({ family }: { family: "food" | "service" }
       if (d !== null && d <= 7) return 1;
       return 2;
     };
-    return SECTION_ORDER
+    // seções vêm das categorias REALMENTE presentes: conhecidas na ordem de SECTION_ORDER,
+    // depois quaisquer categorias custom do tenant (ex.: bar) no fim — senão elas ficariam invisíveis.
+    const present = [...new Set(items.map((i) => i.category))];
+    const ordered = [
+      ...SECTION_ORDER.filter((c) => present.includes(c)),
+      ...present.filter((c) => !SECTION_ORDER.includes(c)),
+    ];
+    return ordered
       .filter((cat) => filter === "todos" || famOf(cat).key === filter)
       .map((cat) => ({
         cat,
@@ -251,7 +260,7 @@ export default function EstoqueClient({ family }: { family: "food" | "service" }
           <section key={s.cat}>
             <div className="mb-2.5 flex items-center gap-2.5">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: famOf(s.cat).color }} />
-              <h2 className="text-sm font-extrabold text-ink">{CAT_LABEL[s.cat]}</h2>
+              <h2 className="text-sm font-extrabold text-ink">{CAT_LABEL[s.cat] ?? s.cat}</h2>
               <span className="text-xs font-bold text-[var(--text-faded)]">{s.list.length}</span>
               <div className="ml-1 h-px flex-1 bg-line" />
             </div>

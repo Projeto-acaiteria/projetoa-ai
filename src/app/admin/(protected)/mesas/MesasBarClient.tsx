@@ -50,6 +50,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [recebido, setRecebido] = useState(""); // dinheiro: valor recebido → calcula o troco
   const [splitMode, setSplitMode] = useState(false); // "Dividir conta": libera pagamentos parciais por método
   const [coverOn, setCoverOn] = useState(true); // couvert ATIVO por padrão; desligável no fechamento se o cliente recusar (igual os 10%)
+  const [splitTroco, setSplitTroco] = useState(0); // troco do último parcial em dinheiro (excedente que voltou pro cliente)
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -82,7 +83,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setSplitTroco(0); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -201,10 +202,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (amountCents <= 0) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
+      const r = await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents, applyFee: fee, applyCover: coverOn, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
+      setSplitTroco(method === "dinheiro" ? (d.trocoCents ?? 0) : 0); // troco só faz sentido em dinheiro
       await loadComanda(drawer.tabId);
       onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
@@ -534,6 +536,12 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                           </div>
                           <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar</button>
                         </div>
+                        {splitTroco > 0 && (
+                          <div className="mt-2 flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5">
+                            <span className="text-xs font-semibold text-[var(--text-muted)]">Troco a devolver</span>
+                            <span className="text-lg font-extrabold tabular-nums text-brand-600">{brl(splitTroco)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
