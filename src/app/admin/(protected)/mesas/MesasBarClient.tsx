@@ -48,6 +48,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [pickedCat, setPickedCat] = useState<string | null>(null); // picker category-first: null = grade de categorias
   const [paying, setPaying] = useState(false); // comanda: só mostra pagamento ao clicar "Fechar conta"
   const [recebido, setRecebido] = useState(""); // dinheiro: valor recebido → calcula o troco
+  const [splitMode, setSplitMode] = useState(false); // "Dividir conta": libera pagamentos parciais por método
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -80,7 +81,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -493,9 +494,24 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                       </div>
                     )}
 
+                    {!splitMode ? (
+                      <button onClick={() => setSplitMode(true)} className="mt-2 text-xs font-bold text-brand-600 underline">Dividir em mais de um pagamento</button>
+                    ) : (
+                      <div className="mt-2 rounded-lg border border-line bg-bg-surface-2 p-2.5">
+                        <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-muted)]">Dividir: escolha o método acima, digite o valor e registre. Repita e feche quando quitar.</p>
+                        <div className="flex gap-1.5">
+                          <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                            <span className="text-xs font-semibold text-[var(--text-muted)]">R$</span>
+                            <input type="number" min={0} step="0.5" value={parcial} onChange={(e) => setParcial(e.target.value)} placeholder={falta > 0 ? `vazio = ${brl(falta)}` : "valor"} className="w-full bg-transparent px-1.5 py-2 text-sm font-bold text-ink outline-none" />
+                          </div>
+                          <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar</button>
+                        </div>
+                      </div>
+                    )}
+
                     {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                     <div className="mt-3 flex gap-2">
-                      <button onClick={() => { setPaying(false); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">‹ Voltar</button>
+                      <button onClick={() => { setPaying(false); setSplitMode(false); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">‹ Voltar</button>
                       <button onClick={fechar} disabled={busy || grand === 0} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">{busy ? "..." : "Fechar conta"}</button>
                     </div>
                   </>
