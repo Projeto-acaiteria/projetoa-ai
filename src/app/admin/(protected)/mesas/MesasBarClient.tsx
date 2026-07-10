@@ -46,6 +46,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [comanda, setComanda] = useState<Comanda | null>(null);
   const [temp, setTemp] = useState<TempLine[]>([]);
   const [pickedCat, setPickedCat] = useState<string | null>(null); // picker category-first: null = grade de categorias
+  const [paying, setPaying] = useState(false); // comanda: só mostra pagamento ao clicar "Fechar conta"
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -78,7 +79,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -451,41 +452,52 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                   {paid > 0 && falta > 0 && <div className="flex justify-between font-bold text-[var(--red-no)]"><span>Falta</span><span className="tabular-nums">{brl(falta)}</span></div>}
                 </div>
 
-                <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
-                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                  {PAYS.map(([id, label]) => <button key={id} onClick={() => setMethod(id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold ${method === id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{label}</button>)}
-                </div>
-                {(method === "debito" || method === "credito") && activeMachines.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    {activeMachines.length > 1 && (
-                      <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
-                        {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    )}
-                    {method === "credito" && (
-                      <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
-                        {Array.from({ length: activeMachines.find((x) => x.id === machineId)?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
-                      </select>
-                    )}
-                  </div>
-                )}
-
-                {/* split: registra pagamento parcial (vazio = paga a falta toda) sem fechar */}
-                {grand > 0 && (
-                  <div className="mt-2 flex gap-1.5">
-                    <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
-                      <span className="text-xs font-semibold text-[var(--text-muted)]">R$</span>
-                      <input type="number" min={0} step="0.5" value={parcial} onChange={(e) => setParcial(e.target.value)} placeholder={falta > 0 ? `parcial (vazio = ${brl(falta)})` : "parcial"} className="w-full bg-transparent px-1.5 py-2 text-sm font-bold text-ink outline-none" />
+                {paying ? (
+                  <>
+                    <p className="mb-1.5 mt-3 text-xs font-semibold text-[var(--text-muted)]">Pagamento {falta > 0 ? `(falta ${brl(falta)})` : ""}</p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      {PAYS.map(([id, label]) => <button key={id} onClick={() => setMethod(id)} className={`rounded-lg border-2 py-2 text-[11px] font-bold ${method === id ? "border-brand-600 text-brand-600" : "border-line text-[var(--text-muted)]"}`}>{label}</button>)}
                     </div>
-                    <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar pagamento</button>
-                  </div>
+                    {(method === "debito" || method === "credito") && activeMachines.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {activeMachines.length > 1 && (
+                          <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                            {activeMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                        )}
+                        {method === "credito" && (
+                          <select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))} className="w-full rounded-lg border border-line bg-bg-base px-2.5 py-2 text-sm font-semibold text-ink outline-none">
+                            {Array.from({ length: activeMachines.find((x) => x.id === machineId)?.maxParcelas ?? 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x parcelado`}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                    {/* split: registra pagamento parcial (vazio = paga a falta toda) sem fechar */}
+                    {grand > 0 && (
+                      <div className="mt-2 flex gap-1.5">
+                        <div className="flex flex-1 items-center rounded-lg border border-line bg-bg-base px-2.5">
+                          <span className="text-xs font-semibold text-[var(--text-muted)]">R$</span>
+                          <input type="number" min={0} step="0.5" value={parcial} onChange={(e) => setParcial(e.target.value)} placeholder={falta > 0 ? `parcial (vazio = ${brl(falta)})` : "parcial"} className="w-full bg-transparent px-1.5 py-2 text-sm font-bold text-ink outline-none" />
+                        </div>
+                        <button onClick={registrarParcial} disabled={busy} className="shrink-0 rounded-lg border border-brand-400 px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">Registrar pagamento</button>
+                      </div>
+                    )}
+                    {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => { setPaying(false); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">‹ Voltar</button>
+                      <button onClick={fechar} disabled={busy || grand === 0} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">{busy ? "..." : "Fechar conta"}</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
+                      <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
+                      {grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
+                    </div>
+                  </>
                 )}
-
-                {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
-                <div className="mt-3 flex gap-2">
-                  <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
-                  <button onClick={fechar} disabled={busy || grand === 0} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-50">{busy ? "..." : "Fechar conta"}</button>
-                </div>
               </>
             )}
           </div>
