@@ -512,6 +512,7 @@ export async function addPayment(
 
 export type CloseTabOpts = {
   serviceFeeCents?: number;
+  coverCents?: number; // se vier (couvert isentado no fechamento), sobrescreve o snapshot na comanda — mantém repasse/relatório certos
   customerPhone?: string;
   customerName?: string;
 };
@@ -535,6 +536,7 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
     closed_at: new Date().toISOString(),
     service_fee_cents: opts.serviceFeeCents ?? full.tab.service_fee_cents ?? 0,
   };
+  if (opts.coverCents !== undefined) patch.cover_cents = opts.coverCents; // couvert isentado → zera o snapshot
   if (phone) patch.customer_phone = phone;
   if (name) patch.customer_name = name;
   const { error } = await d.from("tabs").update(patch).eq("id", tabId).eq("store_id", sid);

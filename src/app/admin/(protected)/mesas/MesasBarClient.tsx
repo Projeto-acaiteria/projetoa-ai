@@ -49,6 +49,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [paying, setPaying] = useState(false); // comanda: só mostra pagamento ao clicar "Fechar conta"
   const [recebido, setRecebido] = useState(""); // dinheiro: valor recebido → calcula o troco
   const [splitMode, setSplitMode] = useState(false); // "Dividir conta": libera pagamentos parciais por método
+  const [coverOn, setCoverOn] = useState(true); // couvert ATIVO por padrão; desligável no fechamento se o cliente recusar (igual os 10%)
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -81,7 +82,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -165,7 +166,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     finally { setBusy(false); }
   }
   const serviceFee = fee ? Math.round(consumo * 0.1) : 0; // taxa só sobre consumo, nunca sobre cover
-  const grand = consumo + cover + serviceFee;
+  const coverCharged = coverOn ? cover : 0; // couvert só entra no total se o toggle estiver ligado (cliente pode recusar)
+  const grand = consumo + coverCharged + serviceFee;
   const paid = comanda?.paidCents ?? 0;
   const falta = Math.max(0, grand - paid);
 
@@ -213,7 +215,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (!drawer?.tabId || busy) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, method, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
+      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, applyCover: coverOn, method, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
       // cupom de fechamento: itens (mods no nome + totalCents que JÁ inclui os mods) + total fresco do servidor
@@ -232,7 +234,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         ...(cupomReceived > 0 ? { receivedCents: cupomReceived, changeCents: cupomTroco } : {}),
         items: [
           ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
-          ...(cover > 0 ? [{ qty: 1, name: "Couvert", totalCents: cover }] : []),
+          ...(coverCharged > 0 ? [{ qty: 1, name: "Couvert", totalCents: coverCharged }] : []),
           ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
         ],
         totalCents: d.totalCents ?? grand,
@@ -255,7 +257,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       modeLabel: `${dest} · CONFERÊNCIA`,
       items: [
         ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
-        ...(cover > 0 ? [{ qty: 1, name: "Couvert", totalCents: cover }] : []),
+        ...(coverCharged > 0 ? [{ qty: 1, name: "Couvert", totalCents: coverCharged }] : []),
         ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
       ],
       totalCents: grand,
@@ -459,17 +461,20 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                   <div className="flex justify-between text-[var(--text-muted)]"><span>Consumo</span><span className="tabular-nums">{brl(consumo)}</span></div>
                   {coverShow ? (
                     <div className="flex items-center justify-between text-[var(--text-muted)]">
-                      <span className="flex items-center gap-2">Couvert
+                      <span className="flex items-center gap-2">
+                        <input type="checkbox" checked={coverOn} onChange={(e) => setCoverOn(e.target.checked)} title="Cliente pode recusar o couvert" /> Couvert
                         <span className="flex items-center gap-1.5">
-                          <button onClick={() => setPeople(people - 1)} disabled={busy || people <= 1} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
+                          <button onClick={() => setPeople(people - 1)} disabled={busy || !coverOn || people <= 1} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
                           <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{people}</span>
-                          <button onClick={() => setPeople(people + 1)} disabled={busy} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-base leading-none text-white">+</button>
+                          <button onClick={() => setPeople(people + 1)} disabled={busy || !coverOn} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-base leading-none text-white disabled:opacity-40">+</button>
                         </span>
                         <span className="text-xs">pessoas</span>
                       </span>
-                      <span className="tabular-nums">{brl(cover)}</span>
+                      <span className="tabular-nums">{coverOn ? brl(cover) : <span className="text-[var(--text-faded)] line-through">{brl(cover)}</span>}</span>
                     </div>
-                  ) : (cover > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Couvert</span><span className="tabular-nums">{brl(cover)}</span></div>)}
+                  ) : (cover > 0 && (
+                    <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={coverOn} onChange={(e) => setCoverOn(e.target.checked)} /> Couvert</span><span className="tabular-nums">{coverOn ? brl(cover) : <span className="text-[var(--text-faded)] line-through">{brl(cover)}</span>}</span></label>
+                  ))}
                   <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={fee} onChange={(e) => setFee(e.target.checked)} /> Taxa de serviço 10%</span><span className="tabular-nums">{brl(serviceFee)}</span></label>
                   <div className="flex justify-between border-t border-line pt-1 text-base font-extrabold text-ink"><span>Total</span><span className="tabular-nums text-brand-600">{brl(grand)}</span></div>
                   {paid > 0 && <div className="flex justify-between text-[var(--text-muted)]"><span>Pago</span><span className="tabular-nums">{brl(paid)}</span></div>}
