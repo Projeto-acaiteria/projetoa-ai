@@ -11,7 +11,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
-import { printVias } from "@/lib/print";
+import { printVias, openDrawer } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
@@ -203,6 +203,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
       await loadComanda(drawer.tabId);
+      if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
     finally { setBusy(false); }
@@ -233,6 +234,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         ],
         totalCents: d.totalCents ?? grand,
       }));
+      // abre a gaveta na venda em dinheiro (se a máquina tem gaveta ligada) — igual ao balcão
+      if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
