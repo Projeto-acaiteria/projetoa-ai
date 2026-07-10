@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import CaixaPrintQueue from "@/components/admin/CaixaPrintQueue";
+import CaixaPrepPrinter from "@/components/admin/CaixaPrepPrinter";
 import {
   IconBowl,
   IconFlame,
@@ -68,7 +69,7 @@ const NAV: NavItem[] = [
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string }) {
+export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor, prepStations = [] }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string; prepStations?: string[] }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -97,9 +98,10 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={brandVars(brandColor)}>
-      {/* Vigia da fila de impressão: roda em QUALQUER página, mas só imprime na máquina do caixa
-          (com impressora configurada). Torna a impressão sob demanda do garçom automática. */}
+      {/* Vigias de impressão GLOBAIS: rodam em qualquer página, mas só imprimem na máquina do caixa
+          (com impressora configurada). Fila sob demanda (conta do garçom) + vias de preparo novas. */}
       <CaixaPrintQueue station="caixa" />
+      {prepStations.length > 0 && <CaixaPrepPrinter stations={prepStations} loja={storeName} />}
       {/* Sidebar desktop */}
       <aside className="hidden border-r border-line bg-bg-elevated lg:flex lg:flex-col">
         <div className="flex items-center gap-2.5 px-5 py-5">

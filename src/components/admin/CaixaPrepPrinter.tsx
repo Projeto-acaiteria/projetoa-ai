@@ -30,6 +30,7 @@ export default function CaixaPrepPrinter({ stations, loja }: { stations: string[
 
   const load = useCallback(async () => {
     if (!on || !stations.length) return;
+    if (!stations.some((s) => getStationPrinter(s))) return; // só a máquina do caixa (com impressora de estação) vigia/imprime
     try {
       const r = await fetch(`/api/kds?stations=${encodeURIComponent(stations.join(","))}`, { cache: "no-store" });
       const d = await r.json();

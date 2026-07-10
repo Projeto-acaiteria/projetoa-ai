@@ -3,6 +3,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import OrderWatcher from "@/components/admin/OrderWatcher";
 import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import { getStore } from "@/lib/settings-store";
+import { getStations } from "@/lib/menu-bar-store";
 import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
 import { getStoreConfig } from "@/lib/auth/store-config";
@@ -21,6 +22,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   if (isBlocked(sub)) redirect("/admin/bloqueado");
 
   const [store, cfg, role] = await Promise.all([getStore(), getStoreConfig(loja.id), getCurrentRole()]);
+  const stations = cfg?.has_stations ? await getStations(loja.id) : []; // pro vigia de preparo global (imprime só na máquina do caixa)
   const nav = {
     template: cfg?.menu_template ?? "acai",
     hasTables: !!cfg?.has_tables,
@@ -33,7 +35,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     family: familyOf(cfg?.business_type),
   };
   return (
-    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor}>
+    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
       <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
       {/* offline (resiliência a quedas): motor de plataforma, ativado por ora só no vertical service
