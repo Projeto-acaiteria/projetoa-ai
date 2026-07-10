@@ -47,6 +47,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [temp, setTemp] = useState<TempLine[]>([]);
   const [pickedCat, setPickedCat] = useState<string | null>(null); // picker category-first: null = grade de categorias
   const [paying, setPaying] = useState(false); // comanda: só mostra pagamento ao clicar "Fechar conta"
+  const [recebido, setRecebido] = useState(""); // dinheiro: valor recebido → calcula o troco
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -79,7 +80,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -472,6 +473,21 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                         )}
                       </div>
                     )}
+                    {method === "dinheiro" && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-bg-base px-2.5">
+                          <span className="shrink-0 text-xs font-semibold text-[var(--text-muted)]">Recebido R$</span>
+                          <input inputMode="decimal" value={recebido} onChange={(e) => setRecebido(e.target.value)} placeholder="quanto o cliente deu" className="w-full bg-transparent px-1.5 py-2 text-right text-sm font-bold text-ink outline-none" />
+                        </div>
+                        {(() => { const rc = Math.round((parseFloat(recebido.replace(",", ".")) || 0) * 100); return rc > 0 ? (
+                          <div className="mt-1 flex items-center justify-between px-1">
+                            <span className="text-sm font-semibold text-[var(--text-muted)]">Troco</span>
+                            <span className="text-xl font-extrabold tabular-nums text-brand-600">{brl(Math.max(0, rc - falta))}</span>
+                          </div>
+                        ) : null; })()}
+                      </div>
+                    )}
+
                     {/* split: registra pagamento parcial (vazio = paga a falta toda) sem fechar */}
                     {grand > 0 && (
                       <div className="mt-2 flex gap-1.5">
