@@ -66,6 +66,7 @@ export type BarCategory = {
   sort: number;
   active: boolean;
   earns_points: boolean; // fidelidade: itens desta categoria pontuam? (default true)
+  no_prep: boolean; // "pronto pra servir" (cerveja/refri): some do quadro de Preparo, mas imprime/cobra normal
   products: BarProduct[];
 };
 
@@ -93,6 +94,7 @@ const toCategory = (r: Record<string, unknown>, products: BarProduct[]): BarCate
   sort: num(r.sort),
   active: Boolean(r.active),
   earns_points: r.earns_points !== false, // ausente/null = pontua (default true)
+  no_prep: Boolean(r.no_prep),
   products,
 });
 
@@ -274,6 +276,7 @@ export type CategoryInput = {
   sort?: number;
   active?: boolean;
   earns_points?: boolean; // fidelidade: itens desta categoria pontuam? (default true)
+  no_prep?: boolean; // "pronto pra servir": some do quadro de Preparo (imprime/cobra normal)
 };
 
 export async function createCategory(input: CategoryInput, storeId?: string): Promise<BarCategory> {
@@ -289,6 +292,7 @@ export async function createCategory(input: CategoryInput, storeId?: string): Pr
       sort: input.sort ?? 0,
       active: input.active ?? true,
       earns_points: input.earns_points ?? true,
+      no_prep: input.no_prep ?? false,
     })
     .select("*")
     .single();

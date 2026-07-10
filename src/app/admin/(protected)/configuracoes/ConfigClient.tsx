@@ -32,7 +32,7 @@ const FEE_ROWS: { k: keyof Fees; label: string; hint: string }[] = [
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; has_estoque: boolean; sells_by_weight: boolean } | null;
+type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; has_estoque: boolean; sells_by_weight: boolean; kitchen_screen: boolean } | null;
 
 export default function ConfigClient() {
   const [fees, setFees] = useState<Fees | null>(null);
@@ -48,7 +48,7 @@ export default function ConfigClient() {
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight, kitchen_screen: !!d.config.kitchen_screen } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -242,6 +242,7 @@ export default function ConfigClient() {
             <FeatureToggle label="Fidelidade (pontos)" hint="Cliente junta pontos e troca por brinde." on={config.loyalty_enabled} onToggle={() => { setConfig((c) => c ? { ...c, loyalty_enabled: !c.loyalty_enabled } : c); setSaved(false); }} />
             <FeatureToggle label="Dose / garrafa" hint="Controle de destilado em doses (estoque do bar)." on={config.stock_dose} onToggle={() => { setConfig((c) => c ? { ...c, stock_dose: !c.stock_dose } : c); setSaved(false); }} />
             <FeatureToggle label="Controle de estoque" hint="Liga o módulo Estoque + CMV e a baixa por insumo no cardápio (ficha técnica). Desligado, o cardápio fica enxuto, sem '+ insumo'." on={config.has_estoque} onToggle={() => { setConfig((c) => c ? { ...c, has_estoque: !c.has_estoque } : c); setSaved(false); }} />
+            <FeatureToggle label="Cozinha usa tela (KDS)" hint="Ligado: a cozinha tem tela e clica Iniciar preparo → Pronto. Desligado: cozinha trabalha só pelo ticket impresso e o Preparo vira quadro de leitura (ninguém clica status)." on={config.kitchen_screen} onToggle={() => { setConfig((c) => c ? { ...c, kitchen_screen: !c.kitchen_screen } : c); setSaved(false); }} />
           </div>
         </Card>
       )}

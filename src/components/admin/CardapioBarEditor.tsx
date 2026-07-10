@@ -11,7 +11,7 @@ import RecipeManager from "@/components/admin/RecipeManager";
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
 
-type CatForm = { id?: string; name: string; station: string; description: string; active: boolean; earns_points: boolean };
+type CatForm = { id?: string; name: string; station: string; description: string; active: boolean; earns_points: boolean; no_prep: boolean };
 type ProdForm = { id?: string; category_id: string; name: string; priceReais: string; size_label: string; img: string; active: boolean; by_weight: boolean; tara: string };
 
 const ImgIcon = () => (
@@ -153,8 +153,8 @@ export default function CardapioBarEditor() {
   async function saveCat() {
     const f = catModal;
     if (!f || !f.name.trim()) return;
-    if (f.id) await api("cat.update", { id: f.id, patch: { name: f.name.trim(), station: f.station, description: f.description || null, active: f.active, earns_points: f.earns_points } });
-    else await api("cat.create", { name: f.name.trim(), station: f.station, description: f.description || null, sort: cats.length, earns_points: f.earns_points });
+    if (f.id) await api("cat.update", { id: f.id, patch: { name: f.name.trim(), station: f.station, description: f.description || null, active: f.active, earns_points: f.earns_points, no_prep: f.no_prep } });
+    else await api("cat.create", { name: f.name.trim(), station: f.station, description: f.description || null, sort: cats.length, earns_points: f.earns_points, no_prep: f.no_prep });
     setCatModal(null);
   }
   function delCat(c: BarCategory) {
@@ -179,7 +179,7 @@ export default function CardapioBarEditor() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setCatModal({ name: "", station: "cozinha", description: "", active: true, earns_points: true })} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
+        <button onClick={() => setCatModal({ name: "", station: "cozinha", description: "", active: true, earns_points: true, no_prep: false })} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
           + Nova categoria
         </button>
       </div>
@@ -199,7 +199,7 @@ export default function CardapioBarEditor() {
               {!c.active && <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-xs text-[var(--text-faded)]">oculta</span>}
             </div>
             <div className="flex gap-1">
-              <button onClick={() => setCatModal({ id: c.id, name: c.name, station: c.station, description: c.description ?? "", active: c.active, earns_points: c.earns_points })} title="Editar categoria" className="rounded-lg p-2 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
+              <button onClick={() => setCatModal({ id: c.id, name: c.name, station: c.station, description: c.description ?? "", active: c.active, earns_points: c.earns_points, no_prep: c.no_prep })} title="Editar categoria" className="rounded-lg p-2 text-[var(--text-faded)] hover:bg-bg-surface-2 hover:text-ink"><Pencil /></button>
               <button onClick={() => delCat(c)} title="Excluir categoria" className="rounded-lg p-2 text-[var(--text-faded)] hover:bg-red-50 hover:text-red-500"><Trash /></button>
             </div>
           </div>
@@ -248,6 +248,11 @@ export default function CardapioBarEditor() {
             <input type="checkbox" checked={catModal.earns_points} onChange={(e) => setCatModal({ ...catModal, earns_points: e.target.checked })} />
             Dá pontos de fidelidade
             <span className="font-normal text-[var(--text-faded)]">— desligue em itens de revenda (refri, água)</span>
+          </label>
+          <label className="flex items-center gap-2 rounded-lg bg-bg-surface-2 px-3 py-2.5 text-sm font-semibold text-ink">
+            <input type="checkbox" checked={catModal.no_prep} onChange={(e) => setCatModal({ ...catModal, no_prep: e.target.checked })} />
+            Pronto pra servir
+            <span className="font-normal text-[var(--text-faded)]">— cerveja/refri: imprime no bar e cobra, mas some do quadro de Preparo</span>
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={catModal.active} onChange={(e) => setCatModal({ ...catModal, active: e.target.checked })} /> Visível no cardápio</label>
         </Modal>

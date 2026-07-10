@@ -285,14 +285,22 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const prodIds = [...new Set(items.map((it) => it.productId).filter(Boolean) as string[])];
   const recipeByProduct = new Map<string, StockConsume[]>();
   const nameByProduct = new Map<string, string>();
+  const noPrepByProduct = new Map<string, boolean>(); // categoria "pronto pra servir" → some do quadro de Preparo (mas imprime/cobra normal)
   if (prodIds.length) {
-    const { data: prods } = await d.from("menu_products").select("id, recipe, name").eq("store_id", sid).in("id", prodIds);
-    for (const p of (prods ?? []) as { id: string; recipe: unknown; name: string }[]) {
+    const { data: prods } = await d.from("menu_products").select("id, recipe, name, category_id").eq("store_id", sid).in("id", prodIds);
+    const catIds = [...new Set(((prods ?? []) as { category_id?: string }[]).map((p) => p.category_id).filter(Boolean) as string[])];
+    const noPrepByCat = new Map<string, boolean>();
+    if (catIds.length) {
+      const { data: cats } = await d.from("menu_categories").select("id, no_prep").in("id", catIds);
+      for (const c of (cats ?? []) as { id: string; no_prep?: boolean }[]) noPrepByCat.set(String(c.id), !!c.no_prep);
+    }
+    for (const p of (prods ?? []) as { id: string; recipe: unknown; name: string; category_id?: string }[]) {
       const r = Array.isArray(p.recipe)
         ? (p.recipe as StockConsume[]).map((x) => ({ stockId: String(x?.stockId ?? ""), qty: num(x?.qty) })).filter((x) => x.stockId && x.qty > 0)
         : [];
       recipeByProduct.set(String(p.id), r);
       nameByProduct.set(String(p.id), String(p.name ?? ""));
+      noPrepByProduct.set(String(p.id), p.category_id ? (noPrepByCat.get(String(p.category_id)) ?? false) : false);
     }
   }
 
@@ -332,7 +340,8 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       consumes = [{ stockId: it.stockId, qty: 1 }]; // revenda: baixa 1 un do próprio item
     }
     consumes = consumes.map((c) => ({ ...c, costCents: costById.get(c.stockId) ?? 0 }));
-    return { ...it, consumes, station: it.station || "cozinha" };
+    const noPrep = it.productId ? (noPrepByProduct.get(it.productId) ?? false) : false;
+    return { ...it, consumes, station: it.station || "cozinha", noPrep };
   });
 
   // agrupa por estação → 1 tab_order por estação (o roteamento)
@@ -363,6 +372,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       mods: it.mods ?? null,
       note: it.note ?? null,
       earns_points: it.earnsPoints !== false, // ausente = pontua (default)
+      no_prep: it.noPrep, // "pronto pra servir": imprime/cobra, mas some do quadro de Preparo
     }));
     const { error: e2 } = await d.from("tab_order_items").insert(rows);
     if (e2) throw e2;
@@ -378,7 +388,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
 }
 
 // ── KDS (telas de preparo por estação) ───────────────────────────────────────
-export type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null };
+export type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null; no_prep?: boolean };
 export type KdsOrder = {
   id: number;
   station: string;
@@ -414,15 +424,15 @@ export async function getStationOrders(stations: string[]): Promise<KdsOrder[]> 
   const orderIds = list.map((o) => o.id);
   const tabIds = [...new Set(list.map((o) => o.tab_id))];
   const [{ data: items }, { data: tabs }] = await Promise.all([
-    d.from("tab_order_items").select("tab_order_id, name, size_label, qty, mods, note").in("tab_order_id", orderIds),
+    d.from("tab_order_items").select("tab_order_id, name, size_label, qty, mods, note, no_prep").in("tab_order_id", orderIds),
     d.from("tabs").select("id, label").in("id", tabIds),
   ]);
   const labelByTab = new Map<number, string>();
   for (const t of (tabs ?? []) as Array<{ id: number; label: string | null }>) labelByTab.set(t.id, t.label ?? "Balcão");
   const byOrder = new Map<number, KdsItem[]>();
-  for (const it of (items ?? []) as Array<{ tab_order_id: number; name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note: string | null }>) {
+  for (const it of (items ?? []) as Array<{ tab_order_id: number; name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note: string | null; no_prep: boolean | null }>) {
     const arr = byOrder.get(it.tab_order_id) ?? [];
-    arr.push({ name: it.name, size_label: it.size_label, qty: num(it.qty), mods: it.mods ?? null, note: (it.note ?? null) });
+    arr.push({ name: it.name, size_label: it.size_label, qty: num(it.qty), mods: it.mods ?? null, note: (it.note ?? null), no_prep: !!it.no_prep });
     byOrder.set(it.tab_order_id, arr);
   }
   return list.map((o) => ({
