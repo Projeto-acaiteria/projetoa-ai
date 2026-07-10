@@ -473,7 +473,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                         )}
                       </div>
                     )}
-                    {method === "dinheiro" && (
+                    {method === "dinheiro" && falta > 0 && (
                       <div className="mt-2">
                         <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-bg-base px-2.5">
                           <span className="shrink-0 text-xs font-semibold text-[var(--text-muted)]">Recebido R$</span>
