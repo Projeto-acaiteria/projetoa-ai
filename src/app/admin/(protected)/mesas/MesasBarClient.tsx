@@ -219,14 +219,17 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       // cupom de fechamento: itens (mods no nome + totalCents que JÁ inclui os mods) + total fresco do servidor
       const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
-      // recebido/troco em dinheiro → sai no cupom (falta = valor devido antes de fechar)
+      // recebido/troco em dinheiro → sai no cupom. Dois casos: fluxo simples (campo Recebido) OU split que
+      // já pagou mais que o total (overpay em dinheiro). falta = valor devido antes de fechar.
       const recCents = method === "dinheiro" ? Math.round((parseFloat(recebido.replace(",", ".")) || 0) * 100) : 0;
+      const cupomReceived = recCents > 0 ? recCents : (paid > grand ? paid : 0);
+      const cupomTroco = recCents > 0 ? Math.max(0, recCents - falta) : Math.max(0, paid - grand);
       // auto-impressão por-máquina (desligável na tela de Impressora; default ligado)
       if (localStorage.getItem("autoprint:venda") !== "0") void printVias((via) => ticketHtml({
         loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: dest, via,
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
-        ...(recCents > 0 ? { receivedCents: recCents, changeCents: Math.max(0, recCents - falta) } : {}),
+        ...(cupomReceived > 0 ? { receivedCents: cupomReceived, changeCents: cupomTroco } : {}),
         items: [
           ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
           ...(cover > 0 ? [{ qty: 1, name: "Couvert", totalCents: cover }] : []),
@@ -476,6 +479,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     </div>
                   )}
                   {paid > 0 && falta > 0 && <div className="flex justify-between font-bold text-[var(--red-no)]"><span>Falta</span><span className="tabular-nums">{brl(falta)}</span></div>}
+                  {paid > grand && <div className="flex justify-between text-base font-extrabold text-brand-600"><span>Troco</span><span className="tabular-nums">{brl(paid - grand)}</span></div>}
                 </div>
 
                 {paying ? (
