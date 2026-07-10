@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { staffReport, createStaff, updateStaff, deleteStaff } from "@/lib/staff-store";
+import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess } from "@/lib/staff-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,11 +33,18 @@ export async function POST(req: Request) {
       case "delete":
         await deleteStaff(String(p.id), storeId);
         return NextResponse.json({ ok: true });
+      case "createAccess": {
+        const email = String(p.email ?? "").trim();
+        const senha = String(p.senha ?? "");
+        if (!email || senha.length < 6) return NextResponse.json({ error: "Informe email e senha (mín. 6)." }, { status: 400 });
+        await createStaffAccess(String(p.id), email, senha, storeId);
+        return NextResponse.json({ ok: true });
+      }
       default:
         return NextResponse.json({ error: "ação inválida" }, { status: 400 });
     }
   } catch (e) {
     console.error("garcons:", e);
-    return NextResponse.json({ error: "Não consegui salvar." }, { status: 500 });
+    return NextResponse.json({ error: (e as Error).message || "Não consegui salvar." }, { status: 500 });
   }
 }
