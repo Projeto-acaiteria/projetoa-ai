@@ -16,6 +16,7 @@ import type { BarCategory } from "@/lib/menu-bar-store";
 import MesasBarClient from "../mesas/MesasBarClient";
 import BalcaoClient from "../balcao/BalcaoClient";
 import CaixaPrepPrinter from "@/components/admin/CaixaPrepPrinter";
+import CaixaPrintQueue from "@/components/admin/CaixaPrintQueue";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -86,6 +87,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
         ) : pdvHub ? (
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
             <CaixaPrepPrinter stations={stations} loja={storeName} />
+            <CaixaPrintQueue station="caixa" />
             <div className="flex justify-end">
               <button onClick={() => setAvulsa(true)} className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white">
                 <IconBag width={17} height={17} /> Venda avulsa

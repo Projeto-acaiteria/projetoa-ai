@@ -52,6 +52,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [splitMode, setSplitMode] = useState(false); // "Dividir conta": libera pagamentos parciais por método
   const [coverOn, setCoverOn] = useState(true); // couvert ATIVO por padrão; desligável no fechamento se o cliente recusar (igual os 10%)
   const [splitTroco, setSplitTroco] = useState(0); // troco do último parcial em dinheiro (excedente que voltou pro cliente)
+  const [sentToCaixa, setSentToCaixa] = useState(false); // garçom: confirmação de "conta enviada pro caixa imprimir"
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
@@ -84,7 +85,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setSplitTroco(0); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setSplitTroco(0); setSentToCaixa(false); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
@@ -249,12 +250,13 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     finally { setBusy(false); }
   }
 
-  // pré-conta / conferência: imprime o consumo SEM forma de pagamento (o cliente confere antes de decidir como pagar)
-  function conferir() {
+  // pré-conta / conferência: imprime o consumo SEM forma de pagamento (o cliente confere antes de pagar).
+  // Caixa (canClose) imprime local na hora. GARÇOM (celular NÃO imprime) → manda o job pro caixa imprimir.
+  async function conferir() {
     if (!drawer) return;
     const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
     const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
-    void printTicket(ticketHtml({
+    const html = ticketHtml({
       loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: dest,
       dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
       modeLabel: `${dest} · CONFERÊNCIA`,
@@ -265,7 +267,13 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       ],
       totalCents: grand,
       collectCents: grand,
-    }), "caixa");
+    });
+    if (canClose) { void printTicket(html, "caixa"); return; }
+    // garçom: enfileira pro caixa imprimir (celular não imprime)
+    try {
+      await fetch("/api/print-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ html, kind: "conferencia" }) });
+      setErr(""); setSentToCaixa(true); setTimeout(() => setSentToCaixa(false), 4000);
+    } catch { setErr("Não consegui enviar a conta pro caixa."); }
   }
 
   // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
@@ -574,7 +582,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
-                      {grand > 0 && <button onClick={conferir} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconReceipt width={15} height={15} /> Imprimir conta</button>}
+                      {grand > 0 && <button onClick={conferir} className={`flex items-center gap-1.5 rounded-xl border px-4 py-3 text-sm font-bold ${sentToCaixa ? "border-brand-600 text-brand-600" : "border-line text-ink"}`}><IconReceipt width={15} height={15} /> {canClose ? "Imprimir conta" : sentToCaixa ? "✓ Enviado ao caixa" : "Enviar conta pro caixa"}</button>}
                       <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
                       {canClose && grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
                     </div>
