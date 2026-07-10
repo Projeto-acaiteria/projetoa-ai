@@ -1,17 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { printTicket } from "@/lib/print";
+import { getStationPrinter } from "@/lib/qz";
 
-// Vigia HEADLESS no Caixa: imprime a FILA de jobs sob demanda (ex.: "Imprimir conta" que o garçom
-// pede pelo celular — o celular não imprime, o job cai aqui e o Caixa imprime na impressora do balcão).
-// Lê /api/print-jobs?station=caixa, imprime o HTML e marca done. Só a máquina do caixa (com impressora)
-// roda isso — se não tiver impressora configurada, o printTicket cai no fallback do próprio caixa. — ComandaPRO
+// Vigia HEADLESS da FILA de impressão: imprime jobs sob demanda (ex.: garçom pede "Imprimir conta"
+// pelo celular — o celular não imprime, o job cai aqui e a MÁQUINA DO CAIXA imprime na impressora do
+// balcão). Montado no AdminShell → roda em QUALQUER página do admin, mas SÓ na máquina que tem a
+// impressora do caixa configurada (getStationPrinter). Celular do garçom / outras máquinas não têm
+// impressora → nem faz polling. Assim a impressão é automática sem precisar estar na tela do Caixa. — ComandaPRO
 export default function CaixaPrintQueue({ station = "caixa" }: { station?: string }) {
   const busy = useRef(false);
+  const [hasPrinter, setHasPrinter] = useState(false);
+
+  useEffect(() => {
+    const read = () => setHasPrinter(!!getStationPrinter(station));
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
+  }, [station]);
 
   const tick = useCallback(async () => {
-    if (busy.current) return;
+    if (busy.current || !getStationPrinter(station)) return; // só a máquina do caixa (com impressora) imprime a fila
     busy.current = true;
     try {
       const r = await fetch(`/api/print-jobs?station=${encodeURIComponent(station)}`, { cache: "no-store" });
@@ -31,10 +41,11 @@ export default function CaixaPrintQueue({ station = "caixa" }: { station?: strin
   }, [station]);
 
   useEffect(() => {
+    if (!hasPrinter) return; // sem impressora do caixa nesta máquina → não vigia
     tick();
     const t = setInterval(tick, 5000);
     return () => clearInterval(t);
-  }, [tick]);
+  }, [tick, hasPrinter]);
 
   return null; // headless
 }

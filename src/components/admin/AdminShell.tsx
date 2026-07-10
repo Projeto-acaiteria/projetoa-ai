@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import CaixaPrintQueue from "@/components/admin/CaixaPrintQueue";
 import {
   IconBowl,
   IconFlame,
@@ -96,6 +97,9 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={brandVars(brandColor)}>
+      {/* Vigia da fila de impressão: roda em QUALQUER página, mas só imprime na máquina do caixa
+          (com impressora configurada). Torna a impressão sob demanda do garçom automática. */}
+      <CaixaPrintQueue station="caixa" />
       {/* Sidebar desktop */}
       <aside className="hidden border-r border-line bg-bg-elevated lg:flex lg:flex-col">
         <div className="flex items-center gap-2.5 px-5 py-5">

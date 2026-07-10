@@ -583,7 +583,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
-                      {grand > 0 && <button onClick={conferir} className={`flex items-center gap-1.5 rounded-xl border px-4 py-3 text-sm font-bold ${sentToCaixa ? "border-brand-600 text-brand-600" : "border-line text-ink"}`}><IconReceipt width={15} height={15} /> {canClose ? "Imprimir conta" : sentToCaixa ? "✓ Enviado ao caixa" : "Enviar conta pro caixa"}</button>}
+                      {grand > 0 && <button onClick={conferir} className={`flex items-center gap-1.5 rounded-xl border px-4 py-3 text-sm font-bold ${sentToCaixa ? "border-brand-600 text-brand-600" : "border-line text-ink"}`}><IconReceipt width={15} height={15} /> {sentToCaixa ? "✓ Impresso no caixa" : "Imprimir conta"}</button>}
                       <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
                       {canClose && grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
                     </div>
