@@ -543,6 +543,10 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
   const { error } = await d.from("tabs").update(patch).eq("id", tabId).eq("store_id", sid);
   if (error) throw error;
 
+  // comanda fechada (paga) = tudo já foi servido → tira os pedidos dela do KDS/Preparo (status 'entregue'),
+  // senão eles ficam pendurados na fila da cozinha/bar mesmo depois da conta fechada.
+  await d.from("tab_orders").update({ status: "entregue" }).eq("tab_id", tabId).eq("store_id", sid).in("status", KDS_STATUSES as unknown as string[]);
+
   // fidelidade — pontua só sobre os produtos; detecta 1ª compra pelo cadastro
   let pointsAwarded = 0;
   if (phone && productCents > 0) {

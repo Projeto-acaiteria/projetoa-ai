@@ -43,17 +43,23 @@ export default async function AdminHome() {
   }
 
   // caixa fechado NÃO bloqueia mais — vira um aviso suave (login cai no painel, não na tela de abrir caixa)
-  const semCaixa = !(await getOpenSession());
+  const session = await getOpenSession();
+  const semCaixa = !session;
 
   const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
+  // BAR atravessa a meia-noite: enquanto o CAIXA está aberto, "hoje" = desde a abertura do caixa
+  // (senão às 00h o faturado zera no dashboard, mas a venda da noite continua no caixa — divergência).
+  // Sem caixa aberto, cai no dia-calendário normal.
+  const sessStart = session?.openedAt ? new Date(session.openedAt).getTime() : null;
+  const isToday = (iso: string) => (sessStart !== null ? new Date(iso).getTime() >= sessStart : dateBR(iso) === today);
   const orders = await listOrders();
   const expenses = await listExpenses();
   const [settings, cur, mesaPagosAll, acai] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments(), weightSoldPeriods()]);
 
-  const vendasHoje = orders.filter((o) => o.status === "entregue" && !o.cancelled && dateBR(o.createdAt) === today);
+  const vendasHoje = orders.filter((o) => o.status === "entregue" && !o.cancelled && isToday(o.createdAt));
   // vendas de MESA também entram no faturamento (vivem em tab_payments, não em orders).
   // valor = soma dos pagamentos (split soma certo); contagem = comandas DISTINTAS (split não infla).
-  const mesaHoje = mesaPagosAll.filter((m) => dateBR(m.date) === today);
+  const mesaHoje = mesaPagosAll.filter((m) => isToday(m.date));
   const mesaBrutoHoje = mesaHoje.reduce((s, m) => s + m.grossCents, 0);
   const mesaLiquidoHoje = mesaHoje.reduce((s, m) => s + m.grossCents - m.cardFeeCents, 0);
   const nVendasHoje = vendasHoje.length + new Set(mesaHoje.map((m) => m.tabId)).size;

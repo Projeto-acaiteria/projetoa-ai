@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { IconPrinter, IconCheck } from "@/components/Icons";
-import { qzConnect, qzIsActive, qzListPrinters, qzPrintHtml, qzKickDrawer, getStationPrinter, setStationPrinter } from "@/lib/qz";
+import { qzConnect, qzListPrinters, qzPrintHtml, qzKickDrawer, getStationPrinter, setStationPrinter } from "@/lib/qz";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import { getPrintWidthMm, setPrintWidthMm, PRINT_WIDTH_PRESETS, widthTestHtml } from "@/lib/print-config";
 
@@ -122,7 +122,9 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   // largura do cupom (mm) — CALIBRÁVEL por máquina; o sistema imprime nesta largura (se adapta à impressora)
   const [widthMm, setWidthMm] = useState(72);
 
-  useEffect(() => { qzIsActive().then(setActive); }, []);
+  // conexão do QZ é POR ABA: qzIsActive() retorna false numa aba nova mesmo com o QZ aberto.
+  // qzConnect() estabelece de fato (silencioso) e reflete o estado REAL — igual ao badge do Caixa.
+  useEffect(() => { qzConnect().then(() => setActive(true)).catch(() => setActive(false)); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
   useEffect(() => { setDuasVias(localStorage.getItem("print:duasvias") !== "0"); }, []);
   useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
