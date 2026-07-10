@@ -11,7 +11,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
-import { printVias, openDrawer } from "@/lib/print";
+import { printVias, openDrawer, printTicket } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
@@ -239,6 +239,25 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
+  }
+
+  // pré-conta / conferência: imprime o consumo SEM forma de pagamento (o cliente confere antes de decidir como pagar)
+  function conferir() {
+    if (!drawer) return;
+    const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
+    const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
+    void printTicket(ticketHtml({
+      loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: dest,
+      dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
+      modeLabel: `${dest} · CONFERÊNCIA`,
+      items: [
+        ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
+        ...(cover > 0 ? [{ qty: 1, name: "Couvert", totalCents: cover }] : []),
+        ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
+      ],
+      totalCents: grand,
+      collectCents: grand,
+    }), "caixa");
   }
 
   // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
@@ -520,6 +539,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
+                      {grand > 0 && <button onClick={conferir} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconReceipt width={15} height={15} /> Imprimir conta</button>}
                       <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
                       {grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
                     </div>
