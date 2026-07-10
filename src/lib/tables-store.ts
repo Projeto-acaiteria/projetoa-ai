@@ -285,21 +285,23 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const prodIds = [...new Set(items.map((it) => it.productId).filter(Boolean) as string[])];
   const recipeByProduct = new Map<string, StockConsume[]>();
   const nameByProduct = new Map<string, string>();
+  const sizeByProduct = new Map<string, string>(); // 'dose' | 'garrafa' | ... → roteia a baixa pro estoque certo
   const noPrepByProduct = new Map<string, boolean>(); // categoria "pronto pra servir" → some do quadro de Preparo (mas imprime/cobra normal)
   if (prodIds.length) {
-    const { data: prods } = await d.from("menu_products").select("id, recipe, name, category_id").eq("store_id", sid).in("id", prodIds);
+    const { data: prods } = await d.from("menu_products").select("id, recipe, name, category_id, size_label").eq("store_id", sid).in("id", prodIds);
     const catIds = [...new Set(((prods ?? []) as { category_id?: string }[]).map((p) => p.category_id).filter(Boolean) as string[])];
     const noPrepByCat = new Map<string, boolean>();
     if (catIds.length) {
       const { data: cats } = await d.from("menu_categories").select("id, no_prep").in("id", catIds);
       for (const c of (cats ?? []) as { id: string; no_prep?: boolean }[]) noPrepByCat.set(String(c.id), !!c.no_prep);
     }
-    for (const p of (prods ?? []) as { id: string; recipe: unknown; name: string; category_id?: string }[]) {
+    for (const p of (prods ?? []) as { id: string; recipe: unknown; name: string; category_id?: string; size_label?: string }[]) {
       const r = Array.isArray(p.recipe)
         ? (p.recipe as StockConsume[]).map((x) => ({ stockId: String(x?.stockId ?? ""), qty: num(x?.qty) })).filter((x) => x.stockId && x.qty > 0)
         : [];
       recipeByProduct.set(String(p.id), r);
       nameByProduct.set(String(p.id), String(p.name ?? ""));
+      sizeByProduct.set(String(p.id), String(p.size_label ?? "").toLowerCase());
       noPrepByProduct.set(String(p.id), p.category_id ? (noPrepByCat.get(String(p.category_id)) ?? false) : false);
     }
   }
@@ -309,13 +311,19 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   // Também indexa o estoque POR NOME → baixa automática por nome (bar): produto sem ficha técnica
   // baixa 1 unid/dose do item de estoque de mesmo nome (ex.: dose "Old Parr" → −1 dose do estoque
   // "Old Parr"; "Heineken" → −1 un). É o que liga a venda à baixa sem cadastrar recipe em cada item.
+  // DOIS índices por nome: estoque em DOSE (destilado controlado por garrafa→doses) e estoque em
+  // UNIDADE (garrafa inteira / revenda). Assim a venda de DOSE baixa a dose, e a de GARRAFA baixa a
+  // garrafa — nunca se confundem (mesmo nome, ex.: "Beefeater" pode ter os dois, cada um baixa o seu).
   const costById = new Map<string, number>();
-  const stockByName = new Map<string, string>();
+  const doseStockByName = new Map<string, string>();
+  const unitStockByName = new Map<string, string>();
   const normName = (s: string) => s.normalize("NFC").trim().toLowerCase();
   try {
     for (const s of await listStock(sid)) {
       costById.set(s.id, unitCostCents(s));
-      if (s.name) stockByName.set(normName(s.name), s.id);
+      if (!s.name) continue;
+      if (s.dosesPerBottle && s.dosesPerBottle > 0) doseStockByName.set(normName(s.name), s.id);
+      else unitStockByName.set(normName(s.name), s.id);
     }
   } catch (e) {
     console.error("addTabItems: falha ao congelar custo no consumes (segue sem custo):", e instanceof Error ? e.message : e);
@@ -331,9 +339,14 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       consumes = [{ stockId: POLPA_STOCK_ID, qty: +(it.grams / 1000).toFixed(3) }];
     } else if (it.productId) {
       consumes = recipeByProduct.get(it.productId) ?? [];
-      // sem ficha técnica → tenta baixa por NOME (produto ↔ item de estoque de mesmo nome)
+      // sem ficha técnica → baixa por NOME, roteada pelo TIPO do produto:
+      // garrafa → estoque de garrafa/unidade (NUNCA a dose); dose → estoque de dose; demais → unidade, senão dose.
       if (!consumes.length) {
-        const sid2 = stockByName.get(normName(nameByProduct.get(it.productId) ?? ""));
+        const nm = normName(nameByProduct.get(it.productId) ?? "");
+        const size = sizeByProduct.get(it.productId) ?? "";
+        const sid2 = size === "garrafa" ? unitStockByName.get(nm)
+          : size === "dose" ? doseStockByName.get(nm)
+          : (unitStockByName.get(nm) ?? doseStockByName.get(nm));
         if (sid2) consumes = [{ stockId: sid2, qty: 1 }];
       }
     } else if (it.stockId) {
