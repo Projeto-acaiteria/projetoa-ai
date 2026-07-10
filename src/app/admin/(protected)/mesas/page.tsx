@@ -8,7 +8,7 @@ import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 import { listStaff } from "@/lib/staff-store";
 import { resolveStoreId } from "@/lib/auth/current";
-import { getCurrentRole } from "@/lib/auth/store";
+import { getCurrentMembership } from "@/lib/auth/store";
 import MesasClient from "./MesasClient";
 import MesasBarClient from "./MesasBarClient";
 import CallsAlert from "@/components/admin/CallsAlert";
@@ -19,8 +19,10 @@ export default async function MesasPage() {
   await requireNavAccess("/admin/mesas");
   const storeId = await resolveStoreId();
   const cfg = await getStoreConfig(storeId);
-  const role = await getCurrentRole();
+  const membership = await getCurrentMembership();
+  const role = membership?.role;
   const canClose = role !== "waiter"; // garçom abre e lança; o caixa fecha/recebe
+  const selfWaiterId = role === "waiter" ? membership?.staffId ?? null : null; // garçom logado → pedido no nome dele
   const isRelacional = cfg?.menu_template === "bar" || cfg?.menu_template === "grid";
 
   // show de hoje (couvert): só pergunta nº de pessoas ao abrir mesa se a loja tem cover + atração ao vivo hoje
@@ -38,7 +40,7 @@ export default async function MesasPage() {
   // bar/grid (menu relacional): comanda do operador espelhada do Medellín
   if (isRelacional) {
     const [categories, store, machines] = await Promise.all([readBarMenu(storeId), getStore(storeId), getCardMachines(storeId)]);
-    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} canClose={canClose} /></>;
+    return <>{header}<MesasBarClient categories={categories} coverShow={coverShow} staff={staff} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} canClose={canClose} selfWaiterId={selfWaiterId} /></>;
   }
 
   // açaí (copo/peso): fluxo existente

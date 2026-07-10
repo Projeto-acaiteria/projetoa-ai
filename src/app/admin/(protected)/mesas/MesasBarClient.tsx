@@ -26,7 +26,7 @@ const uid = () => `t${++_seq}`;
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true, selfWaiterId = null }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -38,6 +38,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   cupomRodape: string;
   onSaleClosed?: () => void; // ressincroniza o saldo do Caixa quando a grade está embutida no hub PDV
   canClose?: boolean; // GARÇOM (false): abre e lança, mas NÃO fecha/recebe — quem fecha é o caixa
+  selfWaiterId?: string | null; // garçom logado: pedido nasce no nome dele (sem escolher no seletor)
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -56,7 +57,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [weightFor, setWeightFor] = useState<BarProduct | null>(null);
   const [customizeFor, setCustomizeFor] = useState<{ product: BarProduct } | null>(null);
   const [pax, setPax] = useState(1);
-  const [waiter, setWaiter] = useState("");
+  const [waiter, setWaiter] = useState(selfWaiterId ?? ""); // garçom logado já entra como ele mesmo
   const [fee, setFee] = useState(true);
   const [method, setMethod] = useState<string>("pix");
   const activeMachines = machines.filter((m) => m.active);
@@ -81,7 +82,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }
 
   function clickTable(t: TableCard) {
-    setErr(""); setTemp([]); setPax(1); setWaiter("");
+    setErr(""); setTemp([]); setPax(1); setWaiter(selfWaiterId ?? "");
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
@@ -353,7 +354,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 {/* rascunho: cover (pessoas) + garçom só na 1ª abertura */}
                 {drawer.tabId === null && (
                   <div className="mb-3 space-y-2">
-                    {staff.length > 0 && (
+                    {staff.length > 0 && !selfWaiterId && (
                       <select value={waiter} onChange={(e) => setWaiter(e.target.value)} className="w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm text-ink">
                         <option value="">Sem garçom</option>
                         {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
