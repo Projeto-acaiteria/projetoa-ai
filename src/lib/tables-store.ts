@@ -200,8 +200,9 @@ export async function getOrCreateOpenTab(tableId: number, label?: string, storeI
     .maybeSingle();
   if (existing) return existing as Tab;
 
-  // COUVERT artístico: se vier nº de pessoas e a loja tem cover ligado + show ativo, snapshot na abertura
-  // (cover do show × pessoas). Sem pax (ex: pedido do cliente pelo QR) não aplica couvert.
+  // COUVERT artístico: só entra quando o nº de pessoas é informado pelo GARÇOM ou CAIXA (pax).
+  // Pedido pelo QR do cliente NÃO cobra couvert — a página do QR só AVISA que a noite tem couvert
+  // artístico; quem lança as pessoas e cobra é o garçom/caixa (ajustável na comanda).
   let cover_cents = 0;
   const people_count = Math.max(1, Math.round(pax ?? 1));
   if (pax && pax > 0) {

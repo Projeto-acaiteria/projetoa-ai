@@ -462,18 +462,34 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 <div className="mt-3 space-y-1 text-sm">
                   <div className="flex justify-between text-[var(--text-muted)]"><span>Consumo</span><span className="tabular-nums">{brl(consumo)}</span></div>
                   {coverShow ? (
-                    <div className="flex items-center justify-between text-[var(--text-muted)]">
-                      <span className="flex items-center gap-2">
-                        <input type="checkbox" checked={coverOn} onChange={(e) => setCoverOn(e.target.checked)} title="Cliente pode recusar o couvert" /> Couvert
-                        <span className="flex items-center gap-1.5">
-                          <button onClick={() => setPeople(people - 1)} disabled={busy || !coverOn || people <= 1} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
-                          <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{people}</span>
-                          <button onClick={() => setPeople(people + 1)} disabled={busy || !coverOn} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-base leading-none text-white disabled:opacity-40">+</button>
+                    cover === 0 ? (
+                      // couvert AINDA NÃO cobrado (ex.: comanda aberta pelo cliente via QR — o QR só AVISA
+                      // que a noite tem couvert, não cobra). Garçom/caixa informa o nº de pessoas e cobra aqui.
+                      <div className="flex items-center justify-between gap-2 rounded-lg bg-brand-50 px-2 py-1.5">
+                        <span className="flex items-center gap-2 text-[var(--text-muted)]">Couvert
+                          <span className="flex items-center gap-1.5">
+                            <button onClick={() => setPax((p) => Math.max(1, p - 1))} disabled={busy} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
+                            <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{pax}</span>
+                            <button onClick={() => setPax((p) => p + 1)} disabled={busy} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none">+</button>
+                          </span>
+                          <span className="text-xs">pessoas</span>
                         </span>
-                        <span className="text-xs">pessoas</span>
-                      </span>
-                      <span className="tabular-nums">{coverOn ? brl(cover) : <span className="text-[var(--text-faded)] line-through">{brl(cover)}</span>}</span>
-                    </div>
+                        <button onClick={() => setPeople(pax)} disabled={busy} className="shrink-0 rounded-md brand-gradient px-2.5 py-1 text-xs font-bold text-white disabled:opacity-50">Cobrar {brl(coverShow.coverCents * pax)}</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[var(--text-muted)]">
+                        <span className="flex items-center gap-2">
+                          <input type="checkbox" checked={coverOn} onChange={(e) => setCoverOn(e.target.checked)} title="Cliente pode recusar o couvert" /> Couvert
+                          <span className="flex items-center gap-1.5">
+                            <button onClick={() => setPeople(people - 1)} disabled={busy || !coverOn || people <= 1} className="grid h-7 w-7 place-items-center rounded-md border border-line text-base leading-none disabled:opacity-40">−</button>
+                            <span className="w-5 text-center text-sm font-bold tabular-nums text-ink">{people}</span>
+                            <button onClick={() => setPeople(people + 1)} disabled={busy || !coverOn} className="grid h-7 w-7 place-items-center rounded-md brand-gradient text-base leading-none text-white disabled:opacity-40">+</button>
+                          </span>
+                          <span className="text-xs">pessoas</span>
+                        </span>
+                        <span className="tabular-nums">{coverOn ? brl(cover) : <span className="text-[var(--text-faded)] line-through">{brl(cover)}</span>}</span>
+                      </div>
+                    )
                   ) : (cover > 0 && (
                     <label className="flex items-center justify-between"><span className="flex items-center gap-2 text-[var(--text-muted)]"><input type="checkbox" checked={coverOn} onChange={(e) => setCoverOn(e.target.checked)} /> Couvert</span><span className="tabular-nums">{coverOn ? brl(cover) : <span className="text-[var(--text-faded)] line-through">{brl(cover)}</span>}</span></label>
                   ))}

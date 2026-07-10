@@ -16,6 +16,21 @@ export default function EventosClient() {
   const [date, setDate] = useState("");
   const [cover, setCover] = useState("");
   const [repasse, setRepasse] = useState("");
+  // edição inline de um show existente (Bug #4: antes só dava pra criar/excluir)
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eArtist, setEArtist] = useState("");
+  const [eDate, setEDate] = useState("");
+  const [eCover, setECover] = useState("");
+  const [eRepasse, setERepasse] = useState("");
+  function startEdit(e: EventoRow) {
+    setEditId(e.id); setEArtist(e.artist); setEDate(e.event_date);
+    setECover((e.cover_cents / 100).toString()); setERepasse((e.repasse_cents / 100).toString());
+  }
+  async function saveEdit() {
+    if (!editId || !eArtist.trim() || !eDate) return;
+    await api("update", { id: editId, patch: { artist: eArtist.trim(), event_date: eDate, cover_cents: reaisToCents(eCover), repasse_cents: reaisToCents(eRepasse) } });
+    setEditId(null);
+  }
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/eventos", { cache: "no-store" });
@@ -54,6 +69,18 @@ export default function EventosClient() {
       {eventos.length === 0 && <Card className="p-6 text-center text-sm text-[var(--text-muted)]">Nenhum show agendado ainda.</Card>}
       {eventos.map((e) => (
         <Card key={e.id} className="p-4 sm:p-5">
+          {editId === e.id ? (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input value={eArtist} onChange={(ev) => setEArtist(ev.target.value)} placeholder="Artista / atração" className={inputCls} />
+              <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} className={inputCls} />
+              <input value={eCover} onChange={(ev) => setECover(ev.target.value)} inputMode="decimal" placeholder="Cover por pessoa (R$)" className={inputCls} />
+              <input value={eRepasse} onChange={(ev) => setERepasse(ev.target.value)} inputMode="decimal" placeholder="Repasse pro artista (R$)" className={inputCls} />
+              <div className="flex gap-2 sm:col-span-2">
+                <button onClick={saveEdit} disabled={saving || !eArtist.trim() || !eDate} className="rounded-xl brand-gradient px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Salvar</button>
+                <button onClick={() => setEditId(null)} disabled={saving} className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-ink">Cancelar</button>
+              </div>
+            </div>
+          ) : (
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
@@ -62,8 +89,12 @@ export default function EventosClient() {
               </div>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">Cover {brl(e.cover_cents)}/pessoa · Repasse {brl(e.repasse_cents)}</p>
             </div>
-            <button onClick={() => confirm(`Excluir o show de ${e.artist}?`) && api("delete", { id: e.id })} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => startEdit(e)} disabled={saving} className="text-xs font-bold text-brand-600">editar</button>
+              <button onClick={() => confirm(`Excluir o show de ${e.artist}?`) && api("delete", { id: e.id })} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
+            </div>
           </div>
+          )}
           <div className="mt-3 flex flex-wrap gap-4 border-t border-line pt-3 text-sm">
             <span className="text-[var(--text-secondary)]">Arrecadado (cover): <b className="text-[var(--green-ok)]">{brl(e.arrecadado_cents)}</b></span>
             <span className="text-[var(--text-secondary)]">Comandas com cover: <b className="text-ink">{e.comandas}</b></span>
