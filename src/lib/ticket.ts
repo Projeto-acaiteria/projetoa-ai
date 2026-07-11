@@ -23,7 +23,8 @@ export type TicketData = {
   bairro?: string;
   items: TicketItem[];
   totalCents: number;
-  subtotalCents?: number; // antes do desconto (só sai se discountCents>0)
+  subtotalCents?: number; // soma dos PRODUTOS (sem couvert/taxa) — sai como "Subtotal" quando há extras/desconto
+  extras?: { label: string; cents: number }[]; // linhas ENTRE subtotal e total: couvert, taxa de serviço 10%…
   discountCents?: number;
   feeCents?: number;
   receivedCents?: number;
@@ -303,7 +304,8 @@ export function ticketHtml(d: TicketData): string {
     ${items}
     <div class="dash"></div>
     ${d.feeCents ? lead("Taxa entrega", brl(d.feeCents)) : ""}
-    ${d.discountCents ? lead("Subtotal", brl(d.subtotalCents ?? d.totalCents + d.discountCents)) : ""}
+    ${((d.extras && d.extras.length) || d.discountCents) ? lead("Subtotal", brl(d.subtotalCents ?? (d.totalCents + (d.discountCents ?? 0)))) : ""}
+    ${(d.extras ?? []).map((e) => lead(esc(e.label), brl(e.cents))).join("")}
     ${d.discountCents ? lead("Desconto", "- " + brl(d.discountCents)) : ""}
     ${lead("TOTAL", brl(d.totalCents), "b total")}
     ${d.collectCents != null ? `<div class="collect">RECEBER ${d.paymentLabel ? `EM ${esc(d.paymentLabel).toUpperCase()}` : "DO CLIENTE"}<br><span class="v">${brl(d.collectCents)}</span></div>` : (d.paymentLabel ? `<div class="c">Pagamento: ${esc(d.paymentLabel)}</div>` : "")}

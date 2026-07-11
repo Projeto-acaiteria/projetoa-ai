@@ -240,10 +240,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
         ...(cupomReceived > 0 ? { receivedCents: cupomReceived, changeCents: cupomTroco } : {}),
-        items: [
-          ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
-          ...(coverCharged > 0 ? [{ qty: 1, name: "Couvert", totalCents: coverCharged }] : []),
-          ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
+        items: consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
+        subtotalCents: consumo, // produtos, sem couvert/taxa
+        extras: [
+          ...(coverCharged > 0 ? [{ label: "Couvert", cents: coverCharged }] : []),
+          ...(serviceFee > 0 ? [{ label: "Taxa de serviço 10%", cents: serviceFee }] : []),
         ],
         totalCents: d.totalCents ?? grand,
       }));
@@ -264,10 +265,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       loja: storeName, endereco, cnpj, tel, rodape: cupomRodape, display: dest,
       dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
       modeLabel: `${dest} · CONFERÊNCIA`,
-      items: [
-        ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
-        ...(coverCharged > 0 ? [{ qty: 1, name: "Couvert", totalCents: coverCharged }] : []),
-        ...(serviceFee > 0 ? [{ qty: 1, name: "Taxa de serviço 10%", totalCents: serviceFee }] : []),
+      items: consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
+      subtotalCents: consumo, // produtos, sem couvert/taxa
+      extras: [
+        ...(coverCharged > 0 ? [{ label: "Couvert", cents: coverCharged }] : []),
+        ...(serviceFee > 0 ? [{ label: "Taxa de serviço 10%", cents: serviceFee }] : []),
       ],
       totalCents: grand,
       collectCents: grand,
