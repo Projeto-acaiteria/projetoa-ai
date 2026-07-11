@@ -9,7 +9,17 @@ import type { Order, OrderStatus } from "@/lib/orders-store";
 import type { WaMsgs } from "@/lib/settings-store";
 
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Cartão débito", credito: "Cartão crédito" };
+const ONLINE_PAY_LABEL: Record<string, string> = { pix: "Pix", cartao: "Cartão (déb/créd)", dinheiro: "Dinheiro" };
 const MODE_LABEL: Record<string, string> = { balcao: "Balcão", retirada: "Retirada", entrega: "Entrega" };
+// forma declarada no pedido do link + troco (o cliente ainda não pagou — a loja cobra na entrega)
+function onlinePayText(o: Order): string | undefined {
+  if (!o.onlinePayMethod) return undefined;
+  const base = ONLINE_PAY_LABEL[o.onlinePayMethod] ?? o.onlinePayMethod;
+  if (o.onlinePayMethod === "dinheiro") {
+    return o.trocoParaCents ? `${base} · troco p/ ${brl(o.trocoParaCents)}` : `${base} · sem troco`;
+  }
+  return base;
+}
 // fallback sem emoji (vale só até o fetch de /api/configuracoes trazer as mensagens reais).
 // motivo: emoji astral passado por PROP RSC server→client corrompe (vira �); via fetch/JSON preserva.
 const WA_FALLBACK: WaMsgs = {
@@ -27,7 +37,7 @@ function cupomFromOrder(o: Order, storeName: string, head: { endereco: string; c
     display: o.display,
     dateLabel: `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`,
     modeLabel: MODE_LABEL[o.mode] ?? o.mode,
-    paymentLabel: o.paymentMethod ? PAY_LABEL[o.paymentMethod] : undefined,
+    paymentLabel: onlinePayText(o) ?? (o.paymentMethod ? PAY_LABEL[o.paymentMethod] : undefined),
     customerName: o.customerName,
     phone: o.phone || undefined,
     address: o.address,
@@ -261,6 +271,11 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
                   {o.mode === "entrega" && o.address && (
                     <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">
                       <span className="font-semibold">Entrega:</span> {o.address}
+                    </div>
+                  )}
+                  {onlinePayText(o) && (
+                    <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                      <span className="font-semibold">Pagamento:</span> {onlinePayText(o)}
                     </div>
                   )}
 

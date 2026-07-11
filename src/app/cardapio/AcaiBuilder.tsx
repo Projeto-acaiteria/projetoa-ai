@@ -5,6 +5,8 @@ import { type ModifierGroup, type Size } from "@/lib/menu";
 import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
 
 type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean; minEarnCents?: number; fixedPointsPerSale?: number };
+
+const PAY_LABEL: Record<"pix" | "cartao" | "dinheiro", string> = { pix: "Pix", cartao: "Cartão (débito/crédito)", dinheiro: "Dinheiro" };
 import { brl } from "@/lib/format";
 import {
   IconBowl,
@@ -63,6 +65,9 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const [address, setAddress] = useState("");
   const [complemento, setComplemento] = useState("");
   const [bairro, setBairro] = useState("");
+  const [pay, setPay] = useState<"pix" | "cartao" | "dinheiro" | "">("");
+  const [precisaTroco, setPrecisaTroco] = useState<null | boolean>(null); // null = ainda não respondeu
+  const [trocoPara, setTrocoPara] = useState(""); // "50" (reais) → troco pra R$ 50
   const usaZonas = brand.deliveryZones.length > 0;
   const [sending, setSending] = useState(false);
   const [placed, setPlaced] = useState<string | null>(null);
@@ -85,6 +90,8 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
   const feeCents = mode === "entrega" ? (usaZonas ? (zona?.feeCents ?? 0) : brand.deliveryFeeCents) : 0;
   const totalCents = size.priceCents + addCents + feeCents;
   const belowMin = mode === "entrega" && totalCents < brand.minOrderCents; // mínimo só vale p/ entrega
+  // troco: cliente digita quanto vai pagar (reais) → guardamos em centavos. Só usado no dinheiro.
+  const trocoCents = Math.round((parseFloat(trocoPara.replace(",", ".")) || 0) * 100);
   const productCents = size.priceCents + addCents; // pontua só produto, sem taxa
   // regras de pontuação do dono: mínimo pra pontuar + modo fixo por compra (ignora o proporcional)
   const fixedPts = brand.fixedPointsPerSale ?? 0;
@@ -141,6 +148,12 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
     }
     L.push(`\n*Entrega:* ${mode === "entrega" ? `Delivery (+${brl(feeCents)})` : "Retirada no balcão"}`);
     if (mode === "entrega" && address) L.push(`*Endereço:* ${address}${complemento.trim() ? ` — ${complemento.trim()}` : ""}`);
+    if (pay) {
+      L.push(`*Pagamento:* ${PAY_LABEL[pay]}`);
+      if (pay === "dinheiro") {
+        L.push(trocoCents > 0 ? `*Troco para:* ${brl(trocoCents)}` : `*Troco:* não precisa`);
+      }
+    }
     L.push(`*Total: ${brl(totalCents)}*`);
     return encodeURIComponent(L.join("\n"));
   }
@@ -157,6 +170,18 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
     }
     if (mode === "entrega" && usaZonas && !bairro) {
       setError("Escolha o bairro de entrega.");
+      return;
+    }
+    if (!pay) {
+      setError("Escolha a forma de pagamento.");
+      return;
+    }
+    if (pay === "dinheiro" && precisaTroco === null) {
+      setError("Você precisa de troco?");
+      return;
+    }
+    if (pay === "dinheiro" && precisaTroco === true && trocoCents <= totalCents) {
+      setError(`Informe um valor de troco maior que o total (${brl(totalCents)}).`);
       return;
     }
     setSending(true);
@@ -177,6 +202,8 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           subtotalCents: size.priceCents + addCents,
           feeCents,
           totalCents,
+          onlinePayMethod: pay,
+          trocoParaCents: pay === "dinheiro" && precisaTroco ? trocoCents : undefined,
         }),
       });
       const data = await res.json();
@@ -561,6 +588,80 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
                     className="w-full rounded-xl border border-line bg-bg-base px-4 py-3 text-ink outline-none focus:border-brand-600"
                   />
                 </>
+              )}
+            </div>
+
+            {/* Forma de pagamento (pedido do Vidal) */}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                Como você vai pagar?
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(["pix", "cartao", "dinheiro"] as const).map((m) => {
+                  const on = pay === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setPay(m);
+                        if (m !== "dinheiro") { setPrecisaTroco(null); setTrocoPara(""); }
+                      }}
+                      className={`rounded-xl border-2 px-2 py-3 text-sm font-bold transition ${
+                        on ? "border-brand-600 bg-bg-surface-2 text-ink" : "border-line bg-bg-base text-ink-2"
+                      }`}
+                    >
+                      {m === "pix" ? "Pix" : m === "cartao" ? "Cartão" : "Dinheiro"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {pay === "dinheiro" && (
+                <div className="mt-3">
+                  <div className="mb-2 text-xs font-semibold text-ink-2">Precisa de troco?</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setPrecisaTroco(false); setTrocoPara(""); }}
+                      className={`rounded-xl border-2 px-2 py-2.5 text-sm font-bold transition ${
+                        precisaTroco === false ? "border-brand-600 bg-bg-surface-2 text-ink" : "border-line bg-bg-base text-ink-2"
+                      }`}
+                    >
+                      Não precisa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrecisaTroco(true)}
+                      className={`rounded-xl border-2 px-2 py-2.5 text-sm font-bold transition ${
+                        precisaTroco === true ? "border-brand-600 bg-bg-surface-2 text-ink" : "border-line bg-bg-base text-ink-2"
+                      }`}
+                    >
+                      Sim, troco para…
+                    </button>
+                  </div>
+                  {precisaTroco === true && (
+                    <div className="mt-2">
+                      <input
+                        value={trocoPara}
+                        onChange={(e) => setTrocoPara(e.target.value.replace(/[^\d.,]/g, ""))}
+                        inputMode="decimal"
+                        placeholder={`Troco para quanto? (total ${brl(totalCents)})`}
+                        className="w-full rounded-xl border border-line bg-bg-base px-4 py-3 text-ink outline-none focus:border-brand-600"
+                      />
+                      {trocoCents > 0 && trocoCents < totalCents && (
+                        <div className="mt-1 text-xs font-semibold text-[var(--red-no)]">
+                          O troco precisa ser maior que o total ({brl(totalCents)}).
+                        </div>
+                      )}
+                      {trocoCents > totalCents && (
+                        <div className="mt-1 text-xs font-semibold text-ink-2">
+                          Troco: {brl(trocoCents - totalCents)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

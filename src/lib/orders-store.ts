@@ -40,6 +40,10 @@ export type Order = {
   consumes?: { stockId: string; qty: number; costCents?: number }[]; // ficha técnica (baixa + custo congelado p/ CMV)
   consumed?: boolean; // estoque já abatido (evita duplicar na entrega)
   bairro?: string; // zona de entrega (delivery)
+  // forma de pagamento DECLARADA no pedido do link (intenção do cliente; a venda só é liquidada
+  // na entrega/balcão → paymentMethod). "cartao" = deb/créd, o cliente decide na maquininha.
+  onlinePayMethod?: "pix" | "cartao" | "dinheiro";
+  trocoParaCents?: number; // dinheiro: troco pra quanto (ausente = não precisa / pagou certo)
   code?: string; // código de rastreio (curto, aleatório) — cliente consulta o status por ele
   // ESTORNO: venda cancelada (bateu errado, cliente desistiu). NÃO deleta — vira registro auditável
   // e é excluída de caixa/receita/CMV/açaí-vendido; estoque e pontos são revertidos na ação.

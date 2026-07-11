@@ -37,6 +37,8 @@ type RecvBody = {
   sizeLabel?: string;
   bairro?: string;
   items?: RecvItem[];
+  onlinePayMethod?: string; // forma declarada no pedido do link
+  trocoParaCents?: number; // dinheiro: troco pra quanto
 };
 
 type Calc =
@@ -133,6 +135,13 @@ export async function POST(req: Request) {
       totalCents: calc.totalCents,
       consumes: calc.consumes,
       bairro: body.bairro,
+      // forma de pagamento é declaração do cliente — não afeta o preço, só chega pra loja saber
+      // como cobrar na entrega. Sanitiza pro union; troco só faz sentido no dinheiro.
+      onlinePayMethod: (["pix", "cartao", "dinheiro"] as const).find((m) => m === body.onlinePayMethod),
+      trocoParaCents:
+        body.onlinePayMethod === "dinheiro" && Number(body.trocoParaCents) > 0
+          ? Math.round(Number(body.trocoParaCents))
+          : undefined,
     },
     new Date().toISOString(),
     // pedido do link já entra EM PREPARO (a loja começa a fazer na hora). A próxima ação é "saiu
