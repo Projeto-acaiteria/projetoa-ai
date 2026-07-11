@@ -214,7 +214,7 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
       {modal === "sangria" && <MovModal type="sangria" store={store} rodape={cupomRodape} cashPinSet={cashPinSet} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
       {modal === "suprimento" && <MovModal type="suprimento" store={store} rodape={cupomRodape} cashPinSet={false} onClose={() => setModal(null)} onDone={(d) => { setModal(null); onChanged(d); }} />}
       {modal === "movimentos" && <MovimentosModal movements={session.movements} onClose={() => setModal(null)} />}
-      {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
+      {modal === "fechar" && <FecharModal expected={resumo.saldoCaixaCents} salesCash={resumo.salesCashCents} salesCard={resumo.salesCardCents} salesPix={resumo.salesPixCents} salesTotal={resumo.salesTotalCents} cardFee={resumo.cardFeeCents} onClose={() => setModal(null)} onDone={onClosed} />}
       {modal === "consulta" && <ConsultaModal onClose={() => setModal(null)} />}
       {modal === "historico" && <HistoricoModal onClose={() => setModal(null)} />}
       {modal === "leiturax" && <LeituraXModal store={store} onClose={() => setModal(null)} />}
@@ -602,12 +602,14 @@ function DiffPill({ diff }: { diff: number }) {
   );
 }
 
-function FecharModal({ expected, salesCard, salesPix, cardFee, onClose, onDone }: { expected: number; salesCard: number; salesPix: number; cardFee: number; onClose: () => void; onDone: (s: CashSession) => void }) {
+function FecharModal({ expected, salesCash, salesCard, salesPix, salesTotal, cardFee, onClose, onDone }: { expected: number; salesCash: number; salesCard: number; salesPix: number; salesTotal: number; cardFee: number; onClose: () => void; onDone: (s: CashSession) => void }) {
   const [counted, setCounted] = useState("");
   const [cardCounted, setCardCounted] = useState("");
   const [pixCounted, setPixCounted] = useState("");
+  const [conf, setConf] = useState(false); // conferência é OPCIONAL — só abre se o operador quiser contar
   const [saving, setSaving] = useState(false);
-  const countedCents = Math.round((parseFloat(counted) || 0) * 100);
+  // dinheiro contado vazio = fecha pelo ESPERADO (sem apontar diferença). Contar ou não é decisão interna.
+  const countedCents = counted !== "" ? Math.round((parseFloat(counted) || 0) * 100) : expected;
   const cardCents = Math.round((parseFloat(cardCounted) || 0) * 100);
   const pixCents = Math.round((parseFloat(pixCounted) || 0) * 100);
   const diff = countedCents - expected;
@@ -632,53 +634,38 @@ function FecharModal({ expected, salesCard, salesPix, cardFee, onClose, onDone }
 
   return (
     <Overlay title="Fechar caixa" onClose={onClose}>
-      {/* DINHEIRO */}
-      <div className="flex items-center justify-between rounded-xl bg-bg-surface-2 px-4 py-3">
-        <span className="text-sm font-semibold text-[var(--text-muted)]">Esperado na gaveta (dinheiro)</span>
-        <span className="text-lg font-extrabold text-ink">{brl(expected)}</span>
+      {/* RECEBIDO no turno — só mostra os valores; contar é opcional (decisão interna) */}
+      <div className="space-y-1.5 rounded-xl bg-bg-surface-2 px-4 py-3 text-sm">
+        <div className="flex justify-between"><span className="text-[var(--text-muted)]">Dinheiro</span><span className="font-bold tabular-nums text-ink">{brl(salesCash)}</span></div>
+        {salesCard > 0 && <div className="flex justify-between"><span className="text-[var(--text-muted)]">Cartão <span className="text-[11px] text-[var(--text-faded)]">(líq. {brl(cardNet)})</span></span><span className="font-bold tabular-nums text-ink">{brl(salesCard)}</span></div>}
+        {salesPix > 0 && <div className="flex justify-between"><span className="text-[var(--text-muted)]">Pix</span><span className="font-bold tabular-nums text-ink">{brl(salesPix)}</span></div>}
+        <div className="flex justify-between border-t border-line pt-1.5 text-base"><span className="font-bold text-ink">Total recebido</span><span className="font-extrabold tabular-nums text-brand-600">{brl(salesTotal)}</span></div>
       </div>
-      <label className="text-xs font-semibold text-[var(--text-muted)]">Dinheiro contado</label>
-      <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
-        <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
-        <input type="number" min={0} step="0.5" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" autoFocus className="w-full bg-transparent px-2 py-3 text-xl font-extrabold text-ink outline-none" />
-      </div>
-      {counted !== "" && <DiffPill diff={diff} />}
 
-      {/* CARTÃO */}
-      {salesCard > 0 && (
-        <div className="mt-2 space-y-1.5 border-t border-line pt-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-[var(--text-muted)]">Cartão (bruto)</span>
-            <span className="font-bold text-ink">{brl(salesCard)}</span>
-          </div>
-          <p className="text-[11px] text-[var(--text-faded)]">taxa maquininha {brl(cardFee)} · líquido a receber {brl(cardNet)}</p>
-          <label className="text-xs font-semibold text-[var(--text-muted)]">Cartão conferido (relatório da maquininha)</label>
-          <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
-            <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
-            <input type="number" min={0} step="0.5" value={cardCounted} onChange={(e) => setCardCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" />
-          </div>
-          {cardCounted !== "" && <DiffPill diff={cardCents - salesCard} />}
+      {/* Conferência OPCIONAL: quem conta o dinheiro abre aqui */}
+      {!conf ? (
+        <button onClick={() => setConf(true)} className="mt-2 text-xs font-bold text-brand-600 underline">Conferir o dinheiro (opcional)</button>
+      ) : (
+        <div className="mt-2 space-y-2 rounded-xl border border-line p-3">
+          <div className="flex items-center justify-between text-sm"><span className="font-semibold text-[var(--text-muted)]">Esperado na gaveta</span><span className="font-bold text-ink">{brl(expected)}</span></div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Dinheiro contado</label>
+          <div className="flex items-center rounded-xl border border-line bg-bg-base px-3"><span className="text-base font-bold text-[var(--text-muted)]">R$</span><input type="number" min={0} step="0.5" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" /></div>
+          {counted !== "" && <DiffPill diff={diff} />}
+          {salesCard > 0 && (<>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Cartão conferido (maquininha)</label>
+            <div className="flex items-center rounded-xl border border-line bg-bg-base px-3"><span className="text-base font-bold text-[var(--text-muted)]">R$</span><input type="number" min={0} step="0.5" value={cardCounted} onChange={(e) => setCardCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" /></div>
+            {cardCounted !== "" && <DiffPill diff={cardCents - salesCard} />}
+          </>)}
+          {salesPix > 0 && (<>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Pix conferido (extrato)</label>
+            <div className="flex items-center rounded-xl border border-line bg-bg-base px-3"><span className="text-base font-bold text-[var(--text-muted)]">R$</span><input type="number" min={0} step="0.5" value={pixCounted} onChange={(e) => setPixCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" /></div>
+            {pixCounted !== "" && <DiffPill diff={pixCents - salesPix} />}
+          </>)}
         </div>
       )}
 
-      {/* PIX */}
-      {salesPix > 0 && (
-        <div className="mt-2 space-y-1.5 border-t border-line pt-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-[var(--text-muted)]">Pix (esperado)</span>
-            <span className="font-bold text-ink">{brl(salesPix)}</span>
-          </div>
-          <label className="text-xs font-semibold text-[var(--text-muted)]">Pix conferido (extrato)</label>
-          <div className="flex items-center rounded-xl border border-line bg-bg-base px-3">
-            <span className="text-base font-bold text-[var(--text-muted)]">R$</span>
-            <input type="number" min={0} step="0.5" value={pixCounted} onChange={(e) => setPixCounted(e.target.value)} placeholder="0,00" className="w-full bg-transparent px-2 py-2.5 text-lg font-bold text-ink outline-none" />
-          </div>
-          {pixCounted !== "" && <DiffPill diff={pixCents - salesPix} />}
-        </div>
-      )}
-
-      <button onClick={fechar} disabled={saving || counted === ""} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
-        {saving ? "Fechando..." : "Confirmar fechamento"}
+      <button onClick={fechar} disabled={saving} className="mt-3 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
+        {saving ? "Fechando..." : "Fechar caixa"}
       </button>
     </Overlay>
   );
