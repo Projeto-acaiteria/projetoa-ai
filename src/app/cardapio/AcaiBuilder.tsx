@@ -540,7 +540,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
       {checkout && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCheckout(false)} />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-2xl animate-pop rounded-t-3xl bg-bg-elevated p-5 shadow-[var(--shadow-pop)]">
+          <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[90dvh] max-w-2xl animate-pop overflow-y-auto overscroll-contain rounded-t-3xl bg-bg-elevated p-5 shadow-[var(--shadow-pop)]">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line" />
             <h2 className="text-lg font-extrabold text-ink">Quase lá! Seus dados</h2>
             <p className="mt-0.5 text-sm text-[var(--text-muted)]">
