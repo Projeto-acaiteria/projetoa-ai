@@ -86,13 +86,24 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       </div>
 
       <div className="relative z-10">
-        <section className="relative flex min-h-[64vh] flex-col justify-center overflow-hidden px-6 py-20 text-center">
+        <section className={`relative flex flex-col overflow-hidden px-6 text-center ${store.bannerUrl ? "min-h-[86vh] justify-end pb-14 pt-6" : "min-h-[64vh] justify-center py-20"}`}>
           {store.bannerUrl && (
-            <div className="absolute inset-0 z-0" aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={store.bannerUrl} alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/35 to-[#140820]" />
-            </div>
+            <>
+              {/* foto do produto — funde no fundo aurora, sem emenda (hero imersivo) */}
+              <div
+                className="absolute inset-0 z-0 bg-cover bg-center"
+                aria-hidden
+                style={{
+                  backgroundImage: `url(${store.bannerUrl})`,
+                  WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 48%, transparent 92%)",
+                  maskImage: "linear-gradient(to bottom, #000 0%, #000 48%, transparent 92%)",
+                }}
+              />
+              {/* overlay leve só pra legibilidade do texto */}
+              <div className="absolute inset-0 z-0" aria-hidden style={{ background: "linear-gradient(to bottom, rgba(22,8,35,0.10) 0%, rgba(22,8,35,0.18) 45%, rgba(22,8,35,0.55) 100%)" }} />
+              {/* vinheta radial — profundidade nos cantos */}
+              <div className="absolute inset-0 z-0" aria-hidden style={{ background: "radial-gradient(125% 75% at 50% 28%, transparent 48%, rgba(15,5,24,0.42) 100%)" }} />
+            </>
           )}
           <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-6">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white backdrop-blur ${aberto ? "bg-white/15" : "bg-[#EF4444]/90"}`}>
