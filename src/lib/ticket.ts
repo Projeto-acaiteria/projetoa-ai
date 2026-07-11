@@ -307,6 +307,7 @@ export function ticketHtml(d: TicketData): string {
     ${((d.extras && d.extras.length) || d.discountCents) ? lead("Subtotal", brl(d.subtotalCents ?? (d.totalCents + (d.discountCents ?? 0)))) : ""}
     ${(d.extras ?? []).map((e) => lead(esc(e.label), brl(e.cents))).join("")}
     ${d.discountCents ? lead("Desconto", "- " + brl(d.discountCents)) : ""}
+    ${((d.extras && d.extras.length) || d.discountCents) ? `<div class="dash"></div>` : ""}
     ${lead("TOTAL", brl(d.totalCents), "b total")}
     ${d.collectCents != null ? `<div class="collect">RECEBER ${d.paymentLabel ? `EM ${esc(d.paymentLabel).toUpperCase()}` : "DO CLIENTE"}<br><span class="v">${brl(d.collectCents)}</span></div>` : (d.paymentLabel ? `<div class="c">Pagamento: ${esc(d.paymentLabel)}</div>` : "")}
     ${d.receivedCents != null ? lead("Recebido", brl(d.receivedCents)) : ""}
