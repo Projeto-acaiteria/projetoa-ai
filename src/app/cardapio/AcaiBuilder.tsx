@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { type ModifierGroup, type Size } from "@/lib/menu";
-import { computePoints, REWARDS, POINTS_PER_BRL } from "@/lib/loyalty";
+import { computePoints, POINTS_PER_BRL, type Reward } from "@/lib/loyalty";
 
 type Brand = { name: string; whatsapp: string; deliveryFeeCents: number; minOrderCents: number; deliveryZones: { bairro: string; feeCents: number }[]; slug?: string; hasDelivery?: boolean; minEarnCents?: number; fixedPointsPerSale?: number };
 
@@ -55,7 +55,7 @@ function groupCost(group: ModifierGroup, qty: Qty) {
   return { cents, charged };
 }
 
-export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: Size[]; groups: ModifierGroup[]; brand: Brand; isOpen: boolean }) {
+export default function AcaiBuilder({ sizes, groups, brand, isOpen, rewards }: { sizes: Size[]; groups: ModifierGroup[]; brand: Brand; isOpen: boolean; rewards: Reward[] }) {
   const [sizeId, setSizeId] = useState(sizes[1]?.id ?? sizes[0]?.id ?? "");
   const [qty, setQty] = useState<Qty>({});
   const [mode, setMode] = useState<"retirada" | "entrega">("retirada");
@@ -467,7 +467,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen }: { sizes: S
           </div>
 
           <div className="space-y-2.5">
-            {REWARDS.map((r, i) => {
+            {rewards.map((r, i) => {
               const img = sizes.find((s) => s.id === r.sizeId)?.img;
               return (
                 <div key={r.points} className="flex items-center gap-3 rounded-2xl bg-bg-surface-2 p-2.5">

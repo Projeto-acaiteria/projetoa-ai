@@ -93,6 +93,7 @@ export default async function CardapioPage() {
         sizes={menu.sizes}
         groups={menu.groups}
         isOpen={aberto}
+        rewards={loyalty.rewards}
         brand={{ name: store.name, whatsapp: store.whatsapp, deliveryFeeCents: store.deliveryFeeCents, minOrderCents: store.minOrderCents, deliveryZones: store.deliveryZones, minEarnCents: loyalty.minEarnCents, fixedPointsPerSale: loyalty.fixedPointsPerSale }}
       />
       </div>
