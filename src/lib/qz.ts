@@ -54,6 +54,15 @@ export async function qzKickDrawer(printer: string): Promise<void> {
   await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: "\x1B\x70\x00\x19\xFA" }]);
 }
 
+// Avança o papel e CORTA (ESC/POS): ESC d 5 (feed 5 linhas, pro conteúdo passar da lâmina) + GS V 0
+// (corte total). Algumas impressoras (ex.: 3nStar RPT006W) cortam via comando cru mas não pelo driver
+// HTML — este comando resolve. Enviado só quando a estação está marcada "cortar papel" no print.ts.
+export async function qzCutPaper(printer: string): Promise<void> {
+  const qz = await qzConnect();
+  const cfg = qz.configs.create(printer, { encoding: "ISO-8859-1" });
+  await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: "\x1B\x64\x05\x1D\x56\x00" }]);
+}
+
 export async function qzIsActive(): Promise<boolean> {
   try {
     const qz = await getQz();

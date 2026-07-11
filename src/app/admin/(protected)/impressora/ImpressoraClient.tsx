@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { IconPrinter, IconCheck } from "@/components/Icons";
-import { qzConnect, qzListPrinters, qzPrintHtml, qzKickDrawer, getStationPrinter, setStationPrinter } from "@/lib/qz";
+import { qzConnect, qzListPrinters, qzPrintHtml, qzKickDrawer, qzCutPaper, getStationPrinter, setStationPrinter } from "@/lib/qz";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import { getPrintWidthMm, setPrintWidthMm, PRINT_WIDTH_PRESETS, widthTestHtml } from "@/lib/print-config";
 
@@ -54,7 +54,9 @@ function PrinterPicker({
 }) {
   const [sel, setSel] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setSel(getStationPrinter(destKey) ?? ""); }, [destKey]);
+  const [cut, setCut] = useState(false); // impressora não corta pelo driver → manda comando de corte (ex.: 3nStar)
+  useEffect(() => { setSel(getStationPrinter(destKey) ?? ""); setCut(localStorage.getItem("cut:" + destKey) === "1"); }, [destKey]);
+  function toggleCut(on: boolean) { setCut(on); localStorage.setItem("cut:" + destKey, on ? "1" : "0"); onMsg(on ? `Corte de papel LIGADO (${label}).` : `Corte de papel desligado (${label}).`); }
 
   function save(name: string) {
     setSel(name);
@@ -97,6 +99,15 @@ function PrinterPicker({
         <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--green-ok)]">
           <IconCheck width={14} height={14} /> {sel}
         </p>
+      )}
+      {sel && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-bg-base px-3 py-2">
+          <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <input type="checkbox" checked={cut} onChange={(e) => toggleCut(e.target.checked)} /> Cortar papel
+            <span className="font-normal text-[var(--text-faded)]">— ligue se a impressora não corta/não solta o papel sozinha</span>
+          </label>
+          {cut && <button onClick={async () => { try { await qzCutPaper(sel); onMsg("Comando de corte enviado."); } catch (e) { onMsg("Falha no corte: " + (e instanceof Error ? e.message : "erro")); } }} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-bold text-brand-600">Testar corte</button>}
+        </div>
       )}
     </Card>
   );

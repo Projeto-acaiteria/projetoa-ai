@@ -2,13 +2,17 @@
 // Imprime o cupom: tenta QZ Tray (silencioso, impressora do caixa); se não há
 // impressora configurada ou o QZ não responde, cai no iframe escondido (imprime
 // só o cupom, não a página inteira). Nunca lança — impressão não pode travar a venda.
-import { qzPrintHtml, getStationPrinter, qzKickDrawer } from "./qz";
+import { qzPrintHtml, getStationPrinter, qzKickDrawer, qzCutPaper } from "./qz";
 
 export async function printTicket(html: string, station = "caixa"): Promise<"qz" | "iframe" | "erro"> {
   const printer = getStationPrinter(station);
   if (printer) {
     try {
       await qzPrintHtml(printer, html);
+      // impressoras que não cortam pelo driver HTML (ex.: 3nStar) → corte cru por-máquina/estação
+      if (typeof window !== "undefined" && localStorage.getItem("cut:" + station) === "1") {
+        try { await qzCutPaper(printer); } catch { /* corte é best-effort — nunca trava a impressão */ }
+      }
       return "qz";
     } catch {
       // QZ caiu — segue pro fallback
