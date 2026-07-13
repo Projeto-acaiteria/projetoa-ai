@@ -67,6 +67,7 @@ const NAV: NavItem[] = [
   { href: "/admin/estoque", label: "Estoque", Icon: IconBox, show: (c) => c.hasEstoque },
   { href: "/admin/cmv", label: "CMV", Icon: IconChart, show: (c) => c.hasEstoque, family: "food" },
   { href: "/admin/financeiro", label: "Financeiro", Icon: IconWallet },
+  { href: "/admin/relatorios", label: "Relatórios", Icon: IconChart, family: "service" },
   { href: "/admin/cupons", label: "Cupons", Icon: IconGift, show: (c) => c.loyaltyEnabled || c.hasDelivery },
   { href: "/admin/fidelidade", label: "Fidelidade", Icon: IconStar, show: (c) => c.loyaltyEnabled, family: "food" },
   { href: "/admin/clientes", label: "Clientes", Icon: IconUsers, show: (c) => c.loyaltyEnabled || c.hasDelivery },
