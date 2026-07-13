@@ -1,0 +1,31 @@
+# ComandaPRO
+
+> Sistema de gestão para food service (açaiteria, bar, restaurante, lanchonete, pizzaria e mais): cardápio digital, comanda, mesas, delivery próprio sem comissão, balcão/PDV, caixa, estoque e fidelidade — tudo integrado num sistema só. Site: https://comandapro.net.br
+
+O ComandaPRO é um sistema brasileiro para donos de estabelecimentos de alimentação que querem receber pedidos pelo próprio link (sem pagar comissão de marketplace) e operar o dia a dia — mesa, comanda, cozinha, balcão e caixa — numa plataforma única. Cada tipo de negócio configura só o que usa: açaí vende por peso na balança, pizzaria monta pizza meio a meio, bar trabalha por comanda de mesa.
+
+## Funcionalidades principais
+- **Cardápio digital próprio**: link da loja (comandapro.net.br/nomedaloja) onde o cliente monta o pedido; sem app pra baixar. Suporta montagem no copo (açaí), pizza meio a meio, combos e adicionais.
+- **Delivery próprio sem comissão**: pedido pelo link da loja, taxa de entrega por bairro, pedido mínimo, acompanhamento por código de rastreio e forma de pagamento (Pix, cartão ou dinheiro com troco) informada no pedido.
+- **Comanda e mesas**: abertura de comanda por mesa, controle de garçom, couvert e dose (bar), fechamento parcial e divisão de conta.
+- **Balcão / PDV**: venda rápida no balcão, formas de pagamento, desconto e sangria/suprimento de caixa.
+- **Caixa**: abertura com fundo de troco, receita por forma de pagamento, fechamento e conferência.
+- **Cozinha (KDS) e impressão térmica**: roteamento da via de preparo por estação (cozinha, bar, balcão) e impressão de cupom 80mm em impressora térmica.
+- **Estoque**: baixa automática por ficha técnica, controle de variantes e custo (CMV).
+- **Fidelidade**: pontos por compra e troca por prêmio (item grátis), sem virar dinheiro.
+
+## Segmentos atendidos
+- Açaiteria e sorveteria (venda por peso)
+- Bar e petiscaria (comanda de mesa, couvert, dose)
+- Restaurante, lanchonete e hamburgueria
+- Pizzaria (pizza meio a meio)
+- Marmitaria e sushi
+
+## Diferenciais
+- 0% de comissão: o dono paga só a mensalidade; o marketplace não leva percentual de cada venda.
+- Tudo num sistema só: cardápio, comanda, mesa, cozinha, delivery, balcão, caixa e estoque integrados.
+- Multi-segmento: cada negócio liga só as funcionalidades que usa.
+
+## Links
+- Site: https://comandapro.net.br
+- Cardápio de demonstração e cadastro: https://comandapro.net.br
