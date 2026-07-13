@@ -4,6 +4,7 @@ import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/service-orders-store";
 import { listStaff } from "@/lib/staff-store";
 import OSActions from "./OSActions";
+import DocShare from "@/components/admin/DocShare";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,12 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
         sub={`${os.customerName || "—"} · ${os.device || "—"}`}
         action={<Badge tone="lime">{OS_STATUS_LABEL[os.status]}</Badge>}
       />
+
+      {os.code && (
+        <div className="mb-4 max-w-4xl">
+          <DocShare code={os.code} name={os.customerName} phone={os.customerPhone} kind="os" />
+        </div>
+      )}
 
       <div className="grid max-w-4xl gap-4 lg:grid-cols-[1.3fr_1fr]">
         <div className="space-y-4">

@@ -144,6 +144,22 @@ export async function lookupCustomerByDoc(
   return { name: String(row.customer_name ?? ""), phone: String(row.customer_phone ?? ""), cpf: String(row.cpf ?? "") };
 }
 
+/** Busca pública da OS pelo código (documento A4 no WhatsApp). Varre todas as lojas (código único-ish). */
+export async function getServiceOrderByCode(code: string): Promise<{ storeId: string; os: ServiceOrder; parts: OSPart[] } | null> {
+  const c = (code || "").trim();
+  if (!c) return null;
+  const { data } = await db().from("service_orders").select("*").eq("code", c).limit(1);
+  const row = ((data ?? []) as Record<string, unknown>[])[0];
+  if (!row) return null;
+  const os = toOS(row);
+  const sid = String(row.store_id);
+  const { data: p } = await db().from("os_parts").select("*").eq("os_id", os.id).eq("store_id", sid);
+  const parts: OSPart[] = ((p ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id), sku: str(r.sku), name: String(r.name ?? ""), qty: num(r.qty), unitCostCents: num(r.unit_cost_cents),
+  }));
+  return { storeId: sid, os, parts };
+}
+
 export async function getServiceOrder(id: string, storeId?: string): Promise<{ os: ServiceOrder; parts: OSPart[] } | null> {
   const sid = storeId ?? (await resolveStoreId());
   const { data } = await db().from("service_orders").select("*").eq("id", id).eq("store_id", sid).maybeSingle();

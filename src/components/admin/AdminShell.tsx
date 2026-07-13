@@ -49,6 +49,7 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Início", Icon: IconHome },
   { href: "/admin/minha-area", label: "Minha área", Icon: IconClock },
   { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
+  { href: "/admin/orcamentos", label: "Orçamentos", Icon: IconReceipt, family: "service" },
   { href: "/admin/vendas", label: "Vendas", Icon: IconBag, family: "service" },
   { href: "/admin/loja", label: "Loja Online", Icon: IconCart, family: "service" },
   { href: "/admin/equipe", label: "Equipe", Icon: IconUsers, family: "service" },
