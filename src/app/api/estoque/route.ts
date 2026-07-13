@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       dosesPerBottle: b.dosesPerBottle ? Math.max(1, Math.round(Number(b.dosesPerBottle))) : undefined,
       costPerBottleCents: b.costPerBottleCents ? Math.max(0, Math.round(Number(b.costPerBottleCents))) : undefined,
       costCents: b.costCents ? Math.max(0, Math.round(Number(b.costCents))) : undefined,
+      barcode: b.barcode?.trim() || undefined,
       supplier: b.supplier?.trim() || undefined,
       purchaseUnit: b.purchaseUnit?.trim() || undefined,
       purchaseFactor: b.purchaseFactor ? Math.max(0, Number(b.purchaseFactor)) || undefined : undefined,

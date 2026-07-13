@@ -43,6 +43,7 @@ export type StockItem = {
   dosesPerBottle?: number;
   costPerBottleCents?: number;
   costCents?: number; // custo por UNIDADE do insumo (kg/un/L...) — base do CMV (ficha técnica)
+  barcode?: string; // código de barras (EAN/UPC) — bipa no balcão e acha o produto. AT/revenda embalada
   supplier?: string; // fornecedor (filtrar compras/perdas por fornecedor)
   purchaseUnit?: string; // unidade de COMPRA (ex: fardo, caixa, saco) — opcional
   purchaseFactor?: number; // 1 unidade de compra = purchaseFactor unidades de uso (ex: 1 caixa = 12 un)

@@ -1,11 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { IconSearch, IconTrash, IconCart } from "@/components/Icons";
 import PedidosPendentes, { type Pedido } from "./PedidosPendentes";
 
-type Product = { sku: string; name: string; category: string; priceCents: number; stock: number };
+type Product = { sku: string; name: string; category: string; priceCents: number; stock: number; barcode: string | null };
 type Recente = { display: string; totalCents: number; paymentMethod: string | null; count: number };
 type Line = { sku: string; name: string; priceCents: number; qty: number; stock: number };
 type Machine = { id: string; name: string; maxParcelas: number };
@@ -32,12 +32,34 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
   const [machineId, setMachineId] = useState(machines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
   const [showPedidos, setShowPedidos] = useState(false); // pedidos do site colapsados (foco = PDV)
+  const [bip, setBip] = useState("");
+  const [bipMsg, setBipMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const bipRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     const base = s ? products.filter((p) => (p.name + " " + p.category + " " + p.sku).toLowerCase().includes(s)) : products;
     return base.slice(0, 48);
   }, [q, products]);
+
+  // índice por código de barras (EAN) — o leitor digita os dígitos e manda Enter
+  const byBarcode = useMemo(() => {
+    const m = new Map<string, Product>();
+    for (const p of products) if (p.barcode) m.set(p.barcode, p);
+    return m;
+  }, [products]);
+
+  function onBip(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const code = bip.trim();
+    setBip("");
+    if (!code) return;
+    const p = byBarcode.get(code);
+    if (p) { add(p); setBipMsg({ ok: true, text: `+ ${p.name}` }); }
+    else { setBipMsg({ ok: false, text: `Nenhum produto com o código ${code}. Cadastre o EAN em Estoque.` }); }
+    bipRef.current?.focus();
+  }
 
   const subtotal = cart.reduce((n, l) => n + l.priceCents * l.qty, 0);
   const discountCents = Math.max(0, Math.min(subtotal, Math.round((parseFloat(discInput.replace(",", ".")) || 0) * 100)));
@@ -116,6 +138,25 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* CATÁLOGO */}
         <div className="space-y-3">
+          {/* Leitor de código de barras: bipa o EAN e o produto cai no carrinho */}
+          <div className="rounded-xl border-2 border-dashed border-brand-400 bg-brand-600/5 p-2">
+            <div className="relative">
+              <IconSearch width={16} height={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-600" />
+              <input
+                ref={bipRef}
+                value={bip}
+                onChange={(e) => setBip(e.target.value)}
+                onKeyDown={onBip}
+                inputMode="numeric"
+                autoFocus
+                placeholder="Bipe o código de barras aqui…"
+                className="w-full rounded-lg border border-line bg-bg-base py-2.5 pl-9 pr-3 text-sm font-semibold text-ink outline-none focus:border-brand-600"
+              />
+            </div>
+            {bipMsg && (
+              <p className={`mt-1.5 px-1 text-xs font-bold ${bipMsg.ok ? "text-[var(--green-ok)]" : "text-red-500"}`}>{bipMsg.text}</p>
+            )}
+          </div>
           <div className="relative">
             <IconSearch width={16} height={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input

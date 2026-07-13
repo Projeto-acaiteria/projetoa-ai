@@ -22,7 +22,7 @@ export default async function VendasPage() {
   const pixDiscountPercent = Number(storeSettings.pixDiscountPercent ?? 0);
   const products = stock
     .filter((s) => Number(s.sellPriceCents ?? 0) > 0)
-    .map((s) => ({ sku: s.id, name: s.name, category: String(s.category), priceCents: Number(s.sellPriceCents), stock: Number(s.qty ?? 0) }))
+    .map((s) => ({ sku: s.id, name: s.name, category: String(s.category), priceCents: Number(s.sellPriceCents), stock: Number(s.qty ?? 0), barcode: (s.barcode ?? "").trim() || null }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const recentes = orders

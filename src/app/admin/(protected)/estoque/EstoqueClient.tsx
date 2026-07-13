@@ -412,6 +412,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
   const [badge, setBadge] = useState("");
   const [highlight, setHighlight] = useState(false);
   const [image, setImage] = useState("");
+  const [barcode, setBarcode] = useState(""); // EAN — bipa no balcão
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
@@ -452,6 +453,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         badge: isService ? badge.trim() || undefined : undefined,
         highlight: isService ? highlight || undefined : undefined,
         image: isService ? image || undefined : undefined,
+        barcode: sellable ? barcode.trim() || undefined : undefined,
       }),
     });
     onSaved();
@@ -470,6 +472,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         ))}
       </select>
       {isService && <input className={inp} placeholder="Marca (ex: AMD, Kingston, Corsair)" value={brand} onChange={(e) => setBrand(e.target.value)} />}
+      {sellable && <input className={inp} inputMode="numeric" placeholder="Código de barras (EAN) — bipe aqui pra preencher" value={barcode} onChange={(e) => setBarcode(e.target.value)} />}
       <div className="grid grid-cols-3 gap-2">
         <input className={inp} type="number" min={0} placeholder={byDose ? "Garrafas" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
         <input className={inp} placeholder="Unid" value={byDose ? "dose" : unit} onChange={(e) => setUnit(e.target.value)} disabled={byDose} />
@@ -663,8 +666,10 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
   const [supplier, setSupplier] = useState(item.supplier ?? "");
   const [purchaseUnit, setPurchaseUnit] = useState(item.purchaseUnit ?? "");
   const [purchaseFactor, setPurchaseFactor] = useState(item.purchaseFactor ? String(item.purchaseFactor) : "");
+  const [barcode, setBarcode] = useState(item.barcode ?? "");
   const [saving, setSaving] = useState(false);
   const isVenda = famOf(category).key === "venda";
+  const sellable = isVenda || family === "service";
 
   async function save() {
     if (!name.trim()) return;
@@ -685,6 +690,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         supplier: supplier.trim(),
         purchaseUnit: purchaseUnit.trim(),
         purchaseFactor: purchaseFactor ? parseFloat(purchaseFactor.replace(",", ".")) || 0 : 0,
+        barcode: barcode.trim(),
       }),
     });
     onSaved();
@@ -711,6 +717,12 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
             <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
             <input className="w-full bg-transparent px-2 py-2.5 text-sm text-ink outline-none" type="number" min={0} step="0.5" placeholder="0,00" value={sell} onChange={(e) => setSell(e.target.value)} />
           </div>
+        </div>
+      )}
+      {sellable && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Código de barras (EAN)</label>
+          <input className={`${inp} mt-1`} inputMode="numeric" placeholder="Bipe aqui pra preencher" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
         </div>
       )}
       <div>
