@@ -21,6 +21,15 @@ _Última atualização: 13/07/2026. Escrito pra uma NOVA instância do Verbo con
 ## Estado DEPLOYADO (tudo em prod, main)
 ComandaPRO topo — conferir `git log` (13/07 subiu o módulo de comissão+caixa) · Site topo `71a5b48`.
 
+**Shipped 13/07/2026 — Check-in por CPF + comprovante 80mm de entrada + importador de clientes (estudo do GestãoClick):**
+- **Contexto:** o GestãoClick (ERP+loja da Starteq) identifica cliente por CPF na recepção e imprime comprovante. Estudamos o concorrente (relatório completo no chat/Verbo) e trouxemos a paridade.
+- **Migrations ADITIVAS (prod, verificadas):** `service_orders.cpf text` + tabela `service_customers (store_id, cpf, data jsonb, PK(store_id,cpf), RLS on)` — base de clientes por CPF, service-only. Scripts `scripts/migrate-clientes-starteq.mjs` (idempotente).
+- **`service-customers-store.ts`:** `getServiceCustomerByCpf`, `upsertServiceCustomer` (best-effort). `service-orders-store`: OS ganhou `cpf`; `createServiceOrder` alimenta a base por CPF; `lookupCustomerByDoc(doc)` = base de clientes 1º, OS antiga como fallback.
+- **`/api/os`:** GET `?doc=<cpf>` (busca cliente recorrente, bloqueado p/ técnico); POST create aceita `cpf` e devolve `{os, store}` (cabeçalho da loja p/ imprimir).
+- **Check-in (`NovaOSButton`):** campo **CPF + botão "buscar"** (acha cliente e auto-preenche nome/telefone) + imprime **comprovante 80mm de entrada** ao abrir a OS (`osEntryTicketHtml` em `ticket.ts`: header white-label + nº OS + cliente/CPF/tel + aparelho/defeito + **garantia + cláusula de abandono Art.1.275** + assinatura; SEM marca de terceiro, ≠ GestãoClick que assina "emitida no GestãoClick"). Gate impressão `autoprint:os !== "0"`.
+- **Importador de clientes:** `scripts/import-clientes-starteq.mjs` — lê CSV exportado do GestãoClick (Clientes > "Mais ações" > Exportar cadastros), autodetecta `;`/`,`, mapeia colunas (nome/cpf/telefone/email/endereço), `--dry` pra conferir, `--latin1` p/ Excel BR, upsert idempotente por CPF. **Espera só o CSV do Junior.** Alternativa: API do GestãoClick (token, add-on) expõe clientes por GET.
+- **Validado:** tsc limpo + build OK + parser testado (aspas/vírgula/sem-CPF). **Limite honesto:** a busca por CPF só acha quem já está na base (importada OU de check-in nosso) — não puxa a base antiga do GestãoClick sem o export.
+
 **Shipped 13/07/2026 — Pagamento de comissão + comissão no caixa (estudo do Palace portado):**
 - **Migration ADITIVA (já em prod, verificada):** `service_orders.commission_payment_id text` (NULL=comissão pendente, preenchido=paga) + tabela `commission_payments` (jsonb `data`, RLS ligada). Script `scripts/migrate-commission-caixa.mjs` (idempotente, read-after-write). **Food intacto:** `service_orders` é só do vertical service; `commission_payments` é nova.
 - **Store `src/lib/commission-payments-store.ts`:** `payCommission` (recalcula no server via `osCommissionCents`, **trava anti-2x** = só vincula OS com `commission_payment_id IS NULL`, rollback total se corrida), `pendingOSForStaff`, `listCommissionPayments`, `reverseCommissionPayment` (estorno devolve OS pra pendente). Modelo espelhado do Palace (`commission_payments` + FK na OS).

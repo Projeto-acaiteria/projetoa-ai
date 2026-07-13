@@ -99,6 +99,70 @@ export function stationTicketHtml(d: StationTicketData): string {
   </body></html>`;
 }
 
+// ── COMPROVANTE DE ENTRADA da OS (80mm) — recibo que o cliente leva no check-in ──
+// White-label (cabeçalho vem do settings da loja). Guarda garantia curta + cláusula de
+// abandono (proteção legal) e a senha do aparelho (é do próprio cliente). Escrito do nosso jeito.
+export type OSEntryTicketData = {
+  loja: string;
+  cnpj?: string;
+  endereco?: string;
+  tel?: string;
+  code: string; // nº/código da OS
+  dateLabel: string;
+  customerName: string;
+  cpf?: string;
+  phone?: string;
+  device: string;
+  imei?: string;
+  problem?: string;
+  devicePassword?: string;
+  rodape?: string;
+};
+
+export function osEntryTicketHtml(d: OSEntryTicketData): string {
+  const linha = (l: string, r: string) =>
+    r ? `<div class="row"><span class="lbl">${esc(l)}</span><span class="val">${esc(r)}</span></div>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{font-family:'Courier New',monospace;color:#000;margin:0;box-sizing:border-box}
+    body{width:${getPrintWidthMm()}mm;padding:2mm 4mm;line-height:1.35}
+    .loja{font-weight:700;font-size:16px;text-align:center}
+    .info{font-size:10px;text-align:center;line-height:1.25}
+    .tit{font-weight:700;font-size:13px;text-align:center;border:2px solid #000;padding:3px 0;margin:6px 0;letter-spacing:1px}
+    .os{font-weight:700;font-size:20px;text-align:center;line-height:1.1}
+    .when{font-size:11px;text-align:center;margin-bottom:4px}
+    .sep{border-top:1px dashed #000;margin:5px 0}
+    .row{display:flex;gap:6px;font-size:12px;margin:2px 0}
+    .row .lbl{font-weight:700;white-space:nowrap}
+    .row .val{flex:1;text-align:right;word-break:break-word}
+    .block{font-size:12px;margin:3px 0}
+    .block b{font-weight:700}
+    .termo{font-size:9.5px;line-height:1.3;margin-top:5px;text-align:justify}
+    .sign{margin-top:22px;text-align:center;font-size:10px}
+    .sign .ln{border-top:1px solid #000;margin:0 6mm 2px}
+    .rod{font-size:10px;text-align:center;margin-top:8px}
+  </style></head><body>
+    <div class="loja">${esc(d.loja).toUpperCase()}</div>
+    ${d.cnpj ? `<div class="info">${docLabel(d.cnpj)}: ${esc(d.cnpj)}</div>` : ""}
+    ${d.endereco ? `<div class="info">${esc(d.endereco)}</div>` : ""}
+    ${d.tel ? `<div class="info">${esc(d.tel)}</div>` : ""}
+    <div class="tit">COMPROVANTE DE ENTRADA</div>
+    <div class="os">OS Nº ${esc(d.code)}</div>
+    <div class="when">Entrada: ${esc(d.dateLabel)}</div>
+    <div class="sep"></div>
+    ${linha("Cliente:", d.customerName)}
+    ${d.cpf ? linha("CPF:", d.cpf) : ""}
+    ${d.phone ? linha("Telefone:", d.phone) : ""}
+    <div class="sep"></div>
+    <div class="block"><b>Aparelho:</b> ${esc(d.device)}${d.imei ? `<br><b>IMEI/Série:</b> ${esc(d.imei)}` : ""}</div>
+    ${d.problem ? `<div class="block"><b>Defeito relatado:</b> ${esc(d.problem)}</div>` : ""}
+    ${d.devicePassword ? `<div class="block"><b>Senha do aparelho:</b> ${esc(d.devicePassword)}</div>` : ""}
+    <div class="sep"></div>
+    <div class="termo">Garantia de 90 dias sobre o serviço executado e peças fornecidas pela loja; não cobre mau uso, quedas ou contato com líquidos. Aparelho não retirado em até 90 dias corridos pode ser considerado abandonado (Art. 1.275 do Código Civil). <b>Guarde este comprovante para a retirada.</b></div>
+    <div class="sign"><div class="ln"></div>Assinatura do cliente</div>
+    <div class="rod">${esc(d.rodape || "Obrigado pela preferência!")}</div>
+  </body></html>`;
+}
+
 // ── LEITURA X (relatório parcial do caixa, NÃO zera, pode tirar N vezes) ───────
 // Imprime o resumo() do caixa aberto: recebimentos por método + conferência da
 // gaveta de dinheiro. Espelha o cabeçalho do cupom (white-label). É o "espelho"

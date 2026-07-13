@@ -2,6 +2,7 @@
 // Técnico reusa staff (staff_id). Comissão = service_value da OS QUITADA (peça nunca entra na base).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getServiceCustomerByCpf, upsertServiceCustomer } from "@/lib/service-customers-store";
 
 const num = (v: unknown) => Number(v ?? 0);
 const str = (v: unknown) => (v == null ? null : String(v));
@@ -19,6 +20,7 @@ export type ServiceOrder = {
   code: string | null;
   customerName: string;
   customerPhone: string;
+  cpf: string | null; // CPF do cliente (só dígitos) — recepção identifica cliente recorrente por ele
   device: string;
   imei: string | null;
   problem: string;
@@ -52,6 +54,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   code: str(r.code),
   customerName: String(r.customer_name ?? ""),
   customerPhone: String(r.customer_phone ?? ""),
+  cpf: str(r.cpf),
   device: String(r.device ?? ""),
   imei: str(r.imei),
   problem: String(r.problem ?? ""),
@@ -112,6 +115,31 @@ export async function listByTechnician(staffId: string, storeId?: string): Promi
   return listServiceOrders({ staffId }, storeId);
 }
 
+/** Busca cliente recorrente pela recepção: OS mais recente com esse CPF (ou telefone). Devolve
+ *  os dados p/ auto-preencher o check-in. Só acha quem já tem OS antiga — histórico acumula sozinho. */
+export async function lookupCustomerByDoc(
+  doc: string,
+  storeId?: string,
+): Promise<{ name: string; phone: string; cpf: string } | null> {
+  const digits = (doc || "").replace(/\D/g, "");
+  if (digits.length < 3) return null;
+  const sid = storeId ?? (await resolveStoreId());
+  // 1) base de clientes (importada do GestãoClick ou criada em check-ins anteriores)
+  const base = await getServiceCustomerByCpf(digits, sid);
+  if (base) return { name: base.name, phone: base.phone, cpf: base.cpf };
+  // 2) fallback: OS anterior com esse CPF ou telefone
+  const { data } = await db()
+    .from("service_orders")
+    .select("customer_name, customer_phone, cpf, created_at")
+    .eq("store_id", sid)
+    .or(`cpf.eq.${digits},customer_phone.eq.${digits}`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const row = ((data ?? []) as Record<string, unknown>[])[0];
+  if (!row) return null;
+  return { name: String(row.customer_name ?? ""), phone: String(row.customer_phone ?? ""), cpf: String(row.cpf ?? "") };
+}
+
 export async function getServiceOrder(id: string, storeId?: string): Promise<{ os: ServiceOrder; parts: OSPart[] } | null> {
   const sid = storeId ?? (await resolveStoreId());
   const { data } = await db().from("service_orders").select("*").eq("id", id).eq("store_id", sid).maybeSingle();
@@ -126,6 +154,7 @@ export async function getServiceOrder(id: string, storeId?: string): Promise<{ o
 export type NewOSInput = {
   customerName: string;
   customerPhone?: string;
+  cpf?: string;
   device: string;
   imei?: string;
   devicePassword?: string;
@@ -153,6 +182,7 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     code: genOSCode(),
     customer_name: input.customerName.trim(),
     customer_phone: (input.customerPhone ?? "").trim(),
+    cpf: input.cpf?.replace(/\D/g, "") || null,
     device: input.device.trim(),
     imei: input.imei?.trim() || null,
     device_password: input.devicePassword?.trim() || null,
@@ -166,6 +196,15 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     payment_status: "aberta",
   }).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Falha ao abrir OS.");
+  // alimenta a base de clientes pela chave CPF (recorrência) — não trava a abertura se falhar
+  if (input.cpf?.replace(/\D/g, "")) {
+    try {
+      await upsertServiceCustomer(
+        { cpf: input.cpf, name: input.customerName, phone: input.customerPhone },
+        sid,
+      );
+    } catch { /* base de clientes é best-effort */ }
+  }
   return toOS(data);
 }
 

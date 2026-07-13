@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { getStore } from "@/lib/settings-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,15 @@ const TEC_STATUSES = new Set(["aguardando", "em_reparo", "pronto"]);
 export async function GET(req: Request) {
   const m = await getCurrentMembership();
   if (!m) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
+  // Busca de cliente recorrente por CPF/telefone (recepção no check-in). Técnico não faz check-in.
+  const doc = new URL(req.url).searchParams.get("doc");
+  if (doc) {
+    if (m.role === "technician") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    const found = await lookupCustomerByDoc(doc, m.store.id);
+    return NextResponse.json({ found });
+  }
+
   const q = new URL(req.url).searchParams.get("q") ?? "";
   let results = await searchServiceOrders(q, m.store.id);
   if (m.role === "technician") results = results.filter((o) => o.staffId === m.technicianId);
@@ -53,13 +63,21 @@ export async function POST(req: Request) {
         const os = await createServiceOrder({
           customerName: name,
           customerPhone: p.customerPhone ? String(p.customerPhone) : undefined,
+          cpf: p.cpf ? String(p.cpf) : undefined,
           device,
           imei: p.imei ? String(p.imei) : undefined,
           devicePassword: p.devicePassword ? String(p.devicePassword) : undefined,
           problem: p.problem ? String(p.problem) : undefined,
           serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined,
         }, storeId);
-        return NextResponse.json({ ok: true, id: os.id });
+        // devolve a OS + cabeçalho da loja p/ o cliente imprimir o comprovante de entrada 80mm
+        const s = await getStore(storeId);
+        return NextResponse.json({
+          ok: true,
+          id: os.id,
+          os,
+          store: { loja: s.name, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, rodape: s.cupomRodape },
+        });
       }
       case "status":
         await updateOSStatus(String(p.id), String(p.status) as OSStatus, storeId);
