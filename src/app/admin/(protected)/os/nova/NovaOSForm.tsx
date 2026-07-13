@@ -37,7 +37,7 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
   const [looking, setLooking] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", printObs: "", servico: "", staffId: "", priority: "" });
+  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", marca: "", modelo: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", printObs: "", servico: "", staffId: "", priority: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function buscar() {
@@ -78,7 +78,7 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
       const nome = f.customerName.trim();
       const res = await submitOrQueue("/api/os", { action: "create", payload: {
         customerName: nome, customerPhone: f.customerPhone.trim() || undefined, cpf: onlyDigits(f.cpf) || undefined,
-        device: f.device.trim(), imei: f.imei.trim() || undefined, condicoes: f.condicoes.trim() || undefined,
+        device: f.device.trim(), marca: f.marca.trim() || undefined, modelo: f.modelo.trim() || undefined, imei: f.imei.trim() || undefined, condicoes: f.condicoes.trim() || undefined,
         acessorios: f.acessorios.trim() || undefined, devicePassword: f.devicePassword.trim() || undefined,
         problem: f.problem.trim() || undefined, printObs: f.printObs.trim() || undefined,
         staffId: f.staffId || undefined,
@@ -116,7 +116,9 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
       <Card className="p-5">
         <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Equipamento</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Aparelho *"><input value={f.device} onChange={(e) => set("device", e.target.value)} placeholder="ex: iPhone 12, Notebook Acer" className={inputCls} /></Field>
+          <Field label="Aparelho *"><input value={f.device} onChange={(e) => set("device", e.target.value)} placeholder="ex: Notebook, Celular, Monitor" className={inputCls} /></Field>
+          <Field label="Marca"><input value={f.marca} onChange={(e) => set("marca", e.target.value)} placeholder="ex: Acer, Samsung" className={inputCls} /></Field>
+          <Field label="Modelo"><input value={f.modelo} onChange={(e) => set("modelo", e.target.value)} placeholder="ex: Aspire 5" className={inputCls} /></Field>
           <Field label="IMEI / série"><input value={f.imei} onChange={(e) => set("imei", e.target.value)} placeholder="número de série" className={`${inputCls} font-mono`} /></Field>
           <Field label="Condições na entrada"><textarea value={f.condicoes} onChange={(e) => set("condicoes", e.target.value)} rows={2} placeholder="ex: tela trincada, riscos na tampa" className={inputCls} /></Field>
           <Field label="Acessórios entregues"><textarea value={f.acessorios} onChange={(e) => set("acessorios", e.target.value)} rows={2} placeholder="carregador, cabo, capa…" className={inputCls} /></Field>

@@ -65,6 +65,8 @@ export async function POST(req: Request) {
           customerPhone: p.customerPhone ? String(p.customerPhone) : undefined,
           cpf: p.cpf ? String(p.cpf) : undefined,
           device,
+          marca: p.marca ? String(p.marca) : undefined,
+          modelo: p.modelo ? String(p.modelo) : undefined,
           imei: p.imei ? String(p.imei) : undefined,
           condicoes: p.condicoes ? String(p.condicoes) : undefined,
           acessorios: p.acessorios ? String(p.acessorios) : undefined,

@@ -13,7 +13,7 @@ export type DocA4Props = {
   statusLabel?: string | null;
   store: { name: string; logoUrl?: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string; garantiaTermos?: string; avisos?: string };
   customer: { name: string; cpf?: string | null; phone?: string | null };
-  equipamento?: { device?: string; imei?: string | null; condicoes?: string | null; acessorios?: string | null; problem?: string | null; diagnosis?: string | null } | null;
+  equipamento?: { device?: string; marca?: string | null; modelo?: string | null; imei?: string | null; condicoes?: string | null; acessorios?: string | null; problem?: string | null; diagnosis?: string | null } | null;
   items: DocA4Item[];
   totals: { produtosCents: number; servicosCents: number; freteCents: number; outrosCents: number; descontoCents: number; totalCents: number };
   observacao?: string | null;
@@ -154,6 +154,7 @@ export default function DocA4(d: DocA4Props) {
                   <td className="lb">Aparelho</td><td>{eq.device || "—"}</td>
                   <td className="lb">Série / IMEI</td><td>{eq.imei || "—"}</td>
                 </tr>
+                {(eq.marca || eq.modelo) ? <tr><td className="lb">Marca / modelo</td><td colSpan={3}>{[eq.marca, eq.modelo].filter(Boolean).join(" · ")}</td></tr> : null}
                 {eq.condicoes ? <tr><td className="lb">Condições na entrada</td><td colSpan={3}>{eq.condicoes}</td></tr> : null}
                 {eq.acessorios ? <tr><td className="lb">Acessórios</td><td colSpan={3}>{eq.acessorios}</td></tr> : null}
                 {eq.problem ? <tr><td className="lb">Defeito relatado</td><td colSpan={3}>{eq.problem}</td></tr> : null}

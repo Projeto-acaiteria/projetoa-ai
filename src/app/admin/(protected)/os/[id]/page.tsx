@@ -42,6 +42,7 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
             <Row label="Cliente" value={os.customerName || "—"} />
             {os.customerPhone && <Row label="WhatsApp" value={os.customerPhone} />}
             <Row label="Aparelho" value={os.device || "—"} />
+            {(os.marca || os.modelo) && <Row label="Marca / modelo" value={[os.marca, os.modelo].filter(Boolean).join(" · ") || "—"} />}
             {os.imei && <Row label="IMEI / série" value={os.imei} mono />}
             {os.condicoes && <Row label="Condições na entrada" value={os.condicoes} />}
             {os.acessorios && <Row label="Acessórios" value={os.acessorios} />}

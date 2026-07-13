@@ -24,6 +24,8 @@ export type ServiceOrder = {
   customerPhone: string;
   cpf: string | null; // CPF do cliente (só dígitos) — recepção identifica cliente recorrente por ele
   device: string;
+  marca: string | null; // marca do aparelho (ex: Acer, Samsung)
+  modelo: string | null; // modelo do aparelho (ex: Aspire 5)
   imei: string | null;
   condicoes: string | null; // estado do aparelho na entrada (proteção contra disputa)
   acessorios: string | null; // o que veio junto (carregador, cabo, capa…)
@@ -62,6 +64,8 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   customerPhone: String(r.customer_phone ?? ""),
   cpf: str(r.cpf),
   device: String(r.device ?? ""),
+  marca: str(r.marca),
+  modelo: str(r.modelo),
   imei: str(r.imei),
   condicoes: str(r.condicoes),
   acessorios: str(r.acessorios),
@@ -182,6 +186,8 @@ export type NewOSInput = {
   customerPhone?: string;
   cpf?: string;
   device: string;
+  marca?: string;
+  modelo?: string;
   imei?: string;
   condicoes?: string;
   acessorios?: string;
@@ -220,6 +226,8 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     customer_phone: (input.customerPhone ?? "").trim(),
     cpf: input.cpf?.replace(/\D/g, "") || null,
     device: input.device.trim(),
+    marca: input.marca?.trim() || null,
+    modelo: input.modelo?.trim() || null,
     imei: input.imei?.trim() || null,
     condicoes: input.condicoes?.trim() || null,
     acessorios: input.acessorios?.trim() || null,

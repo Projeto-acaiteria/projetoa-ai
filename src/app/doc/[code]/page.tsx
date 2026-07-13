@@ -72,7 +72,7 @@ export default async function DocPage({ params }: { params: Promise<{ code: stri
         statusLabel={OS_STATUS_LABEL[os.status]}
         store={{ name: s.name, logoUrl: s.logoUrl, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, email: s.email, site: s.site, responsavel: s.responsavel, garantiaTermos: s.garantiaTermos, avisos: s.avisos }}
         customer={{ name: os.customerName, cpf: os.cpf, phone: os.customerPhone }}
-        equipamento={{ device: os.device, imei: os.imei, condicoes: os.condicoes, acessorios: os.acessorios, problem: os.problem, diagnosis: os.diagnosis }}
+        equipamento={{ device: os.device, marca: os.marca, modelo: os.modelo, imei: os.imei, condicoes: os.condicoes, acessorios: os.acessorios, problem: os.problem, diagnosis: os.diagnosis }}
         items={items}
         totals={{ produtosCents, servicosCents: os.serviceValueCents, freteCents: 0, outrosCents: 0, descontoCents: os.discountCents, totalCents: os.totalCents }}
         observacao={os.printObs}
