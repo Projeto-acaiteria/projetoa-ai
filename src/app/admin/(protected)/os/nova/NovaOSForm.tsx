@@ -36,7 +36,7 @@ export default function NovaOSForm() {
   const [looking, setLooking] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", servico: "" });
+  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", printObs: "", servico: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function buscar() {
@@ -79,7 +79,7 @@ export default function NovaOSForm() {
         customerName: nome, customerPhone: f.customerPhone.trim() || undefined, cpf: onlyDigits(f.cpf) || undefined,
         device: f.device.trim(), imei: f.imei.trim() || undefined, condicoes: f.condicoes.trim() || undefined,
         acessorios: f.acessorios.trim() || undefined, devicePassword: f.devicePassword.trim() || undefined,
-        problem: f.problem.trim() || undefined,
+        problem: f.problem.trim() || undefined, printObs: f.printObs.trim() || undefined,
         serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
       } }, `Check-in ${nome}`);
       if ("queued" in res) {
@@ -126,6 +126,7 @@ export default function NovaOSForm() {
         <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Serviço</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Valor do serviço R$ (opcional)"><input value={f.servico} onChange={(e) => set("servico", e.target.value)} inputMode="decimal" placeholder="0,00" className={inputCls} /></Field>
+          <Field label="Observações (saem no documento)"><textarea value={f.printObs} onChange={(e) => set("printObs", e.target.value)} rows={2} placeholder="Ex: retirar até sexta · cliente autorizou troca" className={inputCls} /></Field>
         </div>
         <p className="mt-2 text-xs text-[var(--text-faded)]">Ao abrir a OS, imprime o comprovante de entrada 80mm pro cliente.</p>
       </Card>

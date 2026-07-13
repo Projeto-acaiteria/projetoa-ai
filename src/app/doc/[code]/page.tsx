@@ -75,6 +75,7 @@ export default async function DocPage({ params }: { params: Promise<{ code: stri
         equipamento={{ device: os.device, imei: os.imei, condicoes: os.condicoes, acessorios: os.acessorios, problem: os.problem, diagnosis: os.diagnosis }}
         items={items}
         totals={{ produtosCents, servicosCents: os.serviceValueCents, freteCents: 0, outrosCents: 0, descontoCents: os.discountCents, totalCents: os.totalCents }}
+        observacao={os.printObs}
       />
     );
   }

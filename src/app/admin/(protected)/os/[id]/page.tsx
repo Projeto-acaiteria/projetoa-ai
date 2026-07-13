@@ -5,6 +5,7 @@ import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/servi
 import { listStaff } from "@/lib/staff-store";
 import { getStore } from "@/lib/settings-store";
 import OSActions from "./OSActions";
+import OSObsEditor from "./OSObsEditor";
 import DocShare from "@/components/admin/DocShare";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,8 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
             {os.problem && <Row label="Defeito / pedido" value={os.problem} />}
             {os.diagnosis && <Row label="Laudo" value={os.diagnosis} />}
           </Card>
+
+          <OSObsEditor id={os.id} initial={os.printObs ?? ""} />
 
           {parts.length > 0 && (
             <Card className="p-5">

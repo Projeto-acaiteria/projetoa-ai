@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getStore } from "@/lib/settings-store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +70,7 @@ export async function POST(req: Request) {
           acessorios: p.acessorios ? String(p.acessorios) : undefined,
           devicePassword: p.devicePassword ? String(p.devicePassword) : undefined,
           problem: p.problem ? String(p.problem) : undefined,
+          printObs: p.printObs ? String(p.printObs) : undefined,
           serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined,
         }, storeId);
         // devolve a OS + cabeçalho da loja p/ o cliente imprimir o comprovante de entrada 80mm
@@ -89,6 +90,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "notes":
         await updateOSNotes(String(p.id), String(p.notes ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "printObs": // observação que sai no documento (não é ação do técnico — fora de TEC_ACTIONS)
+        await updateOSPrintObs(String(p.id), String(p.text ?? ""), storeId);
         return NextResponse.json({ ok: true });
       case "estimate":
         await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);

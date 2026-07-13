@@ -40,7 +40,8 @@ export type ServiceOrder = {
   commissionPaymentId: string | null; // NULL = comissão pendente; preenchido = já paga (trava anti-2x)
   photos: OSPhoto[];
   devicePassword: string | null; // senha p/ destravar o aparelho (recepção captura, técnico usa)
-  notes: string | null; // anotações de bancada do técnico (separado do laudo oficial)
+  notes: string | null; // anotações de bancada do técnico (INTERNAS — nunca saem no documento)
+  printObs: string | null; // observação que SAI no documento pro cliente (recepção escreve)
   estimatedAt: string | null; // prazo estimado de conclusão (o técnico define) — ISO fim-do-dia BR
   readyAt: string | null; // quando ficou PRONTA (p/ "pronta há X dias" no balcão)
   notifiedAt: string | null; // quando a recepção avisou o cliente (WhatsApp)
@@ -77,6 +78,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   photos: Array.isArray(r.photos) ? (r.photos as OSPhoto[]) : [],
   devicePassword: str(r.device_password),
   notes: str(r.notes),
+  printObs: str(r.print_obs),
   estimatedAt: str(r.estimated_at),
   readyAt: str(r.ready_at),
   notifiedAt: str(r.notified_at),
@@ -181,6 +183,7 @@ export type NewOSInput = {
   acessorios?: string;
   devicePassword?: string;
   problem?: string;
+  printObs?: string;
   staffId?: string;
   commissionPercent?: number;
   serviceValueCents?: number;
@@ -211,6 +214,7 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     acessorios: input.acessorios?.trim() || null,
     device_password: input.devicePassword?.trim() || null,
     problem: (input.problem ?? "").trim(),
+    print_obs: input.printObs?.trim() || null,
     staff_id: input.staffId ?? null,
     commission_percent: Math.max(0, Number(input.commissionPercent ?? 0)),
     service_value_cents: service,
@@ -258,6 +262,12 @@ export async function updateOSDiagnosis(id: string, diagnosis: string, storeId?:
 export async function updateOSNotes(id: string, notes: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("service_orders").update({ notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Observação que SAI no documento pro cliente (recepção/dono escreve; nunca é o técnico). */
+export async function updateOSPrintObs(id: string, text: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ print_obs: text.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Prazo estimado de conclusão. Recebe YYYY-MM-DD (ou vazio pra limpar). Guarda no FIM do dia BR

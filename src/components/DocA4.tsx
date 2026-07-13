@@ -195,7 +195,7 @@ export default function DocA4(d: DocA4Props) {
           <div className="row tt"><span>Total</span><span>{brl(t.totalCents)}</span></div>
         </div>
 
-        {d.observacao ? <><div className="bar">Observações do orçamento</div><div className="note">{d.observacao}</div></> : null}
+        {d.observacao ? <><div className="bar">{d.kind === "orcamento" ? "Observações do orçamento" : "Observações"}</div><div className="note">{d.observacao}</div></> : null}
 
         {/* TERMOS DE GARANTIA */}
         {garantiaLines.length ? (
@@ -211,7 +211,7 @@ export default function DocA4(d: DocA4Props) {
         {/* OBSERVAÇÕES / AVISOS (só OS) */}
         {d.kind === "os" && d.store.avisos ? (
           <>
-            <div className="bar">Observações</div>
+            <div className="bar">Avisos importantes</div>
             <div className="box">{d.store.avisos}</div>
           </>
         ) : null}
