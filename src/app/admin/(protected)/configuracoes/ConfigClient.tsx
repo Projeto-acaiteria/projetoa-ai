@@ -317,10 +317,12 @@ export default function ConfigClient({ family }: { family?: string }) {
             <label className="text-xs font-semibold text-[var(--text-muted)]">Logo</label>
             <div className="mt-1.5"><ImageUpload value={store.logoUrl} onChange={(url) => setS("logoUrl", url)} aspect="square" hint="Aparece no topo do cardápio e no cabeçalho do documento de OS/orçamento. PNG fica melhor." /></div>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-[var(--text-muted)]">Banner (foto de fundo)</label>
-            <div className="mt-1.5"><ImageUpload value={store.bannerUrl} onChange={(url) => setS("bannerUrl", url)} aspect="wide" hint="Foto de fundo do topo. Horizontal, boa qualidade." /></div>
-          </div>
+          {family !== "service" && (
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Banner (foto de fundo)</label>
+              <div className="mt-1.5"><ImageUpload value={store.bannerUrl} onChange={(url) => setS("bannerUrl", url)} aspect="wide" hint="Foto de fundo do topo. Horizontal, boa qualidade." /></div>
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-[var(--text-muted)]">Cor de destaque</label>
             <div className="mt-1.5 flex items-center gap-3">
