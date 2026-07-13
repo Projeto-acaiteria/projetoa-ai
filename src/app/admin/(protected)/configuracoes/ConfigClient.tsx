@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -34,7 +34,7 @@ const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm
 
 type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; has_estoque: boolean; sells_by_weight: boolean; kitchen_screen: boolean } | null;
 
-export default function ConfigClient() {
+export default function ConfigClient({ family }: { family?: string }) {
   const [fees, setFees] = useState<Fees | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [config, setConfig] = useState<Config>(null);
@@ -149,6 +149,38 @@ export default function ConfigClient() {
           )}
         </div>
       </Card>
+
+      {/* Documento de OS / Orçamento (A4) — só no vertical service */}
+      {family === "service" && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-extrabold text-ink">Documento de OS / Orçamento</h2>
+          <p className="mb-4 text-sm text-[var(--text-muted)]">Aparece no cabeçalho e no rodapé do documento A4 que o cliente recebe (link do WhatsApp / impressão).</p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">E-mail</label>
+              <input className={`${inp} mt-1`} value={store.email} onChange={(e) => setS("email", e.target.value)} placeholder="contato@sualoja.com" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Site</label>
+              <input className={`${inp} mt-1`} value={store.site} onChange={(e) => setS("site", e.target.value)} placeholder="www.sualoja.com" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Responsável</label>
+              <input className={`${inp} mt-1`} value={store.responsavel} onChange={(e) => setS("responsavel", e.target.value)} placeholder="Nome do responsável" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Termos de garantia</label>
+              <textarea className={`${inp} mt-1 resize-none`} rows={7} value={store.garantiaTermos} onChange={(e) => setS("garantiaTermos", e.target.value)} placeholder="Um item por linha." />
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">Uma cláusula por linha. Sai na OS e no orçamento. Vazio = não mostra.</p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Observações / avisos (só OS)</label>
+              <textarea className={`${inp} mt-1 resize-none`} rows={3} value={store.avisos} onChange={(e) => setS("avisos", e.target.value)} placeholder="Ex.: cláusula de abandono após 90 dias." />
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">Aviso legal no rodapé da OS (ex.: abandono após 90 dias, Art. 1.275).</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Entrega (delivery) — módulo ligável por loja */}
       {config && (

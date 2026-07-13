@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader } from "@/components/admin/ui";
 import { getCurrentStore } from "@/lib/auth/store";
+import { getStoreConfig } from "@/lib/auth/store-config";
+import { familyOf } from "@/config/segments";
 import { getSubscription, billingView } from "@/lib/auth/subscription";
 import ConfigClient from "./ConfigClient";
 
@@ -15,12 +17,14 @@ export default async function ConfiguracoesPage() {
   const loja = await getCurrentStore();
   const sub = loja ? await getSubscription(loja.id) : null;
   const bv = billingView(sub);
+  const cfg = loja ? await getStoreConfig(loja.id) : null;
+  const family = familyOf(cfg?.business_type);
 
   return (
     <>
       <PageHeader title="Ajustes" sub="Configurações da loja" />
       {bv && <PlanoCard bv={bv} />}
-      <ConfigClient />
+      <ConfigClient family={family} />
     </>
   );
 }

@@ -3,6 +3,13 @@
 // Tabela budgets {id, store_id, data jsonb} — service-only (food não usa).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { todayBR } from "@/lib/date-br";
+
+// status efetivo: orçamento PENDENTE cuja validade já passou aparece como "expirado" (só exibição).
+function withExpiry(b: Budget): Budget {
+  if (b.status === "pendente" && b.validadeAt && b.validadeAt < todayBR()) return { ...b, status: "expirado" };
+  return b;
+}
 
 export type BudgetItemKind = "produto" | "servico";
 export type BudgetItem = {
@@ -83,7 +90,7 @@ export async function listBudgets(storeId?: string): Promise<Budget[]> {
   const sid = storeId ?? (await resolveStoreId());
   const { data, error } = await db().from("budgets").select("data").eq("store_id", sid);
   if (error) throw new Error("Erro ao ler orçamentos: " + error.message);
-  return ((data ?? []) as { data: Budget }[]).map((r) => r.data).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return ((data ?? []) as { data: Budget }[]).map((r) => withExpiry(r.data)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function getBudget(id: string, storeId?: string): Promise<Budget | null> {
@@ -97,7 +104,7 @@ export async function getBudgetByCode(code: string): Promise<{ storeId: string; 
   const { data } = await db().from("budgets").select("store_id, data").eq("data->>code", code).maybeSingle();
   if (!data) return null;
   const r = data as { store_id: string; data: Budget };
-  return { storeId: r.store_id, budget: r.data };
+  return { storeId: r.store_id, budget: withExpiry(r.data) };
 }
 
 export type NewBudgetInput = {
