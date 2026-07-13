@@ -7,7 +7,7 @@ import { OS_PRIORITY_META, type OSPriority } from "@/lib/os-priority";
 
 export type OSLite = {
   id: string; code: string | null; customerName: string; device: string; problem: string;
-  status: string; priority?: string | null; totalCents: number; paymentStatus: string; createdAt: string;
+  status: string; situacao?: string | null; priority?: string | null; totalCents: number; paymentStatus: string; createdAt: string;
 };
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
@@ -75,6 +75,7 @@ export default function OSListClient({ orders }: { orders: OSLite[] }) {
                     {o.priority && OS_PRIORITY_META[o.priority as OSPriority] && (
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: OS_PRIORITY_META[o.priority as OSPriority].color }}>{OS_PRIORITY_META[o.priority as OSPriority].label}</span>
                     )}
+                    {o.situacao && <span className="rounded-full border border-brand-400 px-2 py-0.5 text-[10px] font-semibold text-brand-600">{o.situacao}</span>}
                     <span className="text-[10px] text-[var(--text-faded)]">· entrou {haDias(o.createdAt)}</span>
                   </div>
                   <div className="truncate text-sm text-ink">{o.customerName || "—"} · {o.device || "—"}</div>

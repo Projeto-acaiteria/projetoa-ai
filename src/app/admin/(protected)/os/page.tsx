@@ -11,7 +11,7 @@ export default async function OSPage() {
   await requireNavAccess("/admin/os");
   const orders = (await listServiceOrders()).map((o) => ({
     id: o.id, code: o.code, customerName: o.customerName, device: o.device, problem: o.problem,
-    status: o.status, totalCents: o.totalCents, paymentStatus: o.paymentStatus, createdAt: o.createdAt,
+    status: o.status, situacao: o.situacao, priority: o.priority, totalCents: o.totalCents, paymentStatus: o.paymentStatus, createdAt: o.createdAt,
   }));
 
   return (

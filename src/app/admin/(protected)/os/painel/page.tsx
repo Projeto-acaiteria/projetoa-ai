@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { listServiceOrders, OS_STATUS_LABEL, type OSStatus } from "@/lib/service-orders-store";
+import { getStore } from "@/lib/settings-store";
 import { listStaff } from "@/lib/staff-store";
 import { dateBR, todayBR } from "@/lib/date-br";
 import { OS_PRIORITY_ORDER, OS_PRIORITY_META } from "@/lib/os-priority";
@@ -14,7 +15,7 @@ const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFr
 
 export default async function OSPainelPage() {
   await requireNavAccess("/admin/os");
-  const [orders, staff] = await Promise.all([listServiceOrders(), listStaff()]);
+  const [orders, staff, store] = await Promise.all([listServiceOrders(), listStaff(), getStore()]);
 
   const today = todayBR();
   const tomorrow = dateBR(new Date(Date.now() + 86_400_000).toISOString());
@@ -34,6 +35,14 @@ export default async function OSPainelPage() {
   // SITUAÇÃO — contagem por status (exclui canceladas)
   const naoCanc = orders.filter((o) => o.status !== "cancelado");
   const cont = (s: OSStatus) => naoCanc.filter((o) => o.status === s).length;
+
+  // SITUAÇÕES personalizadas da loja (ex: "Aguardando peça") — contagem entre OS ativas
+  const situCount = new Map<string, number>();
+  for (const o of ativas) if (o.situacao) situCount.set(o.situacao, (situCount.get(o.situacao) ?? 0) + 1);
+  // ordem: as configuradas em Ajustes primeiro; depois qualquer situação órfã ainda em uso
+  const configuradas = store.situacoesOS ?? [];
+  const orfas = [...situCount.keys()].filter((s) => !configuradas.includes(s));
+  const situacoes = [...configuradas, ...orfas].filter((s, i, a) => a.indexOf(s) === i);
 
   // FATURAMENTO por técnico (OS quitadas)
   const quitadas = orders.filter((o) => o.paymentStatus === "quitada" && o.status !== "cancelado");
@@ -86,6 +95,16 @@ export default async function OSPainelPage() {
             <Tile n={cont("entregue")} label={OS_STATUS_LABEL.entregue} color="#64748b" />
           </div>
         </div>
+
+        {/* SITUAÇÕES DA LOJA (personalizadas) */}
+        {situacoes.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">🏷 Situações da loja <span className="normal-case text-[var(--text-faded)]">· das OS em aberto</span></h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {situacoes.map((s) => <Tile key={s} n={situCount.get(s) ?? 0} label={s} color="#7c3aed" />)}
+            </div>
+          </div>
+        )}
 
         {/* FATURAMENTO POR TÉCNICO */}
         <Card className="p-5">

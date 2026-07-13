@@ -13,7 +13,7 @@ const STATUSES = [
 ] as const;
 const PAYS: [string, string][] = [["pix", "PIX"], ["dinheiro", "Dinheiro"], ["cartao", "Cartão"]];
 
-export default function OSActions({ id, status, paymentStatus, priority, staffId, staff }: { id: string; status: string; paymentStatus: string; priority: string | null; staffId: string | null; staff: { id: string; name: string }[] }) {
+export default function OSActions({ id, status, situacao, situacoes, paymentStatus, priority, staffId, staff }: { id: string; status: string; situacao: string | null; situacoes: string[]; paymentStatus: string; priority: string | null; staffId: string | null; staff: { id: string; name: string }[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -67,6 +67,18 @@ export default function OSActions({ id, status, paymentStatus, priority, staffId
         )}
         {cancelada && <div className="mt-2 text-xs font-bold text-red-500">OS cancelada</div>}
       </div>
+
+      {situacoes.length > 0 && (
+        <div className="border-t border-line pt-4">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Situação da loja</h3>
+          <select value={situacao ?? ""} disabled={busy || cancelada} onChange={(e) => api("situacao", { id, situacao: e.target.value })}
+            className="w-full rounded-lg border border-line bg-bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600 disabled:opacity-50">
+            <option value="">— Nenhuma —</option>
+            {situacoes.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <p className="mt-1 text-[10px] text-[var(--text-faded)]">Rótulo interno de acompanhamento (ex: aguardando peça). Aparece na lista e no painel. Edite as opções em Ajustes.</p>
+        </div>
+      )}
 
       <div className="border-t border-line pt-4">
         <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Pagamento</h3>

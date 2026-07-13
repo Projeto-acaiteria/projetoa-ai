@@ -8,7 +8,7 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; situacoesOS: string[]; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -179,6 +179,28 @@ export default function ConfigClient({ family }: { family?: string }) {
               <p className="mt-1 text-[11px] text-[var(--text-faded)]">Aviso legal no rodapé da OS (ex.: abandono após 90 dias, Art. 1.275).</p>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Situações personalizadas de OS — só no vertical service */}
+      {family === "service" && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-extrabold text-ink">Situações de OS</h2>
+          <p className="mb-4 text-sm text-[var(--text-muted)]">Rótulos internos além do status (ex.: aguardando peça, em teste). Aparecem na OS, na lista e no painel. Não trocam o status.</p>
+          <div className="space-y-2">
+            {(store.situacoesOS ?? []).map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input className={`${inp} flex-1`} value={s} placeholder="Nome da situação"
+                  onChange={(e) => setStore((st) => st ? { ...st, situacoesOS: st.situacoesOS.map((x, k) => k === i ? e.target.value : x) } : st)} />
+                <button onClick={() => setStore((st) => st ? { ...st, situacoesOS: st.situacoesOS.filter((_, k) => k !== i) } : st)}
+                  className="rounded-lg border border-line px-3 py-2 text-xs font-bold text-[var(--red-no)]">Remover</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setStore((st) => st ? { ...st, situacoesOS: [...(st.situacoesOS ?? []), ""] } : st)}
+            className="mt-3 inline-flex items-center gap-1 rounded-lg bg-bg-surface-2 px-3 py-1.5 text-sm font-bold text-brand-600">
+            <IconPlus width={14} height={14} /> Adicionar situação
+          </button>
         </Card>
       )}
 

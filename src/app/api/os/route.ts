@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getStore } from "@/lib/settings-store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSSituacao, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Ações que o TÉCNICO pode fazer (só na OS DELE): trabalhar a bancada, nunca cobrar/atribuir.
-const TEC_ACTIONS = new Set(["status", "diagnosis", "notes", "estimate", "photo-add", "photo-remove"]);
+const TEC_ACTIONS = new Set(["status", "situacao", "diagnosis", "notes", "estimate", "photo-add", "photo-remove"]);
 // Status que o técnico pode setar (fluxo de bancada; entregue/cancelado são da recepção).
 const TEC_STATUSES = new Set(["aguardando", "em_reparo", "pronto"]);
 
@@ -100,6 +100,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "priority":
         await updateOSPriority(String(p.id), String(p.priority ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "situacao": // situação personalizada da loja (ex: "Aguardando peça"). "" limpa.
+        await updateOSSituacao(String(p.id), String(p.situacao ?? ""), storeId);
         return NextResponse.json({ ok: true });
       case "estimate":
         await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);

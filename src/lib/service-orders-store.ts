@@ -32,6 +32,7 @@ export type ServiceOrder = {
   problem: string;
   diagnosis: string | null;
   status: OSStatus;
+  situacao: string | null; // situação personalizada da loja (ex: "Aguardando peça") — ortogonal ao status
   priority: OSPriority | null;
   staffId: string | null;
   commissionPercent: number;
@@ -72,6 +73,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   problem: String(r.problem ?? ""),
   diagnosis: str(r.diagnosis),
   status: asStatus(r.status),
+  situacao: str(r.situacao),
   priority: asPriority(r.priority),
   staffId: str(r.staff_id),
   commissionPercent: num(r.commission_percent),
@@ -264,6 +266,12 @@ export async function updateOSStatus(id: string, status: OSStatus, storeId?: str
   if (status === "pronto") patch.ready_at = now;
   else if (status === "em_reparo" || status === "aguardando") patch.ready_at = null;
   await db().from("service_orders").update(patch).eq("id", id).eq("store_id", sid);
+}
+
+/** Situação personalizada da loja (ex: "Aguardando peça"). Texto livre — ortogonal ao status. "" limpa. */
+export async function updateOSSituacao(id: string, situacao: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ situacao: situacao.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Marca que a recepção avisou o cliente (WhatsApp) — carimbo p/ não avisar de novo à toa. */

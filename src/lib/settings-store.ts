@@ -40,7 +40,11 @@ export type StoreSettings = {
   cupomRodape: string; // mensagem do rodapé do cupom (vazio = "Obrigado! Volte sempre :)")
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
   pixDiscountPercent: number; // % de desconto quando o cliente paga no PIX (o Adm define; 0 = sem)
+  situacoesOS: string[]; // situações personalizadas de OS que a loja usa (ex: "Aguardando peça") — AT
 };
+
+// situações de OS padrão da assistência técnica (a loja edita em Ajustes)
+export const DEFAULT_SITUACOES_OS = ["Aguardando peça", "Em orçamento", "Aguardando aprovação", "Em teste", "Orçamento reprovado"];
 
 // taxas padrão de mercado (editáveis pelo adm)
 const DEFAULT_FEES: PaymentFees = {
@@ -122,6 +126,7 @@ const DEFAULT_STORE: StoreSettings = {
   cupomRodape: "",
   waMsgs: WA_MSG_DEFAULTS,
   pixDiscountPercent: 0,
+  situacoesOS: DEFAULT_SITUACOES_OS,
 };
 
 // Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
@@ -181,6 +186,14 @@ export async function setStore(
   if (typeof store.avisos === "string") clean.avisos = store.avisos.slice(0, 2000);
   if (typeof store.cupomRodape === "string") clean.cupomRodape = store.cupomRodape.trim().slice(0, 120);
   if (store.pixDiscountPercent != null) clean.pixDiscountPercent = Math.max(0, Math.min(100, Number(store.pixDiscountPercent) || 0));
+  if (Array.isArray(store.situacoesOS)) {
+    // dedup, trim, tira vazios, teto 20 situações de 40 chars
+    const seen = new Set<string>();
+    clean.situacoesOS = store.situacoesOS
+      .map((s) => String(s).trim().slice(0, 40))
+      .filter((s) => s && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()))
+      .slice(0, 20);
+  }
   if (store.waMsgs && typeof store.waMsgs === "object") {
     const m = store.waMsgs as Partial<WaMsgs>;
     const pick = (v: unknown, def: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 280) : def);
