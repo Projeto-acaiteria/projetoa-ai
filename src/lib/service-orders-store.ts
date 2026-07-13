@@ -33,6 +33,7 @@ export type ServiceOrder = {
   paymentStatus: OSPaymentStatus;
   paidAt: string | null;
   paymentMethod: string | null;
+  commissionPaymentId: string | null; // NULL = comissão pendente; preenchido = já paga (trava anti-2x)
   photos: OSPhoto[];
   devicePassword: string | null; // senha p/ destravar o aparelho (recepção captura, técnico usa)
   notes: string | null; // anotações de bancada do técnico (separado do laudo oficial)
@@ -65,6 +66,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   paymentStatus: asPay(r.payment_status),
   paidAt: str(r.paid_at),
   paymentMethod: str(r.payment_method),
+  commissionPaymentId: str(r.commission_payment_id),
   photos: Array.isArray(r.photos) ? (r.photos as OSPhoto[]) : [],
   devicePassword: str(r.device_password),
   notes: str(r.notes),

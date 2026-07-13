@@ -11,10 +11,14 @@ type Venda = { display: string; date: string; mode: string; paymentMethod: strin
 type Despesa = { id: string; description: string; category: string; amountCents: number; date: string; createdAt: string };
 type Fixed = { id: string; description: string; category: string; amountCents: number };
 
-const CATS = ["insumos", "aluguel", "salarios", "utilidades", "embalagens", "marketing", "manutencao", "impostos", "outros"];
+// Categorias de despesa que o Adm escolhe no lançamento — variam por tipo de loja.
+const CATS_FOOD = ["insumos", "aluguel", "salarios", "utilidades", "embalagens", "marketing", "manutencao", "impostos", "outros"];
+const CATS_SERVICE = ["pecas", "aluguel", "salarios", "utilidades", "marketing", "manutencao", "impostos", "frete", "outros"];
+// comissao/bonus NÃO entram no dropdown (são sintéticas do pagamento de comissão) — só têm rótulo p/ exibir.
 const CAT_LABEL: Record<string, string> = {
   insumos: "Insumos", aluguel: "Aluguel", salarios: "Salários", utilidades: "Energia / Água",
   embalagens: "Embalagens", marketing: "Marketing", manutencao: "Manutenção", impostos: "Impostos", outros: "Outros",
+  pecas: "Peças / fornecedores", frete: "Frete / envio", comissao: "Comissão (técnico)", bonus: "Bônus (técnico)",
 };
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Débito", credito: "Crédito" };
 
@@ -27,9 +31,11 @@ const PERIODS = [
 
 const dmy = (d: string) => (d.length > 10 ? dateBR(d) : d).split("-").reverse().join("/"); // ISO→data BR; data pura fica
 
-export default function FinanceiroClient() {
+export default function FinanceiroClient({ family }: { family?: string }) {
+  const CATS = family === "service" ? CATS_SERVICE : CATS_FOOD;
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [comissoes, setComissoes] = useState<Despesa[]>([]); // saídas sintéticas (comissão/bônus pagos) — read-only
   const [loaded, setLoaded] = useState(false);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["k"]>("30d");
   const [tab, setTab] = useState<"resumo" | "fluxo" | "despesas">("resumo");
@@ -42,6 +48,7 @@ export default function FinanceiroClient() {
       const d = await fetch("/api/financeiro", { cache: "no-store" }).then((r) => r.json());
       setVendas(d.vendas ?? []);
       setDespesas(d.despesas ?? []);
+      setComissoes(d.comissoes ?? []);
       const fx = await fetch("/api/despesas-fixas", { cache: "no-store" }).then((r) => r.json());
       setFixed(fx.fixed ?? []);
     } finally {
@@ -69,13 +76,16 @@ export default function FinanceiroClient() {
     return dateBR(d); // corte no fuso do Brasil (não UTC)
   }, [period]);
 
+  // despesas reais (editáveis, aba Despesas) x TODAS as saídas (reais + comissão/bônus pagos), p/ o resultado.
+  const allDespesas = useMemo(() => [...despesas, ...comissoes], [despesas, comissoes]);
   const fVendas = vendas.filter((v) => dateBR(v.date) >= cutoff);
-  const fDespesas = despesas.filter((e) => e.date >= cutoff);
+  const fDespesas = despesas.filter((e) => e.date >= cutoff); // só reais → lista/aba Despesas
+  const fDespesasAll = allDespesas.filter((e) => e.date >= cutoff); // reais + comissão → totais/gráficos/fluxo
 
   const grossCents = fVendas.reduce((s, v) => s + v.grossCents, 0);
   const feeCents = fVendas.reduce((s, v) => s + v.cardFeeCents, 0);
   const entradasCents = fVendas.reduce((s, v) => s + v.netCents, 0); // líquido
-  const despesasCents = fDespesas.reduce((s, e) => s + e.amountCents, 0);
+  const despesasCents = fDespesasAll.reduce((s, e) => s + e.amountCents, 0); // inclui comissão paga
   const saldoCents = entradasCents - despesasCents;
 
   // receitas por forma de pagamento (bruto) e despesas por categoria
@@ -86,9 +96,9 @@ export default function FinanceiroClient() {
   }, [fVendas]);
   const despByCat = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const e of fDespesas) m[e.category] = (m[e.category] || 0) + e.amountCents;
+    for (const e of fDespesasAll) m[e.category] = (m[e.category] || 0) + e.amountCents;
     return m;
-  }, [fDespesas]);
+  }, [fDespesasAll]);
 
   // fluxo de caixa agrupado por DIA, com saldo acumulado
   const byDay = useMemo(() => {
@@ -97,7 +107,7 @@ export default function FinanceiroClient() {
       const d = dateBR(v.date);
       (map[d] ??= { rec: 0, desp: 0 }).rec += v.netCents;
     }
-    for (const e of fDespesas) (map[e.date] ??= { rec: 0, desp: 0 }).desp += e.amountCents;
+    for (const e of fDespesasAll) (map[e.date] ??= { rec: 0, desp: 0 }).desp += e.amountCents;
     const days = Object.keys(map).sort();
     let saldo = 0;
     const rows = days.map((d) => {
@@ -106,7 +116,7 @@ export default function FinanceiroClient() {
       return { date: d, rec, desp, result: rec - desp, saldo };
     });
     return rows.reverse();
-  }, [fVendas, fDespesas]);
+  }, [fVendas, fDespesasAll]);
 
   async function removeDespesa(id: string) {
     await fetch(`/api/despesas/${id}`, { method: "DELETE" });
@@ -189,8 +199,8 @@ export default function FinanceiroClient() {
         </>
       )}
 
-      {/* FLUXO DE CAIXA — tabela multi-período com drill-down */}
-      {tab === "fluxo" && <FluxoCaixaTabela vendas={vendas} despesas={despesas} />}
+      {/* FLUXO DE CAIXA — tabela multi-período com drill-down (comissão paga entra como despesa) */}
+      {tab === "fluxo" && <FluxoCaixaTabela vendas={vendas} despesas={allDespesas} />}
 
       {/* DESPESAS */}
       {tab === "despesas" && (
@@ -233,7 +243,7 @@ export default function FinanceiroClient() {
           </Card>
 
           <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm font-semibold text-[var(--text-muted)]">Lançamentos no período: <b className="text-ink">{brl(despesasCents)}</b></div>
+            <div className="text-sm font-semibold text-[var(--text-muted)]">Lançamentos no período: <b className="text-ink">{brl(fDespesas.reduce((s, e) => s + e.amountCents, 0))}</b></div>
             <button onClick={() => setModal(true)} className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
               <IconPlus width={16} height={16} /> Nova despesa
             </button>
@@ -261,13 +271,13 @@ export default function FinanceiroClient() {
         </>
       )}
 
-      {modal && <DespesaModal onClose={() => setModal(false)} onSaved={() => { setModal(false); load(); }} />}
-      {fixedModal && <FixaModal onClose={() => setFixedModal(false)} onSaved={() => { setFixedModal(false); load(); }} />}
+      {modal && <DespesaModal cats={CATS} onClose={() => setModal(false)} onSaved={() => { setModal(false); load(); }} />}
+      {fixedModal && <FixaModal cats={CATS} onClose={() => setFixedModal(false)} onSaved={() => { setFixedModal(false); load(); }} />}
     </>
   );
 }
 
-function FixaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function FixaModal({ cats, onClose, onSaved }: { cats: string[]; onClose: () => void; onSaved: () => void }) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("aluguel");
   const [valor, setValor] = useState("");
@@ -292,7 +302,7 @@ function FixaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
         <div className="space-y-3">
           <input className={inp} placeholder="Descrição (ex: Aluguel do ponto)" value={description} onChange={(e) => setDescription(e.target.value)} autoFocus />
           <select className={inp} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+            {cats.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
           </select>
           <div className="flex items-center rounded-lg border border-line bg-bg-base px-3">
             <span className="text-sm font-semibold text-[var(--text-muted)]">R$</span>
@@ -317,9 +327,9 @@ function Linha({ label, value, strong, tone }: { label: string; value: string; s
   );
 }
 
-function DespesaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function DespesaModal({ cats, onClose, onSaved }: { cats: string[]; onClose: () => void; onSaved: () => void }) {
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("insumos");
+  const [category, setCategory] = useState(cats[0] ?? "outros");
   const [valor, setValor] = useState("");
   const [date, setDate] = useState(todayBR());
   const [saving, setSaving] = useState(false);
@@ -346,7 +356,7 @@ function DespesaModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <div className="space-y-3">
           <input className={inp} placeholder="Descrição (ex: Polpa fornecedor)" value={description} onChange={(e) => setDescription(e.target.value)} autoFocus />
           <select className={inp} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+            {cats.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
           </select>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-center rounded-lg border border-line bg-bg-base px-3">

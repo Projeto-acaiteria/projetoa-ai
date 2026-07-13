@@ -12,7 +12,8 @@ const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", de
 const CAT_LABEL: Record<string, string> = {
   insumos: "Insumos", aluguel: "Aluguel", salarios: "Salários", utilidades: "Energia / Água",
   embalagens: "Embalagens", marketing: "Marketing", manutencao: "Manutenção", impostos: "Impostos", outros: "Outros",
-  taxa_maquininha: "Taxa de maquininha",
+  taxa_maquininha: "Taxa de maquininha", pecas: "Peças / fornecedores", frete: "Frete / envio",
+  comissao: "Comissão (técnico)", bonus: "Bônus (técnico)",
 };
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 

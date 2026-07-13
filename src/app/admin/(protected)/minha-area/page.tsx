@@ -28,7 +28,10 @@ export default async function MinhaAreaPage() {
   const prontas = orders.filter((o) => o.status === "pronto");
   const entregues = orders.filter((o) => o.status === "entregue");
   const abertas = aFazer.length + emReparo.length + prontas.length;
-  const comissaoApurada = orders.filter((o) => o.paymentStatus === "quitada").reduce((s, o) => s + osCommissionCents(o), 0);
+  const quitadas = orders.filter((o) => o.paymentStatus === "quitada");
+  // comissão apurada (OS quitada) agora tem 2 estados: já paga pelo Adm (tem commissionPaymentId) x pendente.
+  const comissaoPaga = quitadas.filter((o) => o.commissionPaymentId).reduce((s, o) => s + osCommissionCents(o), 0);
+  const comissaoPendente = quitadas.filter((o) => !o.commissionPaymentId).reduce((s, o) => s + osCommissionCents(o), 0);
   const potencial = orders
     .filter((o) => o.paymentStatus !== "quitada" && o.status !== "cancelado")
     .reduce((s, o) => s + potentialCommission(o), 0);
@@ -41,9 +44,10 @@ export default async function MinhaAreaPage() {
         <Card className="max-w-xl p-6 text-sm text-[var(--text-muted)]">Esta área é do técnico — seu usuário não está vinculado a um técnico.</Card>
       ) : (
         <div className="max-w-3xl space-y-5">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="OS abertas" value={String(abertas)} />
-            <Stat label="Comissão apurada" value={brl(comissaoApurada)} accent="ok" />
+            <Stat label="A receber (pendente)" value={brl(comissaoPendente)} accent="ok" />
+            <Stat label="Já recebido" value={brl(comissaoPaga)} />
             <Stat label="A apurar (não quitadas)" value={brl(potencial)} />
           </div>
 
@@ -61,7 +65,7 @@ export default async function MinhaAreaPage() {
               <div className="space-y-2 pt-2">
                 <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--text-faded)]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-faded)]" /> Entregues <span>· {entregues.length}</span>
-                  <span className="ml-auto normal-case text-[var(--green-ok)]">você já ganhou {brl(comissaoApurada)}</span>
+                  <span className="ml-auto normal-case text-[var(--green-ok)]">a receber {brl(comissaoPendente)}</span>
                 </h2>
                 {entregues.slice(0, 15).map((o) => <OSRow key={o.id} os={o} historico />)}
               </div>
@@ -104,7 +108,7 @@ function OSRow({ os, historico }: { os: ServiceOrder; historico?: boolean }) {
         </div>
         <div className="flex-shrink-0 text-right">
           <div className={`font-mono text-sm font-bold ${os.paymentStatus === "quitada" ? "text-[var(--green-ok)]" : "text-ink"}`}>{brl(com)}</div>
-          <div className="text-[10px] text-[var(--text-muted)]">{os.paymentStatus === "quitada" ? "paga/apurada" : "a apurar"}</div>
+          <div className="text-[10px] text-[var(--text-muted)]">{os.paymentStatus === "quitada" ? (os.commissionPaymentId ? "recebida" : "a receber") : "a apurar"}</div>
         </div>
       </Card>
     </Link>

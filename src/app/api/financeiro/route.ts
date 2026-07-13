@@ -3,6 +3,7 @@ import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
 import { listMesaPayments } from "@/lib/tables-store";
 import { listServiceOrders } from "@/lib/service-orders-store";
+import { listCommissionPayments } from "@/lib/commission-payments-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,5 +58,18 @@ export async function GET() {
 
   const vendas = [...vendasOrders, ...vendasMesa, ...vendasOS];
   const despesas = await listExpenses();
-  return NextResponse.json({ vendas, despesas });
+
+  // Comissão/bônus PAGOS ao técnico = saída real de caixa (aprendizado Palace: sem isso o lucro fica
+  // falso-alto). Sintéticas (só service tem commission_payments; food volta vazio), por DATA de pagamento.
+  // NÃO entram na aba Despesas (não são editáveis/deletáveis) — só no cálculo do resultado e no fluxo.
+  const pays = await listCommissionPayments();
+  const comissoes = pays.flatMap((p) => {
+    const date = (p.paidAt || "").slice(0, 10);
+    const rows: { id: string; description: string; category: string; amountCents: number; date: string }[] = [];
+    if (p.paidCents > 0) rows.push({ id: "com_" + p.id, description: "Comissão paga", category: "comissao", amountCents: p.paidCents, date });
+    if (p.bonusCents > 0) rows.push({ id: "bon_" + p.id, description: "Bônus" + (p.bonusReason ? ` · ${p.bonusReason}` : ""), category: "bonus", amountCents: p.bonusCents, date });
+    return rows;
+  });
+
+  return NextResponse.json({ vendas, despesas, comissoes });
 }

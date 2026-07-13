@@ -1,6 +1,6 @@
 # Starteq (ComandaPRO) — Estado de Desenvolvimento / Handoff
 
-_Última atualização: 06/07/2026. Escrito pra uma NOVA instância do Verbo continuar o desenvolvimento sem perder contexto._
+_Última atualização: 13/07/2026. Escrito pra uma NOVA instância do Verbo continuar o desenvolvimento sem perder contexto._
 
 ## O que é
 - **Starteq** = tenant de Assistência Técnica (loja de informática/games) DENTRO do ComandaPRO. Não é app separado: é a plataforma multi-tenant multi-vertical rodando em `comandapro.net.br/starteq`.
@@ -19,7 +19,17 @@ _Última atualização: 06/07/2026. Escrito pra uma NOVA instância do Verbo con
 - **Coordenação:** existe outra instância "Verbo do ComandaPRO" que também mexe na `main` do acai-system. Antes de merge, `git fetch` + conferir sync; combinar "trava a main".
 
 ## Estado DEPLOYADO (tudo em prod, main)
-ComandaPRO topo `2a08c1a` · Site topo `71a5b48` (conferir `git log`).
+ComandaPRO topo — conferir `git log` (13/07 subiu o módulo de comissão+caixa) · Site topo `71a5b48`.
+
+**Shipped 13/07/2026 — Pagamento de comissão + comissão no caixa (estudo do Palace portado):**
+- **Migration ADITIVA (já em prod, verificada):** `service_orders.commission_payment_id text` (NULL=comissão pendente, preenchido=paga) + tabela `commission_payments` (jsonb `data`, RLS ligada). Script `scripts/migrate-commission-caixa.mjs` (idempotente, read-after-write). **Food intacto:** `service_orders` é só do vertical service; `commission_payments` é nova.
+- **Store `src/lib/commission-payments-store.ts`:** `payCommission` (recalcula no server via `osCommissionCents`, **trava anti-2x** = só vincula OS com `commission_payment_id IS NULL`, rollback total se corrida), `pendingOSForStaff`, `listCommissionPayments`, `reverseCommissionPayment` (estorno devolve OS pra pendente). Modelo espelhado do Palace (`commission_payments` + FK na OS).
+- **`/api/equipe` estendido:** GET report agora traz `pendenteCents/pendenteCount` (all-time não pago) além do período; `?staff=<id>` retorna OS pendentes + histórico (base do wizard); POST ações `payCommission` e `reverseCommission`. Guard 3 camadas mantido (auth + family=service + owner).
+- **UI `/equipe` (`EquipeClient`):** card do técnico mostra **Pendente (a pagar)** + botão **"Registrar pagamento"** → modal com OS pendentes (pré-marcadas), **pagamento parcial**, **bônus + motivo**, data, obs., e **histórico com estornar**.
+- **`/minha-area` do técnico:** stats agora separam **"A receber (pendente)" × "Já recebido"** (usa `os.commissionPaymentId`); label da OS quitada = "recebida"/"a receber".
+- **Caixa — comissão como despesa (aprendizado Palace: sem isso o lucro fica falso-alto):** `/api/financeiro` devolve `comissoes` (saídas sintéticas por `paidAt`: categorias `comissao`/`bonus`; só service tem, food volta vazio). `FinanceiroClient` soma essas comissões nos TOTAIS/gráficos/fluxo (resultado real) mas **não** na aba Despesas (não editáveis). O **fluxo dia/semana/mês/ano JÁ EXISTIA** (`FluxoCaixaTabela`, saldo encadeado + drill + CSV + taxa maquininha como despesa) — só faltava a comissão entrar.
+- **Categorias de despesa por family:** `financeiro/page.tsx` passa `family`; service usa Peças/Frete/… (food mantém Insumos/Embalagens). Rótulos `pecas/frete/comissao/bonus` em `FinanceiroClient` e `FluxoCaixaTabela`.
+- **Validado:** `tsc --noEmit` limpo + `next build` OK. Prova-na-fonte: Starteq tem 6 OS quitadas c/ técnico pendentes (coluna nova NULL). **NÃO testado E2E logado** (captcha) — Eduardo/CIC precisa: pagar comissão de teste → some do pendente → aparece no histórico → vira despesa no fluxo de caixa.
 
 **Shipped nesta sessão (06/07, provado em prod):**
 - `5a6f0b8` **Caixa × OS (decisão B):** OS quitada DENTRO da sessão entra no Caixa. Só o DINHEIRO da OS soma no `saldoCaixaCents` (gaveta física); pix/cartão de OS aparecem no total mas não incham a gaveta (igual às vendas). Nova MiniStat "OS quitadas" (some pro food). Snapshot do `closeCash` guarda `osCashCents`/`osTotalCents`. Núcleo em `src/app/api/caixa/route.ts` `resumo()` + `cash-store.ts`. Provado CIC end-to-end: abriu caixa (0) → quitou OS dinheiro R$3.148,90 → saldo pulou exato. **Pendência de polimento (opcional, ok do Eduardo):** MiniStat "Dinheiro" (vendas balcão) fica R$0 enquanto gaveta tem o dinheiro da OS — renomear p/ "Dinheiro (vendas)" se quiser.

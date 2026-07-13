@@ -16,10 +16,36 @@ type Membro = {
   osCount: number;
   servicoCents: number;
   comissaoCents: number;
+  pendenteCents: number;
+  pendenteCount: number;
   aPagarCents: number;
 };
 
+type PendingOS = {
+  id: string;
+  code: string | null;
+  device: string;
+  customerName: string;
+  paidAt: string | null;
+  serviceValueCents: number;
+  commissionPercent: number;
+  comissaoCents: number;
+};
+type PaymentRow = {
+  id: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  totalCents: number;
+  paidCents: number;
+  bonusCents: number;
+  bonusReason: string | null;
+  notes: string | null;
+  osIds: string[];
+  paidAt: string;
+};
+
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
+const dmy = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const inputCls = "rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 const PAY_LABEL: Record<PayType, string> = { comissao: "Comissão", diaria: "Diária", salario: "Salário" };
 const reaisToCents = (s: string) => Math.round((parseFloat(s.replace(",", ".")) || 0) * 100);
@@ -41,6 +67,15 @@ export default function EquipeClient() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [err, setErr] = useState("");
+  // modal de pagamento de comissão
+  const [payFor, setPayFor] = useState<Membro | null>(null);
+  const [detail, setDetail] = useState<{ pending: PendingOS[]; payments: PaymentRow[] } | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bonus, setBonus] = useState("");
+  const [bonusReason, setBonusReason] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const [payDate, setPayDate] = useState("");
+  const [partial, setPartial] = useState(""); // override opcional do valor de comissão pago (parcial)
 
   const reload = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -76,6 +111,38 @@ export default function EquipeClient() {
     if (await api("createAccess", { id, email: email.trim(), senha, role: accessRole })) {
       setAccessFor(null); setEmail(""); setSenha("");
     }
+  }
+
+  async function openPay(m: Membro) {
+    setPayFor(m); setDetail(null); setSel(new Set()); setBonus(""); setBonusReason(""); setPayNotes(""); setPartial(""); setErr("");
+    setPayDate(new Date().toISOString().slice(0, 10));
+    const r = await fetch(`/api/equipe?staff=${m.id}`, { cache: "no-store" });
+    const d = await r.json();
+    const pend: PendingOS[] = d.pending ?? [];
+    setDetail({ pending: pend, payments: d.payments ?? [] });
+    setSel(new Set(pend.map((o) => o.id))); // pré-seleciona tudo que está pendente
+  }
+  const selTotalCents = (detail?.pending ?? []).filter((o) => sel.has(o.id)).reduce((s, o) => s + o.comissaoCents, 0);
+  function toggleOS(id: string) {
+    setSel((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  async function submitPay() {
+    if (!payFor) return;
+    const osIds = [...sel];
+    const bonusCents = reaisToCents(bonus);
+    if (osIds.length === 0 && bonusCents === 0) { setErr("Selecione ao menos uma OS ou informe um bônus."); return; }
+    const payload: Record<string, unknown> = {
+      staffId: payFor.id, osIds, bonusCents,
+      bonusReason: bonusReason.trim() || undefined,
+      notes: payNotes.trim() || undefined,
+      paidAt: payDate ? `${payDate}T12:00:00-03:00` : undefined,
+    };
+    if (partial.trim()) payload.paidCents = reaisToCents(partial);
+    if (await api("payCommission", payload)) setPayFor(null);
+  }
+  async function reverse(id: string) {
+    if (!confirm("Estornar este pagamento? As OS voltam a pendente.")) return;
+    if (await api("reverseCommission", { paymentId: id }) && payFor) openPay(payFor);
   }
 
   if (loading) return <p className="text-sm text-[var(--text-muted)]">Carregando…</p>;
@@ -151,10 +218,14 @@ export default function EquipeClient() {
           )}
 
           <div className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm sm:grid-cols-4">
-            <div><div className="text-xs text-[var(--text-muted)]">OS quitadas</div><div className="font-bold text-ink">{m.osCount}</div></div>
-            <div><div className="text-xs text-[var(--text-muted)]">Serviço (base)</div><div className="font-bold text-ink">{brl(m.servicoCents)}</div></div>
-            <div><div className="text-xs text-[var(--text-muted)]">{m.pay_type === "comissao" ? "Comissão" : PAY_LABEL[m.pay_type]}</div><div className="font-bold text-ink">{m.pay_type === "comissao" ? brl(m.comissaoCents) : brl(m.pay_value_cents)}</div></div>
-            <div><div className="text-xs text-[var(--text-muted)]">A pagar{m.pay_type !== "comissao" ? " (comissão)" : ""}</div><div className="font-extrabold text-[var(--green-ok)]">{brl(m.aPagarCents)}</div></div>
+            <div><div className="text-xs text-[var(--text-muted)]">OS quitadas{(from || to) ? " (período)" : ""}</div><div className="font-bold text-ink">{m.osCount}</div></div>
+            <div><div className="text-xs text-[var(--text-muted)]">Comissão{(from || to) ? " (período)" : ""}</div><div className="font-bold text-ink">{m.pay_type === "comissao" ? brl(m.comissaoCents) : brl(m.pay_value_cents)}</div></div>
+            <div><div className="text-xs text-[var(--text-muted)]">Pendente (a pagar)</div><div className="font-extrabold text-[var(--green-ok)]">{brl(m.pendenteCents)}</div></div>
+            <div className="flex items-end">
+              {m.pay_type === "comissao" && m.pendenteCents > 0 && (
+                <button onClick={() => openPay(m)} disabled={saving} className="w-full rounded-xl brand-gradient px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Registrar pagamento</button>
+              )}
+            </div>
           </div>
         </Card>
       ))}
@@ -162,6 +233,93 @@ export default function EquipeClient() {
       <p className="rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
         A comissão do técnico nasce só quando a OS é <b>quitada</b> e sempre sobre o valor do <b>serviço</b> (mão de obra) — peça nunca entra na base. Recepção/salário: o fixo é acertado à parte. Encargos de folha (13º, FGTS) = contador.
       </p>
+
+      {payFor && (
+        <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center" onClick={() => setPayFor(null)}>
+          <div className="card w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-ink">Pagar comissão · {payFor.name}</h3>
+              <button onClick={() => setPayFor(null)} className="text-xl leading-none text-[var(--text-muted)]">×</button>
+            </div>
+
+            {!detail ? (
+              <p className="py-6 text-center text-sm text-[var(--text-muted)]">Carregando…</p>
+            ) : (
+              <>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">OS pendentes ({detail.pending.length})</div>
+                {detail.pending.length === 0 ? (
+                  <p className="rounded-xl bg-bg-surface-2 p-3 text-sm text-[var(--text-muted)]">Nenhuma OS com comissão pendente. Você ainda pode lançar só um bônus.</p>
+                ) : (
+                  <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-line p-2">
+                    {detail.pending.map((o) => (
+                      <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-bg-surface-2">
+                        <input type="checkbox" checked={sel.has(o.id)} onChange={() => toggleOS(o.id)} className="h-4 w-4 accent-[var(--brand-600)]" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-ink">{o.code ? `${o.code} · ` : ""}{o.device || "Serviço"}</div>
+                          <div className="text-xs text-[var(--text-muted)]">{o.customerName} · {dmy(o.paidAt)} · {o.commissionPercent}% de {brl(o.serviceValueCents)}</div>
+                        </div>
+                        <div className="text-sm font-bold text-ink">{brl(o.comissaoCents)}</div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2 text-sm">
+                  <span className="font-semibold text-brand-600">Comissão selecionada</span>
+                  <span className="font-extrabold text-brand-600">{brl(selTotalCents)}</span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Valor pago (padrão = total)</label>
+                    <input value={partial} onChange={(e) => setPartial(e.target.value)} inputMode="decimal" placeholder={brl(selTotalCents).replace("R$ ", "")} className={`${inputCls} w-full`} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Data do pagamento</label>
+                    <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={`${inputCls} w-full`} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Bônus R$ (opcional)</label>
+                    <input value={bonus} onChange={(e) => setBonus(e.target.value)} inputMode="decimal" placeholder="0,00" className={`${inputCls} w-full`} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Motivo do bônus</label>
+                    <input value={bonusReason} onChange={(e) => setBonusReason(e.target.value)} placeholder="ex.: meta batida" className={`${inputCls} w-full`} />
+                  </div>
+                </div>
+                <input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} placeholder="Observação (opcional)" className={`${inputCls} mt-2 w-full`} />
+
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => setPayFor(null)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)]">Cancelar</button>
+                  <button onClick={submitPay} disabled={saving} className="flex-1 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Confirmar pagamento</button>
+                </div>
+
+                {detail.payments.length > 0 && (
+                  <div className="mt-5 border-t border-line pt-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Histórico de pagamentos</div>
+                    <div className="space-y-1">
+                      {detail.payments.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg-surface-2 px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-ink">
+                              {brl(p.paidCents + p.bonusCents)} <span className="text-xs font-normal text-[var(--text-muted)]">· {dmy(p.paidAt)}</span>
+                              {p.paidCents < p.totalCents && <span className="ml-1 text-xs font-bold text-amber-600">parcial</span>}
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              {p.osIds.length} OS{p.bonusCents > 0 ? ` · bônus ${brl(p.bonusCents)}${p.bonusReason ? ` (${p.bonusReason})` : ""}` : ""}
+                            </div>
+                          </div>
+                          <button onClick={() => reverse(p.id)} disabled={saving} className="shrink-0 text-xs font-bold text-red-500">estornar</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

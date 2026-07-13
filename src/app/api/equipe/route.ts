@@ -12,6 +12,12 @@ import {
   type StaffLoginRole,
 } from "@/lib/staff-store";
 import { listServiceOrders, osCommissionCents } from "@/lib/service-orders-store";
+import {
+  listCommissionPayments,
+  pendingOSForStaff,
+  payCommission,
+  reverseCommissionPayment,
+} from "@/lib/commission-payments-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +60,27 @@ export async function GET(req: Request) {
   const sid = g.store.id;
 
   const url = new URL(req.url);
+  const staffParam = url.searchParams.get("staff");
+
+  // DETALHE de 1 técnico (base do wizard "Registrar Pagamento"): OS pendentes + histórico de pagamentos.
+  if (staffParam) {
+    const [pending, payments] = await Promise.all([
+      pendingOSForStaff(staffParam, sid),
+      listCommissionPayments(staffParam, sid),
+    ]);
+    const pendingOut = pending.map((os) => ({
+      id: os.id,
+      code: os.code,
+      device: os.device,
+      customerName: os.customerName,
+      paidAt: os.paidAt,
+      serviceValueCents: os.serviceValueCents,
+      commissionPercent: os.commissionPercent,
+      comissaoCents: osCommissionCents(os),
+    }));
+    return NextResponse.json({ pending: pendingOut, payments });
+  }
+
   const from = url.searchParams.get("from") || undefined;
   const to = url.searchParams.get("to") || undefined;
 
@@ -65,30 +92,47 @@ export async function GET(req: Request) {
 
   const withLogin = new Set(report.filter((r) => r.hasLogin).map((r) => r.id));
 
-  // agrega comissão/serviço por técnico sobre OS quitadas no período (paid_at)
-  const byStaff = new Map<string, { osCount: number; comissaoCents: number; servicoCents: number }>();
+  // por técnico: comissão gerada no PERÍODO (paid_at) + pendente ALL-TIME (o que ainda se deve pagar).
+  type Agg = { osCount: number; comissaoCents: number; servicoCents: number; pendenteCents: number; pendenteCount: number };
+  const byStaff = new Map<string, Agg>();
+  const bump = (id: string): Agg => {
+    const a = byStaff.get(id) ?? { osCount: 0, comissaoCents: 0, servicoCents: 0, pendenteCents: 0, pendenteCount: 0 };
+    byStaff.set(id, a);
+    return a;
+  };
   for (const os of orders) {
     if (os.paymentStatus !== "quitada" || !os.staffId) continue;
+    const comm = osCommissionCents(os);
+    // pendente = comissão ainda não paga (sem vínculo a um pagamento) — independe do período
+    if (!os.commissionPaymentId && comm > 0) {
+      const a = bump(os.staffId);
+      a.pendenteCents += comm;
+      a.pendenteCount += 1;
+    }
+    // stats do período
     if (from && (!os.paidAt || os.paidAt < from)) continue;
     if (to && (!os.paidAt || os.paidAt > to)) continue;
-    const a = byStaff.get(os.staffId) ?? { osCount: 0, comissaoCents: 0, servicoCents: 0 };
+    const a = bump(os.staffId);
     a.osCount += 1;
-    a.comissaoCents += osCommissionCents(os);
+    a.comissaoCents += comm;
     a.servicoCents += os.serviceValueCents;
-    byStaff.set(os.staffId, a);
   }
 
   const acerto = staff.map((s) => {
-    const a = byStaff.get(s.id) ?? { osCount: 0, comissaoCents: 0, servicoCents: 0 };
+    const a = byStaff.get(s.id) ?? { osCount: 0, comissaoCents: 0, servicoCents: 0, pendenteCents: 0, pendenteCount: 0 };
     // comissão só quando o modelo é comissão; diária/salário são acertados à parte (fixo).
-    const comissaoCents = s.pay_type === "comissao" ? a.comissaoCents : 0;
+    const isComissao = s.pay_type === "comissao";
+    const comissaoCents = isComissao ? a.comissaoCents : 0;
+    const pendenteCents = isComissao ? a.pendenteCents : 0;
     return {
       ...s,
       hasLogin: withLogin.has(s.id),
       osCount: a.osCount,
       servicoCents: a.servicoCents,
       comissaoCents,
-      aPagarCents: comissaoCents,
+      pendenteCents,
+      pendenteCount: isComissao ? a.pendenteCount : 0,
+      aPagarCents: pendenteCents,
     };
   });
 
@@ -126,6 +170,25 @@ export async function POST(req: Request) {
         const role = asLoginRole(p.role); // "technician" (default) | "reception"
         if (!email || senha.length < 6) return NextResponse.json({ error: "Informe email e senha (mín. 6)." }, { status: 400 });
         await createStaffAccess(String(p.id), email, senha, role, sid);
+        return NextResponse.json({ ok: true });
+      }
+      case "payCommission": {
+        const pay = await payCommission(
+          {
+            staffId: String(p.staffId ?? ""),
+            osIds: Array.isArray(p.osIds) ? (p.osIds as unknown[]).map(String) : [],
+            paidCents: p.paidCents != null ? Number(p.paidCents) : undefined,
+            bonusCents: p.bonusCents != null ? Number(p.bonusCents) : undefined,
+            bonusReason: p.bonusReason != null ? String(p.bonusReason) : undefined,
+            notes: p.notes != null ? String(p.notes) : undefined,
+            paidAt: p.paidAt != null ? String(p.paidAt) : undefined,
+          },
+          sid,
+        );
+        return NextResponse.json({ ok: true, id: pay.id });
+      }
+      case "reverseCommission": {
+        await reverseCommissionPayment(String(p.paymentId ?? ""), sid);
         return NextResponse.json({ ok: true });
       }
       default:
