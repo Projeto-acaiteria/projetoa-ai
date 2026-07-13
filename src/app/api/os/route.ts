@@ -71,6 +71,7 @@ export async function POST(req: Request) {
           devicePassword: p.devicePassword ? String(p.devicePassword) : undefined,
           problem: p.problem ? String(p.problem) : undefined,
           printObs: p.printObs ? String(p.printObs) : undefined,
+          staffId: p.staffId ? String(p.staffId) : undefined,
           serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined,
         }, storeId);
         // devolve a OS + cabeçalho da loja p/ o cliente imprimir o comprovante de entrada 80mm

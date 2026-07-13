@@ -202,6 +202,12 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
   const sid = storeId ?? (await resolveStoreId());
   const service = Math.max(0, Math.round(input.serviceValueCents ?? 0));
   const parts = Math.max(0, Math.round(input.partsValueCents ?? 0));
+  // técnico escolhido no check-in → puxa o % de comissão dele (senão a comissão nasceria zerada)
+  let commissionPct = Math.max(0, Number(input.commissionPercent ?? 0));
+  if (input.staffId && input.commissionPercent == null) {
+    const { data: st } = await db().from("staff").select("commission_percent").eq("id", input.staffId).eq("store_id", sid).maybeSingle();
+    if (st) commissionPct = Math.max(0, Number((st as { commission_percent: number }).commission_percent) || 0);
+  }
   const { data, error } = await db().from("service_orders").insert({
     store_id: sid,
     code: genOSCode(),
@@ -216,7 +222,7 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     problem: (input.problem ?? "").trim(),
     print_obs: input.printObs?.trim() || null,
     staff_id: input.staffId ?? null,
-    commission_percent: Math.max(0, Number(input.commissionPercent ?? 0)),
+    commission_percent: commissionPct,
     service_value_cents: service,
     parts_value_cents: parts,
     total_cents: service + parts,
