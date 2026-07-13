@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/admin/ui";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { OS_PRIORITY_ORDER, OS_PRIORITY_META } from "@/lib/os-priority";
 
 const STATUSES = [
@@ -15,6 +16,7 @@ const PAYS: [string, string][] = [["pix", "PIX"], ["dinheiro", "Dinheiro"], ["ca
 
 export default function OSActions({ id, status, situacao, situacoes, paymentStatus, priority, staffId, staff }: { id: string; status: string; situacao: string | null; situacoes: string[]; paymentStatus: string; priority: string | null; staffId: string | null; staff: { id: string; name: string }[] }) {
   const router = useRouter();
+  const { ask, confirmDialog } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
@@ -61,7 +63,7 @@ export default function OSActions({ id, status, situacao, situacoes, paymentStat
           ))}
         </div>
         {!cancelada && (
-          <button disabled={busy} onClick={() => confirm("Cancelar esta OS?") && api("status", { id, status: "cancelado" })} className="mt-2 text-xs font-bold text-red-500">
+          <button disabled={busy} onClick={async () => { if (await ask({ message: "Cancelar esta OS?", danger: true, confirmLabel: "Cancelar OS" })) api("status", { id, status: "cancelado" }); }} className="mt-2 text-xs font-bold text-red-500">
             Cancelar OS
           </button>
         )}
@@ -103,6 +105,7 @@ export default function OSActions({ id, status, situacao, situacoes, paymentStat
         )}
         <p className="mt-2 text-[10px] text-[var(--text-faded)]">Quitar gera a comissão do técnico e dá baixa nas peças do estoque.</p>
       </div>
+      {confirmDialog}
     </Card>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/admin/ui";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 type Kind = "pagar" | "receber";
 type Payment = { amountCents: number; date: string; note?: string | null };
@@ -28,6 +29,7 @@ const statusOf = (b: Bill): "pendente" | "parcial" | "pago" => {
 };
 
 export default function ContasClient() {
+  const { ask, confirmDialog } = useConfirm();
   const [tab, setTab] = useState<Kind>("pagar");
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,15 +198,16 @@ export default function ContasClient() {
                   <span className="text-xs font-semibold text-[var(--green-ok)]">✓ {tab === "pagar" ? "Paga" : "Recebida"}{b.settledAt ? " em " + dmy(b.settledAt) : ""}</span>
                 )}
                 {b.payments.length > 0 && (
-                  <button onClick={() => confirm("Estornar a última baixa desta conta?") && api("estornar", { id: b.id })} disabled={saving} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">Estornar baixa</button>
+                  <button onClick={async () => { if (await ask({ message: "Estornar a última baixa desta conta?", confirmLabel: "Estornar" })) api("estornar", { id: b.id }); }} disabled={saving} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">Estornar baixa</button>
                 )}
                 <button onClick={() => editar(b)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-brand-600">Editar</button>
-                <button onClick={() => confirm(`Excluir a conta ${b.code}?`) && api("delete", { id: b.id })} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
+                <button onClick={async () => { if (await ask({ message: `Excluir a conta ${b.code}?`, danger: true, confirmLabel: "Excluir" })) api("delete", { id: b.id }); }} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
               </div>
             )}
           </Card>
         );
       })}
+      {confirmDialog}
     </div>
   );
 }

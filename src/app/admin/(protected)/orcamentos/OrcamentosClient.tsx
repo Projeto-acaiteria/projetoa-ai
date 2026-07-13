@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/admin/ui";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 type Status = "pendente" | "aprovado" | "recusado" | "expirado";
 type ItemKind = "produto" | "servico";
@@ -35,6 +36,7 @@ function budgetTotal(b: Budget): number {
 }
 
 export default function OrcamentosClient({ storeName }: { storeName?: string }) {
+  const { ask, confirmDialog } = useConfirm();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,13 +104,14 @@ export default function OrcamentosClient({ storeName }: { storeName?: string }) 
             {b.osId ? (
               <a href={`/admin/os/${b.osId}`} className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700">✓ OS gerada: {b.osCode}</a>
             ) : (
-              <button onClick={() => confirm(`Aprovar o orçamento ${b.code} e gerar a Ordem de Serviço?`) && api("aprovar", { id: b.id })} disabled={saving} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700 disabled:opacity-50">Aprovar → gerar OS</button>
+              <button onClick={async () => { if (await ask({ message: `Aprovar o orçamento ${b.code} e gerar a Ordem de Serviço?`, confirmLabel: "Aprovar" })) api("aprovar", { id: b.id }); }} disabled={saving} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700 disabled:opacity-50">Aprovar → gerar OS</button>
             )}
             {b.status === "pendente" && <button onClick={() => api("status", { id: b.id, status: "recusado" })} disabled={saving} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">Recusar</button>}
-            <button onClick={() => confirm(`Excluir o orçamento ${b.code}?`) && api("delete", { id: b.id })} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
+            <button onClick={async () => { if (await ask({ message: `Excluir o orçamento ${b.code}?`, danger: true, confirmLabel: "Excluir" })) api("delete", { id: b.id }); }} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
           </div>
         </Card>
       ))}
+      {confirmDialog}
     </div>
   );
 }

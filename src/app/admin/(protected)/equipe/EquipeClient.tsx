@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 type PayType = "comissao" | "diaria" | "salario";
 type LoginRole = "technician" | "reception";
@@ -51,6 +52,7 @@ const PAY_LABEL: Record<PayType, string> = { comissao: "ComissÃ£o", diaria: "DiÃ
 const reaisToCents = (s: string) => Math.round((parseFloat(s.replace(",", ".")) || 0) * 100);
 
 export default function EquipeClient() {
+  const { ask, confirmDialog } = useConfirm();
   const [acerto, setAcerto] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -141,7 +143,7 @@ export default function EquipeClient() {
     if (await api("payCommission", payload)) setPayFor(null);
   }
   async function reverse(id: string) {
-    if (!confirm("Estornar este pagamento? As OS voltam a pendente.")) return;
+    if (!(await ask({ message: "Estornar este pagamento? As OS voltam a pendente.", danger: true, confirmLabel: "Estornar" }))) return;
     if (await api("reverseCommission", { paymentId: id }) && payFor) openPay(payFor);
   }
 
@@ -198,7 +200,7 @@ export default function EquipeClient() {
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => api("update", { id: m.id, patch: { active: !m.active } })} disabled={saving} className="text-xs font-bold text-[var(--text-muted)]">{m.active ? "desativar" : "ativar"}</button>
-              <button onClick={() => confirm(`Excluir ${m.name}?`) && api("delete", { id: m.id })} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
+              <button onClick={async () => { if (await ask({ message: `Excluir ${m.name}?`, danger: true, confirmLabel: "Excluir" })) api("delete", { id: m.id }); }} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
             </div>
           </div>
 
@@ -320,6 +322,7 @@ export default function EquipeClient() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

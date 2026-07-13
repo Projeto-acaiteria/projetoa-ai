@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/admin/ui";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 type Produto = { id: string; name: string; costCents: number };
 type PItem = { stockId?: string | null; name: string; qty: number; unitCostCents: number };
@@ -25,6 +26,7 @@ function purchaseTotal(p: Purchase): number {
 }
 
 export default function ComprasClient({ produtos }: { produtos: Produto[] }) {
+  const { ask, confirmDialog } = useConfirm();
   const byName = useMemo(() => new Map(produtos.map((p) => [p.name.toLowerCase(), p])), [produtos]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,9 +158,9 @@ export default function ComprasClient({ produtos }: { produtos: Produto[] }) {
           <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
             {p.status === "pendente" ? (
               <>
-                <button onClick={() => confirm(`Receber a compra ${p.code}? Dá entrada no estoque e lança a despesa.`) && api("receber", { id: p.id })} disabled={saving} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700 disabled:opacity-50">Receber → dá entrada</button>
+                <button onClick={async () => { if (await ask({ message: `Receber a compra ${p.code}? Dá entrada no estoque e lança a despesa.`, confirmLabel: "Receber" })) api("receber", { id: p.id }); }} disabled={saving} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700 disabled:opacity-50">Receber → dá entrada</button>
                 <button onClick={() => editar(p)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-brand-600">Editar</button>
-                <button onClick={() => confirm(`Excluir a compra ${p.code}?`) && api("delete", { id: p.id })} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
+                <button onClick={async () => { if (await ask({ message: `Excluir a compra ${p.code}?`, danger: true, confirmLabel: "Excluir" })) api("delete", { id: p.id }); }} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
               </>
             ) : (
               <span className="text-xs font-semibold text-[var(--green-ok)]">✓ Estoque atualizado e despesa lançada</span>
@@ -166,6 +168,7 @@ export default function ComprasClient({ produtos }: { produtos: Produto[] }) {
           </div>
         </Card>
       ))}
+      {confirmDialog}
     </div>
   );
 }
