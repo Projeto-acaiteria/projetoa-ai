@@ -182,8 +182,8 @@ export default function ConfigClient({ family }: { family?: string }) {
         </Card>
       )}
 
-      {/* Entrega (delivery) — módulo ligável por loja */}
-      {config && (
+      {/* Entrega (delivery) — módulo de food (taxa por bairro). Não aparece no service (AT). */}
+      {config && family !== "service" && (
         <Card className="p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -436,7 +436,8 @@ export default function ConfigClient({ family }: { family?: string }) {
         </div>
       </Card>
 
-      {/* Mensagens do WhatsApp — por status, editáveis (disparadas ao avançar o pedido) */}
+      {/* Mensagens do WhatsApp — status de pedido de food. Não aparece no service (AT tem o próprio aviso). */}
+      {family !== "service" && (
       <Card className="p-5 sm:p-6">
         <h2 className="mb-1 text-base font-extrabold text-ink">Mensagens do WhatsApp</h2>
         <p className="mb-3 text-sm text-[var(--text-muted)]">O que o cliente recebe quando você avança o pedido. Use <b className="text-ink">{"{nome}"}</b>, <b className="text-ink">{"{codigo}"}</b> e <b className="text-ink">{"{loja}"}</b> — o link de rastreio entra sozinho.</p>
@@ -454,6 +455,7 @@ export default function ConfigClient({ family }: { family?: string }) {
           ))}
         </div>
       </Card>
+      )}
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-xl brand-gradient px-5 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)] disabled:opacity-60">
