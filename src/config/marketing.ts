@@ -106,8 +106,8 @@ export const NICHOS: Nicho[] = [
     heroH1: "Sistema pra sushi com",
     heroAccent: "combos e rodízio.",
     heroSub: "Combos, barcas e rodízio no cardápio do seu link, comanda por mesa e delivery próprio sem comissão. Do pedido ao caixa, num sistema só — sem gambiarra de planilha.",
-    cardapioImg: null,
-    cardapioCaption: "",
+    cardapioImg: "/site/cardapio-sushi.jpg",
+    cardapioCaption: "Cardápio real · combos e barcas",
     destaques: ["Combos e barcas", "Rodízio", "Comanda por mesa", "Delivery 0% comissão", "Caixa integrado"],
     dores: ["Barca e combo montados na mão, com erro de preço", "Comissão de marketplace comendo a margem do peixe", "Rodízio sem controle do que sai por mesa"],
     faqs: [
