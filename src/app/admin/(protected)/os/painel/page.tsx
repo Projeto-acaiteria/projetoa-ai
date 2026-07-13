@@ -4,6 +4,7 @@ import { PageHeader, Card } from "@/components/admin/ui";
 import { listServiceOrders, OS_STATUS_LABEL, type OSStatus } from "@/lib/service-orders-store";
 import { listStaff } from "@/lib/staff-store";
 import { dateBR, todayBR } from "@/lib/date-br";
+import { OS_PRIORITY_ORDER, OS_PRIORITY_META } from "@/lib/os-priority";
 
 // Painel de OS (visão geral) — inspirado no "Painel" do GestãoClick: prazos, situação e faturamento
 // por técnico. Tudo com o dado que já temos (estimated_at, status, OS quitadas). Service-only.
@@ -62,6 +63,16 @@ export default async function OSPainelPage() {
             <Tile n={amanha} label="Amanhã" color="#3b82f6" />
             <Tile n={futuras} label="Futuras" color="#22c55e" />
             <Tile n={semPrazo} label="Sem prazo" color="#64748b" />
+          </div>
+        </div>
+
+        {/* PRIORIDADE */}
+        <div>
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">🔺 Prioridade <span className="normal-case text-[var(--text-faded)]">· das OS em aberto</span></h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {OS_PRIORITY_ORDER.map((k) => (
+              <Tile key={k} n={ativas.filter((o) => o.priority === k).length} label={OS_PRIORITY_META[k].label} color={OS_PRIORITY_META[k].color} />
+            ))}
           </div>
         </div>
 

@@ -3,6 +3,8 @@
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getServiceCustomerByCpf, upsertServiceCustomer } from "@/lib/service-customers-store";
+import { asPriority, type OSPriority } from "@/lib/os-priority";
+export type { OSPriority } from "@/lib/os-priority";
 
 const num = (v: unknown) => Number(v ?? 0);
 const str = (v: unknown) => (v == null ? null : String(v));
@@ -28,6 +30,7 @@ export type ServiceOrder = {
   problem: string;
   diagnosis: string | null;
   status: OSStatus;
+  priority: OSPriority | null;
   staffId: string | null;
   commissionPercent: number;
   serviceValueCents: number;
@@ -65,6 +68,7 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   problem: String(r.problem ?? ""),
   diagnosis: str(r.diagnosis),
   status: asStatus(r.status),
+  priority: asPriority(r.priority),
   staffId: str(r.staff_id),
   commissionPercent: num(r.commission_percent),
   serviceValueCents: num(r.service_value_cents),
@@ -184,6 +188,7 @@ export type NewOSInput = {
   devicePassword?: string;
   problem?: string;
   printObs?: string;
+  priority?: string;
   staffId?: string;
   commissionPercent?: number;
   serviceValueCents?: number;
@@ -221,6 +226,7 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     device_password: input.devicePassword?.trim() || null,
     problem: (input.problem ?? "").trim(),
     print_obs: input.printObs?.trim() || null,
+    priority: asPriority(input.priority),
     staff_id: input.staffId ?? null,
     commission_percent: commissionPct,
     service_value_cents: service,
@@ -274,6 +280,12 @@ export async function updateOSNotes(id: string, notes: string, storeId?: string)
 export async function updateOSPrintObs(id: string, text: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("service_orders").update({ print_obs: text.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
+}
+
+/** Prioridade da OS (fila da bancada). "" limpa. */
+export async function updateOSPriority(id: string, priority: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("service_orders").update({ priority: asPriority(priority), updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
 /** Prazo estimado de conclusão. Recebe YYYY-MM-DD (ou vazio pra limpar). Guarda no FIM do dia BR

@@ -7,6 +7,7 @@ import { Card } from "@/components/admin/ui";
 import { submitOrQueue } from "@/lib/offline-queue";
 import { printTicket } from "@/lib/print";
 import { osEntryTicketHtml } from "@/lib/ticket";
+import { OS_PRIORITY_ORDER, OS_PRIORITY_META } from "@/lib/os-priority";
 
 // Check-in de OS em PÁGINA INTEIRA com seções (familiaridade com o GestãoClick), no lugar do modal.
 const inputCls = "w-full rounded-lg border border-line bg-bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
@@ -36,7 +37,7 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
   const [looking, setLooking] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", printObs: "", servico: "", staffId: "" });
+  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", printObs: "", servico: "", staffId: "", priority: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function buscar() {
@@ -81,6 +82,7 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
         acessorios: f.acessorios.trim() || undefined, devicePassword: f.devicePassword.trim() || undefined,
         problem: f.problem.trim() || undefined, printObs: f.printObs.trim() || undefined,
         staffId: f.staffId || undefined,
+        priority: f.priority || undefined,
         serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
       } }, `Check-in ${nome}`);
       if ("queued" in res) {
@@ -130,6 +132,12 @@ export default function NovaOSForm({ tecnicos = [] }: { tecnicos?: { id: string;
             <select value={f.staffId} onChange={(e) => set("staffId", e.target.value)} className={inputCls}>
               <option value="">Atribuir depois</option>
               {tecnicos.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Prioridade">
+            <select value={f.priority} onChange={(e) => set("priority", e.target.value)} className={inputCls}>
+              <option value="">Normal</option>
+              {OS_PRIORITY_ORDER.map((k) => <option key={k} value={k}>{OS_PRIORITY_META[k].label}</option>)}
             </select>
           </Field>
           <Field label="Valor do serviço R$ (opcional)"><input value={f.servico} onChange={(e) => set("servico", e.target.value)} inputMode="decimal" placeholder="0,00" className={inputCls} /></Field>

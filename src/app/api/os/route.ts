@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getStore } from "@/lib/settings-store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +71,7 @@ export async function POST(req: Request) {
           devicePassword: p.devicePassword ? String(p.devicePassword) : undefined,
           problem: p.problem ? String(p.problem) : undefined,
           printObs: p.printObs ? String(p.printObs) : undefined,
+          priority: p.priority ? String(p.priority) : undefined,
           staffId: p.staffId ? String(p.staffId) : undefined,
           serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined,
         }, storeId);
@@ -94,6 +95,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "printObs": // observação que sai no documento (não é ação do técnico — fora de TEC_ACTIONS)
         await updateOSPrintObs(String(p.id), String(p.text ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "priority":
+        await updateOSPriority(String(p.id), String(p.priority ?? ""), storeId);
         return NextResponse.json({ ok: true });
       case "estimate":
         await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);

@@ -93,7 +93,7 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
             </div>
           </Card>
 
-          <OSActions id={os.id} status={os.status} paymentStatus={os.paymentStatus} staffId={os.staffId} staff={staff.map((s) => ({ id: s.id, name: s.name }))} />
+          <OSActions id={os.id} status={os.status} paymentStatus={os.paymentStatus} priority={os.priority} staffId={os.staffId} staff={staff.map((s) => ({ id: s.id, name: s.name }))} />
         </div>
       </div>
     </>
