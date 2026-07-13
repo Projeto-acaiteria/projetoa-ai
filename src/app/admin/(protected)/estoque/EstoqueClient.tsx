@@ -746,7 +746,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         minQty: +minQty,
         maxQty: maxQty ? +maxQty : 0,
         expiry: expiry || "",
-        sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : 0,
+        sellPriceCents: sellable && sell ? Math.round(parseFloat(sell) * 100) : 0,
         ...(isDose ? { costPerBottleCents: costC } : { costCents: costC }),
         supplier: supplier.trim(),
         purchaseUnit: purchaseUnit.trim(),
@@ -774,7 +774,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         <input className={inp} type="number" min={0} placeholder="Máximo" value={maxQty} onChange={(e) => setMaxQty(e.target.value)} />
       </div>
       <p className="-mt-1 text-[11px] text-[var(--text-faded)]">Mínimo dispara o alerta de repor. Máximo = alvo (compra sugerida = máximo − atual).</p>
-      {isVenda && (
+      {sellable && (
         <div>
           <label className="text-xs font-semibold text-[var(--text-muted)]">Preço de venda</label>
           <div className="mt-1 flex items-center rounded-lg border border-line bg-bg-base px-3">
