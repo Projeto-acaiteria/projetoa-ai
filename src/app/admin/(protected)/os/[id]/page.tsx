@@ -3,9 +3,11 @@ import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/service-orders-store";
 import { listStaff } from "@/lib/staff-store";
+import { listStock } from "@/lib/stock-store";
 import { getStore } from "@/lib/settings-store";
 import OSActions from "./OSActions";
 import OSObsEditor from "./OSObsEditor";
+import OSPartsEditor from "./OSPartsEditor";
 import DocShare from "@/components/admin/DocShare";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +17,11 @@ const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFr
 export default async function OSDetail({ params }: { params: Promise<{ id: string }> }) {
   await requireNavAccess("/admin/os");
   const { id } = await params;
-  const [res, staff, store] = await Promise.all([getServiceOrder(id), listStaff(), getStore()]);
+  const [res, staff, store, stock] = await Promise.all([getServiceOrder(id), listStaff(), getStore(), listStock()]);
   if (!res) notFound();
   const { os, parts } = res;
+  // peças vendáveis do estoque pro seletor (liga a peça ao produto → baixa ao quitar)
+  const produtos = stock.filter((s) => Number(s.sellPriceCents ?? 0) > 0).map((s) => ({ id: s.id, name: s.name, priceCents: Number(s.sellPriceCents) }));
   const commission = osCommissionCents(os);
   const tecnico = staff.find((s) => s.id === os.staffId);
 
@@ -52,22 +56,7 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
 
           <OSObsEditor id={os.id} initial={os.printObs ?? ""} />
 
-          {parts.length > 0 && (
-            <Card className="p-5">
-              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Peças ({parts.length})</h3>
-              <div className="divide-y divide-line">
-                {parts.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm text-ink">{p.name}</div>
-                      {p.sku && <div className="font-mono text-[10px] text-[var(--text-muted)]">{p.sku} · {p.qty} un</div>}
-                    </div>
-                    <div className="font-mono text-sm text-ink">{brl(p.qty * p.unitCostCents)}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <OSPartsEditor osId={os.id} parts={parts} quitada={os.paymentStatus === "quitada"} produtos={produtos} />
         </div>
 
         <div className="space-y-4">

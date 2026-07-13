@@ -274,6 +274,44 @@ export async function updateOSSituacao(id: string, situacao: string, storeId?: s
   await db().from("service_orders").update({ situacao: situacao.trim() || null, updated_at: new Date().toISOString() }).eq("id", id).eq("store_id", sid);
 }
 
+// Recalcula parts_value_cents (soma das peças) e total_cents (serviço + peças − desconto). Fonte da
+// verdade dos valores fica sempre nas linhas de os_parts — nunca num número solto vindo do client.
+async function recomputeOSTotals(osId: string, sid: string): Promise<void> {
+  const { data: os } = await db().from("service_orders").select("service_value_cents, discount_cents").eq("id", osId).eq("store_id", sid).maybeSingle();
+  if (!os) return;
+  const { data: parts } = await db().from("os_parts").select("qty, unit_cost_cents").eq("os_id", osId).eq("store_id", sid);
+  const partsValue = ((parts ?? []) as { qty: number; unit_cost_cents: number }[]).reduce((s, p) => s + Math.max(0, Math.round(Number(p.qty) * Number(p.unit_cost_cents))), 0);
+  const service = num((os as Record<string, unknown>).service_value_cents);
+  const disc = num((os as Record<string, unknown>).discount_cents);
+  const total = Math.max(0, service + partsValue - disc);
+  await db().from("service_orders").update({ parts_value_cents: partsValue, total_cents: total, updated_at: new Date().toISOString() }).eq("id", osId).eq("store_id", sid);
+}
+
+/** Adiciona uma peça à OS (conserto). unitCents = preço COBRADO por unidade. sku liga ao estoque
+ *  (baixa acontece ao quitar). Bloqueado em OS quitada (total/comissão já fechados). */
+export async function addOSPart(osId: string, input: { name: string; qty: number; unitCents: number; sku?: string | null }, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const name = String(input.name ?? "").trim().slice(0, 120);
+  if (!name) throw new Error("Informe o nome da peça.");
+  const qty = Math.max(1, Math.round(Number(input.qty) || 1));
+  const unit = Math.max(0, Math.round(Number(input.unitCents) || 0));
+  const { data: os } = await db().from("service_orders").select("payment_status").eq("id", osId).eq("store_id", sid).maybeSingle();
+  if (!os) throw new Error("OS não encontrada.");
+  if ((os as { payment_status?: string }).payment_status === "quitada") throw new Error("OS quitada — não dá pra alterar as peças.");
+  await db().from("os_parts").insert({ store_id: sid, os_id: osId, sku: input.sku || null, name, qty, unit_cost_cents: unit });
+  await recomputeOSTotals(osId, sid);
+}
+
+/** Remove uma peça da OS e recalcula. Bloqueado em OS quitada. */
+export async function removeOSPart(osId: string, partId: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: os } = await db().from("service_orders").select("payment_status").eq("id", osId).eq("store_id", sid).maybeSingle();
+  if (!os) throw new Error("OS não encontrada.");
+  if ((os as { payment_status?: string }).payment_status === "quitada") throw new Error("OS quitada — não dá pra alterar as peças.");
+  await db().from("os_parts").delete().eq("id", partId).eq("os_id", osId).eq("store_id", sid);
+  await recomputeOSTotals(osId, sid);
+}
+
 /** Marca que a recepção avisou o cliente (WhatsApp) — carimbo p/ não avisar de novo à toa. */
 export async function markOSNotified(id: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getStore } from "@/lib/settings-store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSSituacao, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSSituacao, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, addOSPart, removeOSPart, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,6 +103,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "situacao": // situação personalizada da loja (ex: "Aguardando peça"). "" limpa.
         await updateOSSituacao(String(p.id), String(p.situacao ?? ""), storeId);
+        return NextResponse.json({ ok: true });
+      case "add-part": // adiciona peça à OS (recepção/owner — fora de TEC_ACTIONS, mexe no total)
+        await addOSPart(String(p.id), { name: String(p.name ?? ""), qty: Number(p.qty ?? 1), unitCents: Number(p.unitCents ?? 0), sku: p.sku ? String(p.sku) : null }, storeId);
+        return NextResponse.json({ ok: true });
+      case "remove-part":
+        await removeOSPart(String(p.id), String(p.partId), storeId);
         return NextResponse.json({ ok: true });
       case "estimate":
         await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);
