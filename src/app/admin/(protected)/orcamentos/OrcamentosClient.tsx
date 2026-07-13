@@ -10,6 +10,7 @@ type Budget = {
   id: string; code: string; customerName: string; customerPhone: string; cpf: string | null;
   items: ApiItem[]; freteCents: number; outrosCents: number; discountCents: number;
   validadeAt: string | null; observacao: string | null; status: Status; createdAt: string;
+  osId?: string | null; osCode?: string | null;
 };
 
 // linha do editor (dinheiro como texto pra digitar)
@@ -217,9 +218,13 @@ export default function OrcamentosClient() {
           <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
             <a href={`/doc/${b.code}`} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink">Ver documento (A4)</a>
             <button onClick={() => enviarWhats(b)} className="rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">Enviar por WhatsApp</button>
-            <button onClick={() => editar(b)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-brand-600">Editar</button>
-            {b.status !== "aprovado" && <button onClick={() => api("status", { id: b.id, status: "aprovado" })} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700">Aprovar</button>}
-            {b.status !== "recusado" && <button onClick={() => api("status", { id: b.id, status: "recusado" })} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">Recusar</button>}
+            {!b.osId && <button onClick={() => editar(b)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-brand-600">Editar</button>}
+            {b.osId ? (
+              <a href={`/admin/os/${b.osId}`} className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700">✓ OS gerada: {b.osCode}</a>
+            ) : (
+              <button onClick={() => confirm(`Aprovar o orçamento ${b.code} e gerar a Ordem de Serviço?`) && api("aprovar", { id: b.id })} className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-bold text-green-700">Aprovar → gerar OS</button>
+            )}
+            {b.status === "pendente" && <button onClick={() => api("status", { id: b.id, status: "recusado" })} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">Recusar</button>}
             <button onClick={() => confirm(`Excluir o orçamento ${b.code}?`) && api("delete", { id: b.id })} className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-500">Excluir</button>
           </div>
         </Card>

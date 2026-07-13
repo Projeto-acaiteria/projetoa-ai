@@ -351,6 +351,54 @@ export async function createMontagemOS(
   return toOS(data);
 }
 
+// Gera uma OS a partir de um orçamento APROVADO. service = serviços; parts = peças + frete + outros;
+// desconto do orçamento vira o desconto da OS. os_parts = as peças (sem SKU → sem baixa automática).
+export type OSFromBudgetInput = {
+  customerName: string;
+  customerPhone?: string;
+  cpf?: string;
+  budgetCode: string;
+  serviceValueCents: number;
+  partsValueCents: number;
+  discountCents: number;
+  parts: { name: string; qty: number; unitCents: number }[];
+  observacao?: string;
+};
+
+export async function createOSFromBudget(input: OSFromBudgetInput, storeId?: string): Promise<ServiceOrder> {
+  const sid = storeId ?? (await resolveStoreId());
+  const service = Math.max(0, Math.round(input.serviceValueCents));
+  const parts = Math.max(0, Math.round(input.partsValueCents));
+  const disc = Math.max(0, Math.round(input.discountCents));
+  const total = Math.max(0, service + parts - disc);
+  const { data, error } = await db().from("service_orders").insert({
+    store_id: sid,
+    code: genOSCode(),
+    customer_name: input.customerName.trim(),
+    customer_phone: (input.customerPhone ?? "").trim(),
+    cpf: input.cpf?.replace(/\D/g, "") || null,
+    device: `Ref. orçamento ${input.budgetCode}`,
+    problem: input.observacao?.trim() || "Serviço aprovado via orçamento.",
+    service_value_cents: service,
+    parts_value_cents: parts,
+    discount_cents: disc,
+    total_cents: total,
+    status: "aguardando",
+    payment_status: "aberta",
+  }).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao gerar OS do orçamento.");
+  const osId = String((data as Record<string, unknown>).id);
+  if (input.parts.length) {
+    await db().from("os_parts").insert(input.parts.map((p) => ({
+      store_id: sid, os_id: osId, sku: null, name: p.name, qty: Math.max(1, Math.round(p.qty)), unit_cost_cents: Math.max(0, Math.round(p.unitCents)),
+    })));
+  }
+  if (input.cpf?.replace(/\D/g, "")) {
+    try { await upsertServiceCustomer({ cpf: input.cpf, name: input.customerName, phone: input.customerPhone }, sid); } catch { /* base best-effort */ }
+  }
+  return toOS(data);
+}
+
 export const OS_STATUS_LABEL: Record<OSStatus, string> = {
   aguardando: "Aguardando",
   em_reparo: "Em reparo",

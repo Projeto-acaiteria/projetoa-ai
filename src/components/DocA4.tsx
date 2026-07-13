@@ -11,7 +11,7 @@ export type DocA4Props = {
   dateLabel: string;
   validadeLabel?: string | null;
   statusLabel?: string | null;
-  store: { name: string; cnpj?: string; endereco?: string; tel?: string };
+  store: { name: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string };
   customer: { name: string; cpf?: string | null; phone?: string | null };
   equipamento?: { device?: string; imei?: string | null; condicoes?: string | null; acessorios?: string | null; problem?: string | null; diagnosis?: string | null } | null;
   items: DocA4Item[];
@@ -80,7 +80,10 @@ export default function DocA4(d: DocA4Props) {
             <div className="nm">{d.store.name || "—"}</div>
             {d.store.cnpj ? <div className="ln">{d.store.cnpj.replace(/\D/g, "").length === 11 ? "CPF" : "CNPJ"}: {fmtCpf(d.store.cnpj)}</div> : null}
             {d.store.endereco ? <div className="ln">{d.store.endereco}</div> : null}
-            {d.store.tel ? <div className="ln">{d.store.tel}</div> : null}
+            {d.store.tel ? <div className="ln">Tel: {d.store.tel}</div> : null}
+            {d.store.email ? <div className="ln">{d.store.email}</div> : null}
+            {d.store.site ? <div className="ln">{d.store.site}</div> : null}
+            {d.store.responsavel ? <div className="ln">Responsável: {d.store.responsavel}</div> : null}
           </div>
           <div className="doc">
             <div className="t">{d.title}</div>

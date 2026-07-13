@@ -28,6 +28,8 @@ export type Budget = {
   validadeAt: string | null; // YYYY-MM-DD
   observacao: string | null;
   status: BudgetStatus;
+  osId: string | null; // OS gerada na aprovação (trava anti-duplicação)
+  osCode: string | null;
   createdAt: string;
   approvedAt: string | null;
 };
@@ -126,6 +128,8 @@ export async function createBudget(input: NewBudgetInput, storeId?: string): Pro
     validadeAt: /^\d{4}-\d{2}-\d{2}$/.test(String(input.validadeAt ?? "")) ? String(input.validadeAt) : null,
     observacao: input.observacao?.trim() || null,
     status: "pendente",
+    osId: null,
+    osCode: null,
     createdAt: now,
     approvedAt: null,
   };
@@ -163,6 +167,16 @@ export async function setBudgetStatus(id: string, status: string, storeId?: stri
   const b: Budget = { ...cur, status: st, approvedAt: st === "aprovado" ? new Date().toISOString() : cur.approvedAt };
   const { error } = await db().from("budgets").update({ data: b }).eq("id", id).eq("store_id", sid);
   if (error) throw new Error("Falha ao atualizar status: " + error.message);
+}
+
+/** Marca o orçamento como aprovado e vincula à OS gerada (trava anti-duplicação). */
+export async function linkBudgetToOS(id: string, osId: string, osCode: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const cur = await getBudget(id, sid);
+  if (!cur) throw new Error("Orçamento não encontrado.");
+  const b: Budget = { ...cur, status: "aprovado", osId, osCode, approvedAt: cur.approvedAt || new Date().toISOString() };
+  const { error } = await db().from("budgets").update({ data: b }).eq("id", id).eq("store_id", sid);
+  if (error) throw new Error("Falha ao vincular OS: " + error.message);
 }
 
 export async function deleteBudget(id: string, storeId?: string): Promise<void> {

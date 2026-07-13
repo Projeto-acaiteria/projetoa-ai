@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
-import { listBudgets, createBudget, updateBudget, setBudgetStatus, deleteBudget } from "@/lib/budgets-store";
+import { listBudgets, createBudget, updateBudget, setBudgetStatus, deleteBudget, getBudget, budgetTotals, linkBudgetToOS } from "@/lib/budgets-store";
+import { createOSFromBudget } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,27 @@ export async function POST(req: Request) {
       case "status":
         await setBudgetStatus(String(p.id), String(p.status), sid);
         return NextResponse.json({ ok: true });
+      case "aprovar": {
+        // aprova + gera a OS automaticamente (idempotente: se já gerou, devolve a mesma)
+        const budget = await getBudget(String(p.id), sid);
+        if (!budget) return NextResponse.json({ error: "Orçamento não encontrado." }, { status: 404 });
+        if (budget.osId) return NextResponse.json({ ok: true, osId: budget.osId, osCode: budget.osCode, already: true });
+        const t = budgetTotals(budget);
+        const parts = budget.items.filter((i) => i.kind === "produto").map((i) => ({ name: i.name, qty: i.qty, unitCents: i.unitCents }));
+        const os = await createOSFromBudget({
+          customerName: budget.customerName,
+          customerPhone: budget.customerPhone || undefined,
+          cpf: budget.cpf || undefined,
+          budgetCode: budget.code,
+          serviceValueCents: t.servicosCents,
+          partsValueCents: t.produtosCents + t.freteCents + t.outrosCents,
+          discountCents: t.descontoCents,
+          parts,
+          observacao: budget.observacao || undefined,
+        }, sid);
+        await linkBudgetToOS(budget.id, os.id, os.code ?? "", sid);
+        return NextResponse.json({ ok: true, osId: os.id, osCode: os.code });
+      }
       case "delete":
         await deleteBudget(String(p.id), sid);
         return NextResponse.json({ ok: true });

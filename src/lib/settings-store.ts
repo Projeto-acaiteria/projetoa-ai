@@ -32,6 +32,9 @@ export type StoreSettings = {
   // dados do cabeçalho do cupom (impressão térmica) — cada loja preenche os seus
   endereco: string; // endereço completo (ex: "Quadra Arse 14, Alameda 17 - Palmas/TO")
   cnpj: string; // CNPJ ou CPF do negócio (sai no cabeçalho do cupom)
+  email: string; // e-mail de contato (cabeçalho do documento A4)
+  site: string; // site da loja (cabeçalho do documento A4)
+  responsavel: string; // responsável pela loja (cabeçalho do documento A4)
   cupomRodape: string; // mensagem do rodapé do cupom (vazio = "Obrigado! Volte sempre :)")
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
   pixDiscountPercent: number; // % de desconto quando o cliente paga no PIX (o Adm define; 0 = sem)
@@ -95,6 +98,9 @@ const DEFAULT_STORE: StoreSettings = {
   primaryColor: "",
   endereco: "",
   cnpj: "",
+  email: "",
+  site: "",
+  responsavel: "",
   cupomRodape: "",
   waMsgs: WA_MSG_DEFAULTS,
   pixDiscountPercent: 0,
@@ -150,6 +156,9 @@ export async function setStore(
   // identidade: URLs do nosso storage (passthrough com teto) + cor hex validada
   if (typeof store.endereco === "string") clean.endereco = store.endereco.trim().slice(0, 120);
   if (typeof store.cnpj === "string") clean.cnpj = store.cnpj.trim().slice(0, 24);
+  if (typeof store.email === "string") clean.email = store.email.trim().slice(0, 80);
+  if (typeof store.site === "string") clean.site = store.site.trim().slice(0, 80);
+  if (typeof store.responsavel === "string") clean.responsavel = store.responsavel.trim().slice(0, 60);
   if (typeof store.cupomRodape === "string") clean.cupomRodape = store.cupomRodape.trim().slice(0, 120);
   if (store.pixDiscountPercent != null) clean.pixDiscountPercent = Math.max(0, Math.min(100, Number(store.pixDiscountPercent) || 0));
   if (store.waMsgs && typeof store.waMsgs === "object") {
