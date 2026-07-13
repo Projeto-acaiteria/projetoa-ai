@@ -51,6 +51,7 @@ const NAV: NavItem[] = [
   { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
   { href: "/admin/orcamentos", label: "Orçamentos", Icon: IconReceipt, family: "service" },
   { href: "/admin/compras", label: "Compras", Icon: IconBag, family: "service" },
+  { href: "/admin/contas", label: "Contas", Icon: IconWallet, family: "service" },
   { href: "/admin/vendas", label: "Vendas", Icon: IconBag, family: "service" },
   { href: "/admin/loja", label: "Loja Online", Icon: IconCart, family: "service" },
   { href: "/admin/equipe", label: "Equipe", Icon: IconUsers, family: "service" },
