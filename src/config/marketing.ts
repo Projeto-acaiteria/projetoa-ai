@@ -84,8 +84,8 @@ export const NICHOS: Nicho[] = [
     heroH1: "Sistema pra pizzaria com",
     heroAccent: "meio a meio de verdade.",
     heroSub: "Pizza meio a meio no cardápio — cobra o sabor mais caro ou a média, do seu jeito — combos e bordas no seu link. Delivery próprio sem comissão, impressão na cozinha e caixa integrado.",
-    cardapioImg: null,
-    cardapioCaption: "",
+    cardapioImg: "/site/cardapio-pizzaria.jpg",
+    cardapioCaption: "Cardápio real · pizza meio a meio",
     destaques: ["Pizza meio a meio", "Combos e bordas", "Delivery 0% comissão", "Impressão na cozinha", "Caixa integrado"],
     dores: ["Pedido de meio a meio anotado errado no WhatsApp", "iFood levando 30% da pizza que você fez", "Cozinha fazendo a pizza errada por comanda ilegível"],
     faqs: [
