@@ -4,9 +4,11 @@
 // segundo-cerebro/.../ESTUDO-SITE-COMANDAPRO.md. Fase 0 = estrutura + AEO; a copy rica
 // de cada seção é preenchida por rodada (regra: uma seção por vez, validada com o dono).
 import type { BusinessType } from "@/config/segments";
+import { BILLING } from "@/config/billing";
 
 // Nicho do site = uma segmentada em /segmentos/<slug>. NÃO usar rota top-level: /<slug> já é
 // o cardápio dos tenants (colidiria). O slug do site é próprio (pode diferir do BusinessType).
+export type Faq = { q: string; a: string };
 export type Nicho = {
   slug: string;              // /segmentos/<slug>
   businessType: BusinessType; // liga ao onboarding/segments.ts
@@ -14,7 +16,15 @@ export type Nicho = {
   // ── AEO/SEO: title casando a intenção de busca (padrão que faz o AgendaPRO rankear/ser citado)
   seoTitle: string;          // <title> da rota
   seoDescription: string;    // meta description
-  // conteúdo rico da LP (dores/motores/faq/foto/exemplos) entra na Fase 2, por nicho.
+  // ── Conteúdo da LP segmentada (o template lê daqui)
+  heroH1: string;            // headline (parte forte)
+  heroAccent: string;        // parte da headline no acento índigo
+  heroSub: string;           // subtítulo
+  cardapioImg: string | null; // print real do cardápio (celular) — null = usa mock genérico
+  cardapioCaption: string;
+  destaques: string[];       // pills do que importa pro nicho
+  dores: string[];           // 3 dores específicas do nicho
+  faqs: Faq[];               // FAQ do nicho (munição AEO)
 };
 
 // 1ª rodada = 4 nichos food (decisão do Eduardo 13/07). AT/Starteq = site próprio, depois.
@@ -26,6 +36,20 @@ export const NICHOS: Nicho[] = [
     seoTitle: "Sistema para Açaiteria — Cardápio Digital, Balança e Delivery | ComandaPRO",
     seoDescription:
       "Sistema para açaiteria: monta o copo no cardápio digital, vende por peso na balança, delivery próprio sem comissão, comanda e caixa num sistema só. Teste o ComandaPRO.",
+    heroH1: "Sistema pra açaiteria que",
+    heroAccent: "monta o copo sozinho.",
+    heroSub: "O cliente monta o açaí no seu link — tamanho, adicionais grátis-até-N, sabor — e o preço nunca sai errado. Venda por peso, delivery próprio sem comissão e fidelidade por pontos, num sistema só.",
+    cardapioImg: "/site/cardapio-acai.jpg",
+    cardapioCaption: "Cardápio real · Cantinho do Açaí",
+    destaques: ["Monta o copo no cardápio", "Venda por peso na balança", "Adicional grátis-até-N", "Delivery 0% comissão", "Fidelidade por pontos"],
+    dores: ["Fila no balcão anotando adicional no papel", "Cliente do iFood que nunca volta — e a comissão comendo a margem", "Não sabe qual sabor e adicional mais saem"],
+    faqs: [
+      { q: "O cliente monta o açaí sozinho pelo link?", a: "Sim. Ele escolhe o tamanho, adiciona frutas, cremes e crocantes com a regra 'os N primeiros grátis' já aplicada, e vê o preço subir ao vivo — sem app pra baixar." },
+      { q: "Dá pra vender por peso (R$/kg)?", a: "Sim. O ComandaPRO integra com a balança (protocolo Toledo) ou você digita as gramas, e o preço sai pelo peso automaticamente." },
+      { q: "Como funciona a fidelidade da açaiteria?", a: "O cliente ganha pontos por compra e troca por um item seu (ex: copo 350ml grátis). Ele consulta o saldo pelo telefone e o cupom imprime quanto falta pro próximo prêmio. Pontos nunca viram dinheiro." },
+      { q: "Preciso pagar comissão no delivery?", a: "Não. O pedido vem pelo seu link, com sua taxa por bairro, e o valor é todo seu — sem marketplace levando percentual." },
+      { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
   },
   {
     // Engloba hamburgueria (comida casual + mesa + petisco + delivery) pra não pulverizar em LPs demais.
@@ -35,6 +59,20 @@ export const NICHOS: Nicho[] = [
     seoTitle: "Sistema para Bar, Petiscaria e Hamburgueria — Comanda, Mesa e Delivery | ComandaPRO",
     seoDescription:
       "Sistema para bar, petiscaria e hamburgueria: comanda por mesa, controle de garçom, couvert e dose, delivery próprio sem comissão, impressão na cozinha e caixa. Conheça o ComandaPRO.",
+    heroH1: "Sistema pra bar que",
+    heroAccent: "fecha a comanda sem erro.",
+    heroSub: "Comanda por mesa, o garçom lança pelo celular, couvert e dose entram automático e a conta divide na hora. Petisco e hambúrguer no delivery próprio, sem comissão — do primeiro chopp ao fechamento do caixa.",
+    cardapioImg: "/site/cardapio-bar.jpg",
+    cardapioCaption: "Cardápio real · Medellín Music Bar",
+    destaques: ["Comanda por mesa", "App do garçom", "Couvert e dose automáticos", "Divisão de conta", "Delivery 0% comissão"],
+    dores: ["Comanda de papel que some e some venda junto", "Garçom correndo pra somar a conta e o cliente esperando", "Dose e couvert que ninguém lança direito"],
+    faqs: [
+      { q: "Como funciona a comanda por mesa?", a: "Cada mesa tem uma comanda; o garçom lança os itens pelo celular e cada pedido já sai roteado pra cozinha ou pro bar. No fim, a conta fecha com a taxa de 10% (o cliente pode recusar) e divide entre as pessoas." },
+      { q: "O sistema controla couvert e dose?", a: "Sim. O couvert entra por pessoa quando tem atração, e a dose/garrafa baixa certo do estoque — sem confundir dose com garrafa." },
+      { q: "Dá pra fazer delivery de petisco e hambúrguer?", a: "Sim. Além da mesa, você recebe pedido de entrega pelo seu link, com taxa por bairro e 0% de comissão de marketplace." },
+      { q: "O garçom consegue ver o meu financeiro?", a: "Não. O garçom só lança e vê os pedidos dele; abrir comanda e lançar sim, fechar conta e ver dinheiro não — isso é do dono e da recepção." },
+      { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
   },
   {
     slug: "pizzaria",
@@ -43,6 +81,20 @@ export const NICHOS: Nicho[] = [
     seoTitle: "Sistema para Pizzaria Delivery — Meio a Meio e Cardápio Digital | ComandaPRO",
     seoDescription:
       "Sistema para pizzaria: pizza meio a meio no cardápio digital, delivery próprio sem comissão, comanda, impressão na cozinha e caixa. Conheça o ComandaPRO.",
+    heroH1: "Sistema pra pizzaria com",
+    heroAccent: "meio a meio de verdade.",
+    heroSub: "Pizza meio a meio no cardápio — cobra o sabor mais caro ou a média, do seu jeito — combos e bordas no seu link. Delivery próprio sem comissão, impressão na cozinha e caixa integrado.",
+    cardapioImg: null,
+    cardapioCaption: "",
+    destaques: ["Pizza meio a meio", "Combos e bordas", "Delivery 0% comissão", "Impressão na cozinha", "Caixa integrado"],
+    dores: ["Pedido de meio a meio anotado errado no WhatsApp", "iFood levando 30% da pizza que você fez", "Cozinha fazendo a pizza errada por comanda ilegível"],
+    faqs: [
+      { q: "O cardápio faz pizza meio a meio?", a: "Sim. O cliente escolhe dois sabores e o sistema cobra pela regra que você definir — o sabor mais caro ou a média dos dois. Também dá pra montar combos e escolher borda." },
+      { q: "A cozinha recebe o pedido certo?", a: "Sim. A via de preparo imprime na cozinha sem preço, só com os sabores e observações — impressão térmica 80mm, roteada pra estação certa." },
+      { q: "Preciso pagar comissão no delivery?", a: "Não. O pedido vem pelo seu link com sua taxa por bairro; o valor é todo seu, sem marketplace no meio." },
+      { q: "Dá pra atender no salão e no delivery no mesmo sistema?", a: "Sim. Comanda de mesa, balcão e delivery caem no mesmo caixa — você não troca de sistema no meio do serviço." },
+      { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
   },
   {
     slug: "sushi",
@@ -51,6 +103,20 @@ export const NICHOS: Nicho[] = [
     seoTitle: "Sistema para Sushi e Restaurante Japonês — Combos, Mesa e Delivery | ComandaPRO",
     seoDescription:
       "Sistema para sushi e restaurante japonês: cardápio digital com combos e rodízio, comanda de mesa, delivery próprio sem comissão, cozinha e caixa. Conheça o ComandaPRO.",
+    heroH1: "Sistema pra sushi com",
+    heroAccent: "combos e rodízio.",
+    heroSub: "Combos, barcas e rodízio no cardápio do seu link, comanda por mesa e delivery próprio sem comissão. Do pedido ao caixa, num sistema só — sem gambiarra de planilha.",
+    cardapioImg: null,
+    cardapioCaption: "",
+    destaques: ["Combos e barcas", "Rodízio", "Comanda por mesa", "Delivery 0% comissão", "Caixa integrado"],
+    dores: ["Barca e combo montados na mão, com erro de preço", "Comissão de marketplace comendo a margem do peixe", "Rodízio sem controle do que sai por mesa"],
+    faqs: [
+      { q: "O cardápio monta combo e barca?", a: "Sim. Você cria combos com itens obrigatórios e opcionais (mínimo e máximo por grupo), e o cliente monta a barca no seu link com o preço certo calculado pelo sistema." },
+      { q: "Funciona pra rodízio?", a: "Sim. Cada mesa abre comanda, os pedidos vão roteados pra cozinha, e você controla o que sai por mesa sem perder o fio." },
+      { q: "Preciso pagar comissão no delivery?", a: "Não. O pedido vem pelo seu link, com sua taxa por bairro e 0% de comissão de marketplace." },
+      { q: "Atende salão e delivery no mesmo sistema?", a: "Sim. Comanda de mesa, balcão e delivery caem no mesmo caixa e no mesmo estoque — tudo integrado." },
+      { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
   },
 ];
 

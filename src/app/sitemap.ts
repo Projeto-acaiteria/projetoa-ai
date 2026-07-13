@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
+import { NICHOS } from "@/config/marketing";
 
 const BASE = "https://comandapro.net.br";
 
-// Sitemap do SITE institucional. Só emite rotas QUE JÁ EXISTEM (senão aponta pra 404 = ruim p/
-// SEO). Conforme /funcionalidades e /segmentos/* forem construídas, adicionar aqui (a lista-alvo
-// completa está em MARKETING_ROUTES no config/marketing.ts). Não lista o app nem os tenants.
-const LIVE_ROUTES = ["/"];
+// Sitemap do SITE institucional. Home + as 4 segmentadas (/segmentos/<slug>), que já existem.
+// Não lista o app (admin) nem os cardápios de tenant (/<slug>).
+const LIVE_ROUTES = ["/", ...NICHOS.map((n) => `/segmentos/${n.slug}`)];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
