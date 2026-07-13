@@ -10,6 +10,7 @@ type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
 type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; situacoesOS: string[]; fiscal: Fiscal; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
 type Fiscal = { razaoSocial: string; inscricaoEstadual: string; inscricaoMunicipal: string; cnae: string; regime: "" | "simples" | "presumido" | "real"; logradouro: string; numero: string; complemento: string; bairro: string; municipio: string; codMunicipio: string; uf: string; cep: string };
+type FiscalStatus = { provedor: "focus"; ambiente: "homologacao" | "producao"; ligado: boolean; hasTokenHomolog: boolean; hasTokenProd: boolean };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -43,13 +44,18 @@ export default function ConfigClient({ family }: { family?: string }) {
   const [hasPin, setHasPin] = useState(false);
   const [pinInput, setPinInput] = useState(""); // novo PIN sendo digitado (vazio = não mexe)
   const [pinDirty, setPinDirty] = useState(false); // só manda cashPin no PUT se o dono tocou
+  const [fiscal, setFiscal] = useState<FiscalStatus | null>(null); // status mascarado da integração fiscal
+  const [tokenH, setTokenH] = useState(""); const [tokenHDirty, setTokenHDirty] = useState(false); // token homologação
+  const [tokenP, setTokenP] = useState(""); const [tokenPDirty, setTokenPDirty] = useState(false); // token produção
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight, kitchen_screen: !!d.config.kitchen_screen } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight, kitchen_screen: !!d.config.kitchen_screen } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); setFiscal(d.fiscal ?? null); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -74,22 +80,44 @@ export default function ConfigClient({ family }: { family?: string }) {
     setSaved(false);
   }
 
+  // patch fiscal: ambiente/ligado sempre; tokens só quando o dono digitou (dirty) — senão preserva no server
+  function fiscalPatch() {
+    if (!fiscal) return undefined;
+    return {
+      ambiente: fiscal.ambiente, ligado: fiscal.ligado,
+      ...(tokenHDirty ? { tokenHomologacao: tokenH } : {}),
+      ...(tokenPDirty ? { tokenProducao: tokenP } : {}),
+    };
+  }
+
   async function save() {
     if (!fees || !store) return;
     setSaving(true);
     const r = await fetch("/api/configuracoes", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      // cashPin só vai quando o dono mexeu (string vazia/<4 dígitos limpa no servidor)
-      body: JSON.stringify({ fees, store, config: config ?? undefined, machines, cashPin: pinDirty ? pinInput : undefined }),
+      // cashPin/tokens só vão quando o dono mexeu (senão preserva no servidor)
+      body: JSON.stringify({ fees, store, config: config ?? undefined, machines, cashPin: pinDirty ? pinInput : undefined, fiscal: fiscalPatch() }),
     });
     if (r.ok) {
       const d = await r.json().catch(() => null);
-      if (d) setHasPin(!!d.hasCashPin);
+      if (d) { setHasPin(!!d.hasCashPin); if (d.fiscal) setFiscal(d.fiscal); }
       setPinInput(""); setPinDirty(false);
+      setTokenH(""); setTokenHDirty(false); setTokenP(""); setTokenPDirty(false);
       setSaved(true); setTimeout(() => setSaved(false), 2500);
     }
     setSaving(false);
+  }
+
+  async function testarFiscal() {
+    setTesting(true); setTestMsg(null);
+    try {
+      const r = await fetch("/api/fiscal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "testar" }) });
+      const d = await r.json();
+      if (d.ok) setTestMsg({ ok: true, text: "Conexão OK — token válido." });
+      else setTestMsg({ ok: false, text: d.message || d.error || `Falhou (${d.status ?? "erro"}).` });
+    } catch { setTestMsg({ ok: false, text: "Não consegui testar agora." }); }
+    finally { setTesting(false); }
   }
 
   if (!fees || !store) return <div className="card p-8 text-center text-sm text-[var(--text-muted)]">Carregando...</div>;
@@ -240,6 +268,42 @@ export default function ConfigClient({ family }: { family?: string }) {
               <input className={`${inp} mt-2`} inputMode="numeric" value={store.fiscal?.cep ?? ""} onChange={(e) => setFisc("cep", e.target.value)} placeholder="CEP" />
               <p className="mt-1 text-[11px] text-[var(--text-faded)]">O código IBGE do município (7 dígitos) é obrigatório na nota — Palmas/TO = 1721000.</p>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Integração fiscal (Focus NFe) — só no vertical service. Tokens são segredo (mascarados). */}
+      {family === "service" && fiscal && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-extrabold text-ink">Integração fiscal · Focus NFe</h2>
+          <p className="mb-4 text-sm text-[var(--text-muted)]">Cole aqui o token da Focus pra emitir nota. Comece pelo <b>homologação</b> (testes). A emissão real (produção) depende do certificado A1 e do regime — configurar após a reunião com o contador.</p>
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Ambiente ativo</label>
+                <select className={`${inp} mt-1`} value={fiscal.ambiente} onChange={(e) => setFiscal({ ...fiscal, ambiente: e.target.value as FiscalStatus["ambiente"] })}>
+                  <option value="homologacao">Homologação (testes)</option>
+                  <option value="producao">Produção (nota real)</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 self-end rounded-lg border border-line bg-bg-base px-3 py-2.5">
+                <input type="checkbox" checked={fiscal.ligado} onChange={(e) => setFiscal({ ...fiscal, ligado: e.target.checked })} />
+                <span className="text-sm text-ink">Emissão ligada</span>
+              </label>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Token de homologação {fiscal.hasTokenHomolog && <span className="text-[var(--green-ok)]">· configurado</span>}</label>
+              <input className={`${inp} mt-1`} value={tokenHDirty ? tokenH : ""} onChange={(e) => { setTokenH(e.target.value); setTokenHDirty(true); }} placeholder={fiscal.hasTokenHomolog ? "•••••• (deixe em branco pra manter)" : "Cole o token de homologação da Focus"} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Token de produção {fiscal.hasTokenProd && <span className="text-[var(--green-ok)]">· configurado</span>}</label>
+              <input className={`${inp} mt-1`} value={tokenPDirty ? tokenP : ""} onChange={(e) => { setTokenP(e.target.value); setTokenPDirty(true); }} placeholder={fiscal.hasTokenProd ? "•••••• (deixe em branco pra manter)" : "Só depois do certificado — deixe vazio por ora"} />
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={testarFiscal} disabled={testing} className="rounded-lg border border-line px-3 py-2 text-xs font-bold text-brand-600 disabled:opacity-50">{testing ? "Testando…" : "Testar conexão"}</button>
+              {testMsg && <span className={`text-xs font-bold ${testMsg.ok ? "text-[var(--green-ok)]" : "text-red-500"}`}>{testMsg.text}</span>}
+            </div>
+            <p className="text-[11px] text-[var(--text-faded)]">Salve antes de testar (o teste usa o token já gravado). O certificado A1 o Junior sobe no painel da própria Focus — o sistema nunca guarda o certificado.</p>
           </div>
         </Card>
       )}

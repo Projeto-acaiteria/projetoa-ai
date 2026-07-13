@@ -169,7 +169,20 @@ export type CardMachine = {
 
 // cashPin: chave IRMÃ de `store` (NÃO entra no StoreSettings). Crítico: `getStore()` só
 // expõe `raw.store` → o cardápio público nunca recebe o PIN. Validação é 100% server-side.
-type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings>; machines?: CardMachine[]; cashPin?: string };
+// Integração fiscal (Focus NFe) — chave IRMÃ de `store`, igual ao cashPin: os TOKENS são segredo
+// e NUNCA saem no getStore/cardápio público. Só o server (emissão) lê o token via getFiscalIntegracao.
+export type FiscalIntegracao = {
+  provedor: "focus";
+  tokenHomologacao: string; // token do ambiente de testes (Focus)
+  tokenProducao: string; // token do ambiente real (Focus) — só depois do certificado
+  ambiente: "homologacao" | "producao"; // qual ambiente está ativo
+  ligado: boolean; // emissão habilitada? (default false até configurar)
+};
+export const DEFAULT_FISCAL_INTEGRACAO: FiscalIntegracao = {
+  provedor: "focus", tokenHomologacao: "", tokenProducao: "", ambiente: "homologacao", ligado: false,
+};
+
+type SettingsBlob = { fees?: Partial<PaymentFees>; store?: Partial<StoreSettings>; machines?: CardMachine[]; cashPin?: string; fiscalIntegracao?: FiscalIntegracao };
 
 async function readSettings(storeId: string): Promise<SettingsBlob> {
   const { data } = await db().from("app_settings").select("data").eq("store_id", storeId).maybeSingle();
@@ -330,6 +343,34 @@ export async function setCashPin(pin: string, storeId?: string): Promise<boolean
   const next = clean.length >= 4 ? clean : ""; // <4 dígitos = limpa
   await writeSettings(storeId, { ...raw, cashPin: next });
   return next.length > 0;
+}
+
+// ---- Integração fiscal (Focus NFe) ----
+// Config COMPLETA (com tokens) — SÓ pro server usar na emissão. Nunca devolver isso pro client.
+export async function getFiscalIntegracao(storeId?: string): Promise<FiscalIntegracao> {
+  const raw = await readSettings(storeId ?? (await resolveStoreId()));
+  return { ...DEFAULT_FISCAL_INTEGRACAO, ...(raw.fiscalIntegracao || {}) };
+}
+// Status MASCARADO pro client: nunca expõe o token, só se está preenchido.
+export type FiscalStatus = { provedor: "focus"; ambiente: "homologacao" | "producao"; ligado: boolean; hasTokenHomolog: boolean; hasTokenProd: boolean };
+export async function getFiscalStatus(storeId?: string): Promise<FiscalStatus> {
+  const f = await getFiscalIntegracao(storeId);
+  return { provedor: "focus", ambiente: f.ambiente, ligado: f.ligado, hasTokenHomolog: f.tokenHomologacao.length > 0, hasTokenProd: f.tokenProducao.length > 0 };
+}
+// Atualiza a config. Tokens só são sobrescritos quando VIEREM na payload (dirty) — senão preserva.
+export async function setFiscalIntegracao(patch: Partial<FiscalIntegracao>, storeId?: string): Promise<FiscalStatus> {
+  storeId = storeId ?? (await resolveStoreId());
+  const raw = await readSettings(storeId);
+  const cur = { ...DEFAULT_FISCAL_INTEGRACAO, ...(raw.fiscalIntegracao || {}) };
+  const next: FiscalIntegracao = {
+    provedor: "focus",
+    tokenHomologacao: typeof patch.tokenHomologacao === "string" ? patch.tokenHomologacao.trim().slice(0, 120) : cur.tokenHomologacao,
+    tokenProducao: typeof patch.tokenProducao === "string" ? patch.tokenProducao.trim().slice(0, 120) : cur.tokenProducao,
+    ambiente: patch.ambiente === "producao" || patch.ambiente === "homologacao" ? patch.ambiente : cur.ambiente,
+    ligado: typeof patch.ligado === "boolean" ? patch.ligado : cur.ligado,
+  };
+  await writeSettings(storeId, { ...raw, fiscalIntegracao: next });
+  return getFiscalStatus(storeId);
 }
 
 function sanitizeMachine(m: Partial<CardMachine>): CardMachine {
