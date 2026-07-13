@@ -19,7 +19,7 @@ export default async function OSPage() {
       <PageHeader
         title="Ordens de Serviço"
         sub="Recebimento do aparelho → orçamento → reparo → entrega"
-        action={<div className="flex items-center gap-2"><Link href="/admin/os/montar" className="rounded-xl border border-line px-4 py-2.5 text-sm font-bold text-ink hover:border-brand-600">Montar PC</Link><NovaOSButton /></div>}
+        action={<div className="flex items-center gap-2"><Link href="/admin/os/painel" className="rounded-xl border border-line px-4 py-2.5 text-sm font-bold text-ink hover:border-brand-600">Painel</Link><Link href="/admin/os/montar" className="rounded-xl border border-line px-4 py-2.5 text-sm font-bold text-ink hover:border-brand-600">Montar PC</Link><NovaOSButton /></div>}
       />
       {orders.length === 0 ? (
         <p className="max-w-xl rounded-xl border border-line bg-bg-elevated p-6 text-center text-sm text-[var(--text-muted)]">Nenhuma OS ainda. Clique em <b>+ Nova OS</b> pra fazer o check-in do primeiro aparelho.</p>
