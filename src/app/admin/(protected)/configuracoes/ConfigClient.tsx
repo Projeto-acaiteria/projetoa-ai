@@ -264,8 +264,8 @@ export default function ConfigClient({ family }: { family?: string }) {
         </Card>
       )}
 
-      {/* Recursos da loja — ligar/desligar features (couvert, fidelidade, dose) */}
-      {config && (
+      {/* Recursos da loja — features de food/bar (couvert, fidelidade, dose, KDS). Não aparece no service (AT). */}
+      {config && family !== "service" && (
         <Card className="p-5 sm:p-6">
           <h2 className="mb-1 text-base font-extrabold text-ink">Recursos da loja</h2>
           <p className="mb-3 text-sm text-[var(--text-muted)]">Ligue só o que o seu negócio usa.</p>
