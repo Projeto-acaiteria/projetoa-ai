@@ -118,11 +118,12 @@ export default function LojaClient({ products, pixDiscountPercent }: { products:
 
   // contagem por categoria pros cards do HUB (total + publicados) — independe do filtro de status
   const catStats = useMemo(() => {
-    const m = new Map<string, { total: number; published: number }>();
+    const m = new Map<string, { total: number; published: number; cover: string }>();
     for (const it of items) {
-      const cur = m.get(it.category) ?? { total: 0, published: 0 };
+      const cur = m.get(it.category) ?? { total: 0, published: 0, cover: "" };
       cur.total += 1;
       if (it.published) cur.published += 1;
+      if (it.image && !cur.cover) cur.cover = it.image; // capa = 1ª foto real da categoria
       m.set(it.category, cur);
     }
     return m;
@@ -286,12 +287,17 @@ export default function LojaClient({ products, pixDiscountPercent }: { products:
                           key={cat}
                           type="button"
                           onClick={() => setActiveCat(cat)}
-                          className="card flex flex-col gap-2.5 p-4 text-left transition hover:border-brand-400"
+                          className="card flex flex-col gap-0 overflow-hidden p-0 text-left transition hover:border-brand-400"
                         >
-                          <span className="grid h-10 w-10 place-items-center rounded-lg bg-bg-surface-2 text-brand-600" aria-hidden>
-                            <IconBox width={20} height={20} />
-                          </span>
-                          <div className="min-w-0">
+                          <div className="flex aspect-[5/3] w-full items-center justify-center overflow-hidden bg-white">
+                            {s.cover ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={s.cover} alt={CAT_LABEL[cat] ?? cat} loading="lazy" className="h-full w-full object-contain p-2.5" />
+                            ) : (
+                              <IconBox width={26} height={26} className="text-brand-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0 p-3">
                             <div className="truncate font-bold text-ink">{CAT_LABEL[cat] ?? cat}</div>
                             <div className="mt-0.5 text-xs text-[var(--text-muted)]">
                               {s.total} {s.total === 1 ? "produto" : "produtos"} · {s.published} publicados
