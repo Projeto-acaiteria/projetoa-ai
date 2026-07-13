@@ -8,7 +8,8 @@ import ImageUpload from "@/components/admin/ImageUpload";
 type Fees = { dinheiro: number; pix: number; debito: number; credito: number };
 type Zone = { bairro: string; feeCents: number };
 type Hour = { open: string; close: string; closed: boolean };
-type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; situacoesOS: string[]; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Store = { name: string; tagline: string; whatsapp: string; endereco: string; cnpj: string; email: string; site: string; responsavel: string; garantiaTermos: string; avisos: string; cupomRodape: string; deliveryMode: "fixed" | "zones"; deliveryFeeCents: number; minOrderCents: number; deliveryZones: Zone[]; hours: Hour[]; logoUrl: string; bannerUrl: string; primaryColor: string; pricePerKgCents: number; doseMl: number; pixDiscountPercent: number; situacoesOS: string[]; fiscal: Fiscal; waMsgs: { recebido: string; preparo: string; saiu: string; entregue: string } };
+type Fiscal = { razaoSocial: string; inscricaoEstadual: string; inscricaoMunicipal: string; cnae: string; regime: "" | "simples" | "presumido" | "real"; logradouro: string; numero: string; complemento: string; bairro: string; municipio: string; codMunicipio: string; uf: string; cep: string };
 type Machine = { id: string; name: string; debito: number; credito: number; creditoParcelado: number; maxParcelas: number; active: boolean };
 
 // presets REFERENCIAIS (taxas mudam por contrato — o dono ajusta depois)
@@ -53,6 +54,10 @@ export default function ConfigClient({ family }: { family?: string }) {
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
     setStore((s) => (s ? { ...s, [k]: v } : s));
+    setSaved(false);
+  }
+  function setFisc<K extends keyof Fiscal>(k: K, v: Fiscal[K]) {
+    setStore((s) => (s ? { ...s, fiscal: { ...s.fiscal, [k]: v } } : s));
     setSaved(false);
   }
   function setF(k: keyof Fees, v: string) {
@@ -177,6 +182,63 @@ export default function ConfigClient({ family }: { family?: string }) {
               <label className="text-xs font-semibold text-[var(--text-muted)]">Observações / avisos (só OS)</label>
               <textarea className={`${inp} mt-1 resize-none`} rows={3} value={store.avisos} onChange={(e) => setS("avisos", e.target.value)} placeholder="Ex.: cláusula de abandono após 90 dias." />
               <p className="mt-1 text-[11px] text-[var(--text-faded)]">Aviso legal no rodapé da OS (ex.: abandono após 90 dias, Art. 1.275).</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Dados fiscais da empresa (emitente) — base pra nota fiscal futura. Só no vertical service */}
+      {family === "service" && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-extrabold text-ink">Dados fiscais da empresa</h2>
+          <p className="mb-4 text-sm text-[var(--text-muted)]">Preencha o que já tiver — é a base pra emissão de nota fiscal (NF-e / NFC-e / NFS-e) quando o certificado digital estiver pronto. A emissão em si ainda não está ligada.</p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Razão social</label>
+              <input className={`${inp} mt-1`} value={store.fiscal?.razaoSocial ?? ""} onChange={(e) => setFisc("razaoSocial", e.target.value)} placeholder="Nome legal da empresa (na Receita)" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Inscrição Estadual (IE)</label>
+                <input className={`${inp} mt-1`} value={store.fiscal?.inscricaoEstadual ?? ""} onChange={(e) => setFisc("inscricaoEstadual", e.target.value)} placeholder="IE ou ISENTO" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Inscrição Municipal (IM)</label>
+                <input className={`${inp} mt-1`} value={store.fiscal?.inscricaoMunicipal ?? ""} onChange={(e) => setFisc("inscricaoMunicipal", e.target.value)} placeholder="Serviço (NFS-e)" />
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">CNAE (atividade principal)</label>
+                <input className={`${inp} mt-1`} inputMode="numeric" value={store.fiscal?.cnae ?? ""} onChange={(e) => setFisc("cnae", e.target.value)} placeholder="ex: 4751201" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Regime tributário</label>
+                <select className={`${inp} mt-1`} value={store.fiscal?.regime ?? ""} onChange={(e) => setFisc("regime", e.target.value as Fiscal["regime"])}>
+                  <option value="">Selecione…</option>
+                  <option value="simples">Simples Nacional</option>
+                  <option value="presumido">Lucro Presumido</option>
+                  <option value="real">Lucro Real</option>
+                </select>
+              </div>
+            </div>
+            <div className="border-t border-line pt-3">
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Endereço fiscal</div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_120px]">
+                <input className={inp} value={store.fiscal?.logradouro ?? ""} onChange={(e) => setFisc("logradouro", e.target.value)} placeholder="Logradouro (rua/quadra)" />
+                <input className={inp} value={store.fiscal?.numero ?? ""} onChange={(e) => setFisc("numero", e.target.value)} placeholder="Número" />
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input className={inp} value={store.fiscal?.complemento ?? ""} onChange={(e) => setFisc("complemento", e.target.value)} placeholder="Complemento (opcional)" />
+                <input className={inp} value={store.fiscal?.bairro ?? ""} onChange={(e) => setFisc("bairro", e.target.value)} placeholder="Bairro" />
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_140px_70px]">
+                <input className={inp} value={store.fiscal?.municipio ?? ""} onChange={(e) => setFisc("municipio", e.target.value)} placeholder="Município" />
+                <input className={inp} inputMode="numeric" value={store.fiscal?.codMunicipio ?? ""} onChange={(e) => setFisc("codMunicipio", e.target.value)} placeholder="Cód. IBGE" />
+                <input className={inp} value={store.fiscal?.uf ?? ""} onChange={(e) => setFisc("uf", e.target.value.toUpperCase())} placeholder="UF" maxLength={2} />
+              </div>
+              <input className={`${inp} mt-2`} inputMode="numeric" value={store.fiscal?.cep ?? ""} onChange={(e) => setFisc("cep", e.target.value)} placeholder="CEP" />
+              <p className="mt-1 text-[11px] text-[var(--text-faded)]">O código IBGE do município (7 dígitos) é obrigatório na nota — Palmas/TO = 1721000.</p>
             </div>
           </div>
         </Card>

@@ -444,6 +444,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
   const [highlight, setHighlight] = useState(false);
   const [image, setImage] = useState("");
   const [barcode, setBarcode] = useState(""); // EAN — bipa no balcão
+  const [ncm, setNcm] = useState(""); const [cfop, setCfop] = useState(""); const [cest, setCest] = useState(""); const [origem, setOrigem] = useState("");
   const [saving, setSaving] = useState(false);
 
   const isVenda = famOf(category).key === "venda";
@@ -486,6 +487,10 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         highlight: isService ? highlight || undefined : undefined,
         image: isService ? image || undefined : undefined,
         barcode: sellable ? barcode.trim() || undefined : undefined,
+        ncm: isService ? ncm.trim() || undefined : undefined,
+        cfop: isService ? cfop.trim() || undefined : undefined,
+        cest: isService ? cest.trim() || undefined : undefined,
+        origem: isService ? origem.trim() || undefined : undefined,
       }),
     });
     onSaved();
@@ -588,6 +593,22 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         </div>
         <p className="mt-1 text-[11px] text-[var(--text-faded)]">Ex: 1 caixa = 12 un. Aí a entrada pode ser lançada em {purchaseUnit || "caixas"}.</p>
       </div>
+      {isService && (
+        <div className="rounded-lg border border-line bg-bg-base p-2.5">
+          <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Fiscal (opcional — pra nota futura)</div>
+          <div className="grid grid-cols-2 gap-2">
+            <input className={inp} inputMode="numeric" placeholder="NCM (8 díg)" value={ncm} onChange={(e) => setNcm(e.target.value)} />
+            <input className={inp} inputMode="numeric" placeholder="CFOP (ex 5102)" value={cfop} onChange={(e) => setCfop(e.target.value)} />
+            <input className={inp} inputMode="numeric" placeholder="CEST (opcional)" value={cest} onChange={(e) => setCest(e.target.value)} />
+            <select className={inp} value={origem} onChange={(e) => setOrigem(e.target.value)}>
+              <option value="">Origem…</option>
+              <option value="0">0 · Nacional</option>
+              <option value="1">1 · Importada direta</option>
+              <option value="2">2 · Importada mercado interno</option>
+            </select>
+          </div>
+        </div>
+      )}
       <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Salvando..." : "Cadastrar item"}
       </button>
@@ -704,9 +725,11 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
   const [purchaseUnit, setPurchaseUnit] = useState(item.purchaseUnit ?? "");
   const [purchaseFactor, setPurchaseFactor] = useState(item.purchaseFactor ? String(item.purchaseFactor) : "");
   const [barcode, setBarcode] = useState(item.barcode ?? "");
+  const [ncm, setNcm] = useState(item.ncm ?? ""); const [cfop, setCfop] = useState(item.cfop ?? ""); const [cest, setCest] = useState(item.cest ?? ""); const [origem, setOrigem] = useState(item.origem ?? "");
   const [saving, setSaving] = useState(false);
   const isVenda = famOf(category).key === "venda";
   const sellable = isVenda || family === "service";
+  const isService = family === "service";
 
   async function save() {
     if (!name.trim()) return;
@@ -729,6 +752,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         purchaseUnit: purchaseUnit.trim(),
         purchaseFactor: purchaseFactor ? parseFloat(purchaseFactor.replace(",", ".")) || 0 : 0,
         barcode: barcode.trim(),
+        ncm: ncm.trim(), cfop: cfop.trim(), cest: cest.trim(), origem: origem.trim(),
       }),
     });
     onSaved();
@@ -788,6 +812,22 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         <label className="text-xs font-semibold text-[var(--text-muted)]">Validade (opcional)</label>
         <input className={`${inp} mt-1`} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
       </div>
+      {isService && (
+        <div className="rounded-lg border border-line bg-bg-base p-2.5">
+          <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Fiscal (opcional — pra nota futura)</div>
+          <div className="grid grid-cols-2 gap-2">
+            <input className={inp} inputMode="numeric" placeholder="NCM (8 díg)" value={ncm} onChange={(e) => setNcm(e.target.value)} />
+            <input className={inp} inputMode="numeric" placeholder="CFOP (ex 5102)" value={cfop} onChange={(e) => setCfop(e.target.value)} />
+            <input className={inp} inputMode="numeric" placeholder="CEST (opcional)" value={cest} onChange={(e) => setCest(e.target.value)} />
+            <select className={inp} value={origem} onChange={(e) => setOrigem(e.target.value)}>
+              <option value="">Origem…</option>
+              <option value="0">0 · Nacional</option>
+              <option value="1">1 · Importada direta</option>
+              <option value="2">2 · Importada mercado interno</option>
+            </select>
+          </div>
+        </div>
+      )}
       <button onClick={save} disabled={saving} className="mt-1 w-full rounded-xl brand-gradient py-3 font-bold text-white disabled:opacity-60">
         {saving ? "Salvando..." : "Salvar alterações"}
       </button>

@@ -14,6 +14,29 @@ export type OpenHours = { open: string; close: string; closed: boolean }; // por
 // mensagens do WhatsApp por status (editáveis pelo dono). Placeholders: {nome} {codigo} {loja}
 export type WaMsgs = { recebido: string; preparo: string; saiu: string; entregue: string };
 
+// Dados fiscais da EMPRESA (emitente) — base pra NF-e/NFC-e/NFS-e futura (provedor Focus NFe).
+// Preenchido antes do certificado chegar; a transmissão real depende de certificado A1 + CSC (não aqui).
+export type FiscalData = {
+  razaoSocial: string; // razão social (nome legal) — nome fantasia = store.name
+  inscricaoEstadual: string; // IE (NF-e/NFC-e). "ISENTO" quando aplicável
+  inscricaoMunicipal: string; // IM (NFS-e / serviço)
+  cnae: string; // atividade econômica principal
+  regime: "" | "simples" | "presumido" | "real"; // regime tributário → define CRT/CSOSN
+  // endereço fiscal ESTRUTURADO (a nota exige separado + código IBGE do município)
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  municipio: string;
+  codMunicipio: string; // código IBGE do município (7 dígitos) — obrigatório na nota
+  uf: string;
+  cep: string;
+};
+export const DEFAULT_FISCAL: FiscalData = {
+  razaoSocial: "", inscricaoEstadual: "", inscricaoMunicipal: "", cnae: "", regime: "",
+  logradouro: "", numero: "", complemento: "", bairro: "", municipio: "", codMunicipio: "", uf: "", cep: "",
+};
+
 export type StoreSettings = {
   name: string;
   tagline: string;
@@ -41,6 +64,7 @@ export type StoreSettings = {
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
   pixDiscountPercent: number; // % de desconto quando o cliente paga no PIX (o Adm define; 0 = sem)
   situacoesOS: string[]; // situações personalizadas de OS que a loja usa (ex: "Aguardando peça") — AT
+  fiscal: FiscalData; // dados fiscais da empresa (emitente) — base pra nota fiscal futura
 };
 
 // situações de OS padrão da assistência técnica (a loja edita em Ajustes)
@@ -127,6 +151,7 @@ const DEFAULT_STORE: StoreSettings = {
   waMsgs: WA_MSG_DEFAULTS,
   pixDiscountPercent: 0,
   situacoesOS: DEFAULT_SITUACOES_OS,
+  fiscal: DEFAULT_FISCAL,
 };
 
 // Maquininha (cartão): cada loja cadastra suas máquinas com a taxa que o provedor cobra.
@@ -158,6 +183,7 @@ export async function getStore(storeId?: string): Promise<StoreSettings> {
   const raw = await readSettings(storeId ?? (await resolveStoreId()));
   const s = { ...DEFAULT_STORE, ...(raw.store || {}) };
   s.waMsgs = { ...WA_MSG_DEFAULTS, ...(s.waMsgs || {}) }; // robusto contra dado antigo/parcial
+  s.fiscal = { ...DEFAULT_FISCAL, ...(s.fiscal || {}) };
   return s;
 }
 
@@ -193,6 +219,26 @@ export async function setStore(
       .map((s) => String(s).trim().slice(0, 40))
       .filter((s) => s && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()))
       .slice(0, 20);
+  }
+  if (store.fiscal && typeof store.fiscal === "object") {
+    const f = store.fiscal as Partial<FiscalData>;
+    const txt = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const dig = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\D+/g, "").slice(0, max) : "");
+    clean.fiscal = {
+      razaoSocial: txt(f.razaoSocial, 120),
+      inscricaoEstadual: txt(f.inscricaoEstadual, 20), // pode ser "ISENTO" → não força só dígito
+      inscricaoMunicipal: txt(f.inscricaoMunicipal, 20),
+      cnae: dig(f.cnae, 7),
+      regime: f.regime === "simples" || f.regime === "presumido" || f.regime === "real" ? f.regime : "",
+      logradouro: txt(f.logradouro, 120),
+      numero: txt(f.numero, 12),
+      complemento: txt(f.complemento, 60),
+      bairro: txt(f.bairro, 60),
+      municipio: txt(f.municipio, 60),
+      codMunicipio: dig(f.codMunicipio, 7),
+      uf: txt(f.uf, 2).toUpperCase(),
+      cep: dig(f.cep, 8),
+    };
   }
   if (store.waMsgs && typeof store.waMsgs === "object") {
     const m = store.waMsgs as Partial<WaMsgs>;

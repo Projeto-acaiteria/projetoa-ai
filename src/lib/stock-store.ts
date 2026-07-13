@@ -45,6 +45,11 @@ export type StockItem = {
   costPerBottleCents?: number;
   costCents?: number; // custo por UNIDADE do insumo (kg/un/L...) — base do CMV (ficha técnica)
   barcode?: string; // código de barras (EAN/UPC) — bipa no balcão e acha o produto. AT/revenda embalada
+  // dados fiscais do produto (base pra nota fiscal futura) — preenchíveis antes do certificado
+  ncm?: string; // Nomenclatura Comum do Mercosul (8 díg) — classificação fiscal do produto
+  cest?: string; // Código Especificador da Substituição Tributária (7 díg) — quando aplicável
+  cfop?: string; // CFOP padrão da venda (ex: 5102) — natureza da operação
+  origem?: string; // origem da mercadoria (0=nacional … 8) — tabela ICMS
   supplier?: string; // fornecedor (filtrar compras/perdas por fornecedor)
   purchaseUnit?: string; // unidade de COMPRA (ex: fardo, caixa, saco) — opcional
   purchaseFactor?: number; // 1 unidade de compra = purchaseFactor unidades de uso (ex: 1 caixa = 12 un)

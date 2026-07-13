@@ -31,7 +31,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const patch: Record<string, unknown> = {};
-  for (const k of ["name", "category", "unit", "minQty", "maxQty", "expiry", "qty", "sellPriceCents", "costCents", "costPerBottleCents", "dosesPerBottle", "barcode", "supplier", "purchaseUnit", "purchaseFactor"]) {
+  for (const k of ["name", "category", "unit", "minQty", "maxQty", "expiry", "qty", "sellPriceCents", "costCents", "costPerBottleCents", "dosesPerBottle", "barcode", "ncm", "cest", "cfop", "origem", "supplier", "purchaseUnit", "purchaseFactor"]) {
     if (k in b) patch[k] = b[k];
   }
   const item = await updateItem(id, patch, today);
