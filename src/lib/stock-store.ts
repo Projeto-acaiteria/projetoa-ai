@@ -55,6 +55,8 @@ export type StockItem = {
   highlight?: boolean;
   badge?: string; // ex: "Lançamento", "Mais Vendido", "Promo", "OpenBox"
   image?: string; // URL da foto real (Storage) — senão o site usa SVG por categoria
+  published?: boolean; // aparece no site (vitrine). default undefined/false = rascunho (não publicado)
+  description?: string; // descrição rica pro site/SEO (Markdown). senão o site mostra só as specs
 };
 
 // linha da ficha técnica consumida na venda. costCents é o custo CONGELADO no momento da venda
