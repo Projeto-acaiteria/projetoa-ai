@@ -104,11 +104,11 @@ export default function LojaEditorClient({ mode, product }: { mode: "edit" | "ne
     try {
       let r: Response;
       if (isNew) {
-        // novo entra como rascunho (o servidor força published=false)
+        // o dono escolhe no toggle se já publica ou entra como rascunho
         r = await fetch("/api/loja-produtos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, published }),
         });
       } else {
         r = await fetch("/api/loja-produtos", {
@@ -213,22 +213,23 @@ export default function LojaEditorClient({ mode, product }: { mode: "edit" | "ne
         <div className="space-y-4">
           <Card className="p-5">
             <div className={`${lbl} uppercase tracking-wide`}>Publicação</div>
-            {isNew ? (
-              <p className="mt-2 text-sm text-[var(--text-muted)]">O produto entra como <b className="text-ink">rascunho</b>. Publique pelo botão “no site” na lista depois de conferir.</p>
-            ) : (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={published}
-                onClick={() => setPublished((v) => !v)}
-                className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-bg-base px-3 py-2.5"
-              >
-                <span className="text-sm font-semibold text-ink">{published ? "Aparece no site" : "Fora do site (rascunho)"}</span>
-                <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${published ? "brand-gradient" : "bg-bg-surface-2"}`}>
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${published ? "left-[22px]" : "left-0.5"}`} />
-                </span>
-              </button>
-            )}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={published}
+              onClick={() => setPublished((v) => !v)}
+              className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-bg-base px-3 py-2.5"
+            >
+              <span className="text-sm font-semibold text-ink">{published ? "Aparece no site" : "Fora do site (rascunho)"}</span>
+              <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${published ? "brand-gradient" : "bg-bg-surface-2"}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${published ? "left-[22px]" : "left-0.5"}`} />
+              </span>
+            </button>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              {published
+                ? "Ao salvar, o produto já aparece no site."
+                : "Fica em rascunho — só você vê. Ligue quando quiser publicar."}
+            </p>
           </Card>
 
           <Card className="p-5 space-y-4">

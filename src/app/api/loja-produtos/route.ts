@@ -166,7 +166,7 @@ export async function POST(req: Request) {
     images: built.patch.images,
     highlight: built.patch.highlight,
     badge: built.patch.badge,
-    published: false, // rascunho — o dono publica pelo toggle depois
+    published: built.patch.published === true, // rascunho por padrão; publica já se o dono ligar o toggle no editor
   };
 
   const item = await addItem(input, todayBR());
