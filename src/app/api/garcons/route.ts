@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         const email = String(p.email ?? "").trim();
         const senha = String(p.senha ?? "");
         if (!email || senha.length < 6) return NextResponse.json({ error: "Informe email e senha (mín. 6)." }, { status: 400 });
-        await createStaffAccess(String(p.id), email, senha, storeId);
+        await createStaffAccess(String(p.id), email, senha, "waiter", storeId);
         return NextResponse.json({ ok: true });
       }
       default:

@@ -34,8 +34,12 @@ export async function createStaff(input: StaffInput, storeId?: string): Promise<
   if (error || !data) throw new Error(error?.message ?? "Falha ao criar garçom.");
   return toStaff(data);
 }
-/** Cria (ou reaproveita) o LOGIN do garçom: conta de auth + membership 'waiter' ligada ao staff. */
-export async function createStaffAccess(staffId: string, email: string, senha: string, storeId?: string): Promise<void> {
+/** Papel de login que um funcionário-staff pode receber. Food = "waiter" (garçom). Service = "technician"/"reception". */
+export type StaffLoginRole = "waiter" | "technician" | "reception";
+/** Cria (ou reaproveita) o LOGIN do funcionário: conta de auth + membership ligada ao staff.
+ *  `role` decide onde o login cai (garçom vs técnico/recepção). Default "waiter" → food NÃO muda
+ *  (a chamada de garçons continua nascendo waiter). O vertical service passa "technician"/"reception". */
+export async function createStaffAccess(staffId: string, email: string, senha: string, role: StaffLoginRole = "waiter", storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   const sb = db();
   let userId: string | undefined;
@@ -49,8 +53,8 @@ export async function createStaffAccess(staffId: string, email: string, senha: s
     } else throw created.error;
   } else userId = created.data.user.id;
   const { data: exist } = await sb.from("store_members").select("id").eq("store_id", sid).eq("user_id", userId).maybeSingle();
-  if (exist) await sb.from("store_members").update({ role: "waiter", active: true, staff_id: staffId }).eq("id", (exist as { id: string }).id);
-  else await sb.from("store_members").insert({ store_id: sid, user_id: userId, role: "waiter", active: true, staff_id: staffId });
+  if (exist) await sb.from("store_members").update({ role, active: true, staff_id: staffId }).eq("id", (exist as { id: string }).id);
+  else await sb.from("store_members").insert({ store_id: sid, user_id: userId, role, active: true, staff_id: staffId });
 }
 export async function updateStaff(id: string, patch: Partial<StaffInput>, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
@@ -71,12 +75,13 @@ export type StaffAcerto = Staff & { comandas: number; vendidoCents: number; comi
 
 /** Acerto por garçom (comandas FECHADAS no período): vendido (consumo) + comissão (% sobre vendido)
  *  + gorjeta (taxa das comandas que atendeu) = a pagar. fromISO/toISO opcionais (por closed_at). */
-export async function staffReport(fromISO?: string, toISO?: string, storeId?: string): Promise<StaffAcerto[]> {
+export async function staffReport(fromISO?: string, toISO?: string, storeId?: string, loginRoles: StaffLoginRole[] = ["waiter"]): Promise<StaffAcerto[]> {
   const sid = storeId ?? (await resolveStoreId());
   const d = db();
   const staff = await listStaff(sid);
-  // quem já tem login (membership waiter ligada ao staff)
-  const { data: mem } = await d.from("store_members").select("staff_id").eq("store_id", sid).eq("role", "waiter").eq("active", true).not("staff_id", "is", null);
+  // quem já tem login (membership ligada ao staff). loginRoles default ["waiter"] → food inalterado;
+  // o vertical service passa ["technician","reception"] pra detectar o login do técnico/recepção.
+  const { data: mem } = await d.from("store_members").select("staff_id").eq("store_id", sid).in("role", loginRoles).eq("active", true).not("staff_id", "is", null);
   const withLogin = new Set(((mem ?? []) as { staff_id: string }[]).map((m) => String(m.staff_id)));
 
   let q = d.from("tabs").select("id, waiter_id, service_fee_cents, closed_at").eq("store_id", sid).eq("status", "fechada").not("waiter_id", "is", null);

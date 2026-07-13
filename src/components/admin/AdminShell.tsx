@@ -51,6 +51,7 @@ const NAV: NavItem[] = [
   { href: "/admin/os", label: "Ordens de Serviço", Icon: IconReceipt, family: "service" },
   { href: "/admin/vendas", label: "Vendas", Icon: IconBag, family: "service" },
   { href: "/admin/loja", label: "Loja Online", Icon: IconCart, family: "service" },
+  { href: "/admin/equipe", label: "Equipe", Icon: IconUsers, family: "service" },
   { href: "/admin/caixa", label: "Caixa", Icon: IconCart },
   { href: "/admin/balcao", label: "Balcão", Icon: IconBag, show: (c) => c.template !== "acai" && !isPdvHub(c), family: "food" },
   { href: "/admin/mesas", label: "Mesas", Icon: IconTable, show: (c) => c.hasTables && (c.template === "acai" || c.role === "waiter"), family: "food" },
