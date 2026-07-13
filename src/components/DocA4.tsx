@@ -11,7 +11,7 @@ export type DocA4Props = {
   dateLabel: string;
   validadeLabel?: string | null;
   statusLabel?: string | null;
-  store: { name: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string };
+  store: { name: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string; garantiaTermos?: string; avisos?: string };
   customer: { name: string; cpf?: string | null; phone?: string | null };
   equipamento?: { device?: string; imei?: string | null; condicoes?: string | null; acessorios?: string | null; problem?: string | null; diagnosis?: string | null } | null;
   items: DocA4Item[];
@@ -156,10 +156,22 @@ export default function DocA4(d: DocA4Props) {
 
         {d.observacao ? <div className="note">{d.observacao}</div> : null}
 
-        <div className="termo">
-          Garantia de 90 dias sobre o serviço executado e peças fornecidas pela loja; não cobre mau uso, quedas ou contato com líquidos.
-          {d.kind === "os" ? " Aparelho não retirado em até 90 dias corridos pode ser considerado abandonado (Art. 1.275 do Código Civil)." : d.validadeLabel ? ` Este orçamento é válido até ${d.validadeLabel}.` : ""}
-        </div>
+        {d.store.garantiaTermos ? (
+          <div className="sec">
+            <div className="h">Termos de garantia</div>
+            <div className="termo">
+              {d.store.garantiaTermos.split("\n").filter((l) => l.trim()).map((l, i) => <p key={i} style={{ margin: "2px 0" }}>{l}</p>)}
+              {d.kind === "orcamento" && d.validadeLabel ? <p style={{ margin: "2px 0" }}>Este orçamento é válido até {d.validadeLabel}.</p> : null}
+            </div>
+          </div>
+        ) : null}
+
+        {d.kind === "os" && d.store.avisos ? (
+          <div className="sec">
+            <div className="h">Observações</div>
+            <div className="termo">{d.store.avisos}</div>
+          </div>
+        ) : null}
 
         <div className="sign">
           <div className="s"><div className="ln"></div>Assinatura do cliente</div>

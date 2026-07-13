@@ -35,6 +35,8 @@ export type StoreSettings = {
   email: string; // e-mail de contato (cabeçalho do documento A4)
   site: string; // site da loja (cabeçalho do documento A4)
   responsavel: string; // responsável pela loja (cabeçalho do documento A4)
+  garantiaTermos: string; // termos de garantia (documento A4 de OS/orçamento) — resguarda o negócio
+  avisos: string; // observações/avisos legais no documento A4 (ex.: abandono Art. 1.275)
   cupomRodape: string; // mensagem do rodapé do cupom (vazio = "Obrigado! Volte sempre :)")
   waMsgs: WaMsgs; // mensagens do WhatsApp por status (semi-auto ao avançar pedido)
   pixDiscountPercent: number; // % de desconto quando o cliente paga no PIX (o Adm define; 0 = sem)
@@ -82,6 +84,20 @@ export function waMsgsForSegment(seg: BusinessType): WaMsgs {
   };
 }
 
+// Termos-padrão do documento A4 (cada loja pode editar). Resguardam o negócio: garantia, perda por
+// lacre violado, exclusões, peça do cliente, prazo de análise; e o aviso de abandono (Art. 1.275 CC).
+export const DEFAULT_GARANTIA = [
+  "Garantia de 90 (noventa) dias sobre os serviços realizados, incluindo peças fornecidas pela loja e a mão de obra.",
+  "A violação do lacre de segurança implica automaticamente na perda da garantia.",
+  "A garantia não cobre: mau uso do equipamento, contato com líquidos, quedas e manuseio incorreto ou inadequado.",
+  "Quando o cliente fornece a peça, a loja não se responsabiliza pela garantia da peça nem da mão de obra.",
+  "A loja poderá, em caso de dúvida, solicitar o comprovante da Ordem de Serviço para verificação dos serviços executados.",
+  "Nos casos de garantia do serviço realizado, a loja poderá solicitar um prazo de 2 (dois) a 15 (quinze) dias para análise e solução do problema, sem custos adicionais ao cliente.",
+  "Caso não seja possível a execução do serviço, o valor pago pelos serviços será integralmente restituído ao cliente.",
+].join("\n");
+export const DEFAULT_AVISOS =
+  "Os produtos não retirados no prazo de até 90 (noventa) dias corridos a partir da data de entrada serão considerados abandonados, podendo ser vendidos, descartados ou utilizados para compensar despesas operacionais, conforme o Art. 1.275, inciso III, do Código Civil Brasileiro.";
+
 const DEFAULT_STORE: StoreSettings = {
   name: "Açaí do Vidal",
   tagline: "Cremoso de verdade. Monte do seu jeito.",
@@ -101,6 +117,8 @@ const DEFAULT_STORE: StoreSettings = {
   email: "",
   site: "",
   responsavel: "",
+  garantiaTermos: DEFAULT_GARANTIA,
+  avisos: DEFAULT_AVISOS,
   cupomRodape: "",
   waMsgs: WA_MSG_DEFAULTS,
   pixDiscountPercent: 0,
@@ -159,6 +177,8 @@ export async function setStore(
   if (typeof store.email === "string") clean.email = store.email.trim().slice(0, 80);
   if (typeof store.site === "string") clean.site = store.site.trim().slice(0, 80);
   if (typeof store.responsavel === "string") clean.responsavel = store.responsavel.trim().slice(0, 60);
+  if (typeof store.garantiaTermos === "string") clean.garantiaTermos = store.garantiaTermos.slice(0, 3000);
+  if (typeof store.avisos === "string") clean.avisos = store.avisos.slice(0, 2000);
   if (typeof store.cupomRodape === "string") clean.cupomRodape = store.cupomRodape.trim().slice(0, 120);
   if (store.pixDiscountPercent != null) clean.pixDiscountPercent = Math.max(0, Math.min(100, Number(store.pixDiscountPercent) || 0));
   if (store.waMsgs && typeof store.waMsgs === "object") {
