@@ -28,6 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   const { data } = await db().from("stock_items").select("data").eq("store_id", s.id);
   const products = ((data ?? []) as { data: Record<string, unknown> }[])
+    .filter((r) => (r.data ?? {}).published === true) // VITRINE: só produtos publicados vão pro site
     .map((r) => {
       const d = r.data ?? {};
       const priceCents = Number(d.sellPriceCents ?? 0);
@@ -42,6 +43,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         specs: (d.specs as Record<string, unknown>) ?? {},
         badge: (d.badge as string | null) ?? null,
         highlight: Boolean(d.highlight),
+        image: (d.image as string) || null, // foto real (Storage/site) — senão o site usa SVG por categoria
+        images: Array.isArray(d.images) ? (d.images as string[]) : undefined,
+        description: (d.description as string) || null, // pro site/SEO
       };
     })
     .filter((p) => p.sku && p.priceCents > 0); // só o que tem preço de venda
