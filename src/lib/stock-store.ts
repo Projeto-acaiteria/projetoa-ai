@@ -54,7 +54,8 @@ export type StockItem = {
   // vitrine (site headless AT): destaque, selo e foto real do produto
   highlight?: boolean;
   badge?: string; // ex: "Lançamento", "Mais Vendido", "Promo", "OpenBox"
-  image?: string; // URL da foto real (Storage) — senão o site usa SVG por categoria
+  image?: string; // URL da foto de CAPA (Storage) — senão o site usa SVG por categoria
+  images?: string[]; // galeria de fotos do produto (vitrine AT). image = images[0] (capa). food não usa
   published?: boolean; // aparece no site (vitrine). default undefined/false = rascunho (não publicado)
   description?: string; // descrição rica pro site/SEO (Markdown). senão o site mostra só as specs
 };

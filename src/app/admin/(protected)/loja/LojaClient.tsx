@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
+import Link from "next/link";
 import { brl } from "@/lib/format";
 import { IconSearch, IconBox, IconPlus } from "@/components/Icons";
 
@@ -121,13 +122,12 @@ export default function LojaClient({ products, pixDiscountPercent }: { products:
         <p className="text-sm text-[var(--text-muted)]">
           <b className="text-ink">{total}</b> produtos · <b className="text-ink">{publishedCount}</b> publicados no site
         </p>
-        <button
-          type="button"
-          title="Em breve — o editor de produto do site"
-          className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)] opacity-80"
+        <Link
+          href="/admin/loja/novo"
+          className="inline-flex items-center gap-2 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]"
         >
           <IconPlus width={16} height={16} /> Adicionar produto
-        </button>
+        </Link>
       </div>
 
       {/* Filtro por FAMÍLIA */}
@@ -227,39 +227,41 @@ function ProductRow({ it, pixPct, busy, onToggle }: { it: LojaProduct; pixPct: n
   const pixCents = pixPct > 0 && it.sellPriceCents > 0 ? Math.round(it.sellPriceCents * (1 - pixPct / 100)) : 0;
   return (
     <div className="flex items-center gap-3 py-3 pl-4 pr-4">
-      <Thumb it={it} />
+      <Link href={`/admin/loja/${it.id}`} className="flex min-w-0 flex-1 items-center gap-3 transition hover:opacity-80" title="Editar produto">
+        <Thumb it={it} />
 
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="truncate font-semibold text-ink">{it.name}</span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              it.published ? "bg-[#E8F6DD] text-lime" : "bg-bg-surface-2 text-[var(--text-muted)]"
-            }`}
-          >
-            {it.published ? "Publicado" : "Rascunho"}
-          </span>
-          {it.badge && <span className="rounded-full bg-[#FBF1DC] px-2 py-0.5 text-[10px] font-bold text-gold">{it.badge}</span>}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="truncate font-semibold text-ink">{it.name}</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                it.published ? "bg-[#E8F6DD] text-lime" : "bg-bg-surface-2 text-[var(--text-muted)]"
+              }`}
+            >
+              {it.published ? "Publicado" : "Rascunho"}
+            </span>
+            {it.badge && <span className="rounded-full bg-[#FBF1DC] px-2 py-0.5 text-[10px] font-bold text-gold">{it.badge}</span>}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-muted)]">
+            {it.brand && <span>{it.brand}</span>}
+            <span className="text-[var(--text-faded)]">SKU {it.id}</span>
+            <span className={it.qty > 0 ? "" : "font-bold text-[var(--red-no)]"}>· {it.qty} em estoque</span>
+          </div>
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-muted)]">
-          {it.brand && <span>{it.brand}</span>}
-          <span className="text-[var(--text-faded)]">SKU {it.id}</span>
-          <span className={it.qty > 0 ? "" : "font-bold text-[var(--red-no)]"}>· {it.qty} em estoque</span>
-        </div>
-      </div>
 
-      <div className="hidden shrink-0 text-right sm:block">
-        {it.sellPriceCents > 0 ? (
-          <>
-            <div className="font-extrabold tabular-nums text-ink">{brl(it.sellPriceCents)}</div>
-            {pixCents > 0 && (
-              <div className="text-[11px] font-bold text-[var(--green-ok)]">{brl(pixCents)} no PIX</div>
-            )}
-          </>
-        ) : (
-          <span className="text-xs text-[var(--text-faded)]">sem preço</span>
-        )}
-      </div>
+        <div className="hidden shrink-0 text-right sm:block">
+          {it.sellPriceCents > 0 ? (
+            <>
+              <div className="font-extrabold tabular-nums text-ink">{brl(it.sellPriceCents)}</div>
+              {pixCents > 0 && (
+                <div className="text-[11px] font-bold text-[var(--green-ok)]">{brl(pixCents)} no PIX</div>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-[var(--text-faded)]">sem preço</span>
+          )}
+        </div>
+      </Link>
 
       {/* Toggle "no site" */}
       <div className="flex shrink-0 flex-col items-center gap-1">
