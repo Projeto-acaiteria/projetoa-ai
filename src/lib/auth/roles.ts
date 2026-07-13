@@ -8,6 +8,7 @@ const RECEPTION_NAV = new Set<string>([
   "/admin",
   "/admin/os", // recepção recebe o cliente e monta/abre a OS (assistência técnica)
   "/admin/orcamentos", // recepção faz orçamento no balcão e envia por WhatsApp
+  "/admin/compras", // recepção registra compra/reposição e dá entrada no estoque
   "/admin/vendas", // recepção opera o balcão de peças/periféricos
   "/admin/caixa",
   "/admin/balcao",
