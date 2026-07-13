@@ -105,7 +105,7 @@ export default function DocA4(d: DocA4Props) {
           <div className="grid2">
             <div className="kv"><b>{d.customer.name || "—"}</b></div>
             {d.customer.cpf ? <div className="kv">CPF/CNPJ: {fmtCpf(d.customer.cpf)}</div> : null}
-            {d.customer.phone ? <div className="kv">Telefone: {d.customer.phone}</div> : null}
+            {d.customer.phone ? <div className="kv">Telefone: {fmtPhone(d.customer.phone)}</div> : null}
           </div>
         </div>
 
