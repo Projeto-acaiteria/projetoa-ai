@@ -20,6 +20,12 @@ export type DocA4Props = {
 };
 
 const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPhone = (s: string) => {
+  const d = (s || "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s;
+};
 const fmtCpf = (s: string) => {
   const d = s.replace(/\D/g, "");
   return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5") : d;
@@ -80,7 +86,7 @@ export default function DocA4(d: DocA4Props) {
             <div className="nm">{d.store.name || "—"}</div>
             {d.store.cnpj ? <div className="ln">{d.store.cnpj.replace(/\D/g, "").length === 11 ? "CPF" : "CNPJ"}: {fmtCpf(d.store.cnpj)}</div> : null}
             {d.store.endereco ? <div className="ln">{d.store.endereco}</div> : null}
-            {d.store.tel ? <div className="ln">Tel: {d.store.tel}</div> : null}
+            {d.store.tel ? <div className="ln">Tel: {fmtPhone(d.store.tel)}</div> : null}
             {d.store.email ? <div className="ln">{d.store.email}</div> : null}
             {d.store.site ? <div className="ln">{d.store.site}</div> : null}
             {d.store.responsavel ? <div className="ln">Responsável: {d.store.responsavel}</div> : null}
