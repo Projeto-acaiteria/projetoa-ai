@@ -31,7 +31,7 @@ const STATUS: Record<Status, { label: string; cls: string }> = {
 };
 const emptyRow = (kind: ItemKind = "produto"): Row => ({ kind, name: "", detail: "", qty: "1", unit: "", desc: "" });
 
-export default function OrcamentosClient() {
+export default function OrcamentosClient({ storeName }: { storeName?: string }) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,7 +119,15 @@ export default function OrcamentosClient() {
   function docUrl(code: string) { return `${window.location.origin}/doc/${code}`; }
   function enviarWhats(b: Budget) {
     const url = docUrl(b.code);
-    const msg = `Olá ${b.customerName}! Segue o seu orçamento da nossa loja. Total: ${brl(budgetTotal(b))}. Veja os detalhes aqui: ${url}`;
+    const loja = storeName?.trim() || "nossa loja";
+    const primeiroNome = (b.customerName || "").trim().split(" ")[0] || "tudo bem";
+    const msg = [
+      `Olá, ${primeiroNome}! Aqui é da ${loja}.`,
+      `Segue o seu orçamento nº ${b.code}, no valor de ${brl(budgetTotal(b))}. Qualquer dúvida, estamos à disposição. 🙂`,
+      ``,
+      `Para ver os detalhes e aprovar, é só acessar:`,
+      url,
+    ].join("\n");
     const foneDig = onlyDigits(b.customerPhone);
     const wa = foneDig ? `https://wa.me/55${foneDig}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(wa, "_blank");

@@ -1,11 +1,28 @@
 "use client";
 
 // Compartilha o documento A4 (OS ou orçamento): link pro /doc/[code] + envio por WhatsApp.
-export default function DocShare({ code, name, phone, kind = "os" }: { code: string; name: string; phone?: string | null; kind?: "os" | "orcamento" }) {
+export default function DocShare({ code, name, phone, storeName, kind = "os" }: { code: string; name: string; phone?: string | null; storeName?: string; kind?: "os" | "orcamento" }) {
   function whats() {
     const url = `${window.location.origin}/doc/${code}`;
-    const label = kind === "orcamento" ? "o seu orçamento" : "a sua ordem de serviço";
-    const msg = `Olá ${name || ""}! Segue ${label} da nossa loja. Acompanhe aqui: ${url}`;
+    const loja = storeName?.trim() || "nossa loja";
+    const primeiroNome = (name || "").trim().split(" ")[0] || "tudo bem";
+    const linhas =
+      kind === "orcamento"
+        ? [
+            `Olá, ${primeiroNome}! Aqui é da ${loja}.`,
+            `Segue o seu orçamento nº ${code}. Qualquer dúvida, estamos à disposição. 🙂`,
+            ``,
+            `Para ver os detalhes e aprovar, é só acessar:`,
+            url,
+          ]
+        : [
+            `Olá, ${primeiroNome}! Aqui é da ${loja}.`,
+            `Segue a sua ordem de serviço nº ${code}. Qualquer dúvida, estamos à disposição. 🙂`,
+            ``,
+            `Para acompanhar, é só acessar:`,
+            url,
+          ];
+    const msg = linhas.join("\n");
     const d = (phone || "").replace(/\D/g, "");
     window.open(d ? `https://wa.me/55${d}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }

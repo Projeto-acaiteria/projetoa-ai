@@ -315,7 +315,7 @@ export default function ConfigClient({ family }: { family?: string }) {
         <div className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-[var(--text-muted)]">Logo</label>
-            <div className="mt-1.5"><ImageUpload value={store.logoUrl} onChange={(url) => setS("logoUrl", url)} aspect="square" hint="Aparece no topo do cardápio. PNG quadrado fica melhor." /></div>
+            <div className="mt-1.5"><ImageUpload value={store.logoUrl} onChange={(url) => setS("logoUrl", url)} aspect="square" hint="Aparece no topo do cardápio e no cabeçalho do documento de OS/orçamento. PNG fica melhor." /></div>
           </div>
           <div>
             <label className="text-xs font-semibold text-[var(--text-muted)]">Banner (foto de fundo)</label>

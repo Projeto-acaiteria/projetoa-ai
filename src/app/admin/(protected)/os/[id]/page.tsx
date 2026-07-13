@@ -3,6 +3,7 @@ import { requireNavAccess } from "@/lib/auth/guard";
 import { PageHeader, Badge, Card } from "@/components/admin/ui";
 import { getServiceOrder, osCommissionCents, OS_STATUS_LABEL } from "@/lib/service-orders-store";
 import { listStaff } from "@/lib/staff-store";
+import { getStore } from "@/lib/settings-store";
 import OSActions from "./OSActions";
 import DocShare from "@/components/admin/DocShare";
 
@@ -13,7 +14,7 @@ const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFr
 export default async function OSDetail({ params }: { params: Promise<{ id: string }> }) {
   await requireNavAccess("/admin/os");
   const { id } = await params;
-  const [res, staff] = await Promise.all([getServiceOrder(id), listStaff()]);
+  const [res, staff, store] = await Promise.all([getServiceOrder(id), listStaff(), getStore()]);
   if (!res) notFound();
   const { os, parts } = res;
   const commission = osCommissionCents(os);
@@ -29,7 +30,7 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
 
       {os.code && (
         <div className="mb-4 max-w-4xl">
-          <DocShare code={os.code} name={os.customerName} phone={os.customerPhone} kind="os" />
+          <DocShare code={os.code} name={os.customerName} phone={os.customerPhone} storeName={store.name} kind="os" />
         </div>
       )}
 

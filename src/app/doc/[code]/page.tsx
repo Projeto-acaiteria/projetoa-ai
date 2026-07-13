@@ -41,7 +41,7 @@ export default async function DocPage({ params }: { params: Promise<{ code: stri
         dateLabel={dmy(b.budget.createdAt)}
         validadeLabel={ymdToBr(b.budget.validadeAt)}
         statusLabel={BUDGET_STATUS_LABEL[b.budget.status]}
-        store={{ name: s.name, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, email: s.email, site: s.site, responsavel: s.responsavel, garantiaTermos: s.garantiaTermos, avisos: s.avisos }}
+        store={{ name: s.name, logoUrl: s.logoUrl, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, email: s.email, site: s.site, responsavel: s.responsavel, garantiaTermos: s.garantiaTermos, avisos: s.avisos }}
         customer={{ name: b.budget.customerName, cpf: b.budget.cpf, phone: b.budget.customerPhone }}
         items={items}
         totals={budgetTotals(b.budget)}
@@ -70,7 +70,7 @@ export default async function DocPage({ params }: { params: Promise<{ code: stri
         code={os.code || os.id.slice(0, 6)}
         dateLabel={dmy(os.createdAt)}
         statusLabel={OS_STATUS_LABEL[os.status]}
-        store={{ name: s.name, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, email: s.email, site: s.site, responsavel: s.responsavel, garantiaTermos: s.garantiaTermos, avisos: s.avisos }}
+        store={{ name: s.name, logoUrl: s.logoUrl, cnpj: s.cnpj, endereco: s.endereco, tel: s.whatsapp, email: s.email, site: s.site, responsavel: s.responsavel, garantiaTermos: s.garantiaTermos, avisos: s.avisos }}
         customer={{ name: os.customerName, cpf: os.cpf, phone: os.customerPhone }}
         equipamento={{ device: os.device, imei: os.imei, condicoes: os.condicoes, acessorios: os.acessorios, problem: os.problem, diagnosis: os.diagnosis }}
         items={items}

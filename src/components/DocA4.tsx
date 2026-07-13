@@ -11,7 +11,7 @@ export type DocA4Props = {
   dateLabel: string;
   validadeLabel?: string | null;
   statusLabel?: string | null;
-  store: { name: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string; garantiaTermos?: string; avisos?: string };
+  store: { name: string; logoUrl?: string; cnpj?: string; endereco?: string; tel?: string; email?: string; site?: string; responsavel?: string; garantiaTermos?: string; avisos?: string };
   customer: { name: string; cpf?: string | null; phone?: string | null };
   equipamento?: { device?: string; imei?: string | null; condicoes?: string | null; acessorios?: string | null; problem?: string | null; diagnosis?: string | null } | null;
   items: DocA4Item[];
@@ -40,6 +40,8 @@ const CSS = `
   .a4 *{box-sizing:border-box}
   /* cabeçalho em quadro */
   .hdr{display:flex;justify-content:space-between;gap:16px;border:1.5px solid #334155;padding:12px 14px}
+  .hdr .left{display:flex;align-items:center;gap:14px}
+  .hdr .logo{height:56px;width:auto;max-width:140px;object-fit:contain}
   .hdr .nm{font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-.4px;margin-bottom:2px}
   .hdr .ln{font-size:10.5px;color:#475569;line-height:1.4}
   .hdr .r{text-align:right}
@@ -98,10 +100,16 @@ export default function DocA4(d: DocA4Props) {
       <div className="a4">
         {/* CABEÇALHO EM QUADRO */}
         <div className="hdr">
-          <div>
-            <div className="nm">{d.store.name || "—"}</div>
-            {d.store.cnpj ? <div className="ln">{d.store.cnpj.replace(/\D/g, "").length === 11 ? "CPF" : "CNPJ"}: {fmtDoc(d.store.cnpj)}</div> : null}
-            {d.store.endereco ? <div className="ln">{d.store.endereco}</div> : null}
+          <div className="left">
+            {d.store.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="logo" src={d.store.logoUrl} alt={d.store.name} />
+            ) : null}
+            <div>
+              <div className="nm">{d.store.name || "—"}</div>
+              {d.store.cnpj ? <div className="ln">{d.store.cnpj.replace(/\D/g, "").length === 11 ? "CPF" : "CNPJ"}: {fmtDoc(d.store.cnpj)}</div> : null}
+              {d.store.endereco ? <div className="ln">{d.store.endereco}</div> : null}
+            </div>
           </div>
           <div className="r">
             {d.store.tel ? <div className="ln">Tel: {fmtPhone(d.store.tel)}</div> : null}
