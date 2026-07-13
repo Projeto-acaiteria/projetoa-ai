@@ -74,7 +74,15 @@ const CSS = `
   .sign .s:first-child{border-right:1px solid #334155}
   .sign .ln{border-top:1px solid #334155;margin:0 8mm 3px}
   .foot{margin-top:12px;text-align:center;font-size:9.5px;color:#94a3b8}
-  @media print{.wrap{background:#fff;padding:0}.no-print{display:none!important}.a4{box-shadow:none;max-width:none;padding:0}@page{size:A4;margin:12mm}}
+  /* o app tem um @media print global que esconde tudo (body *) menos os cupons 80mm;
+     este seletor de classe (maior especificidade) reexibe o documento A4. */
+  @media print{
+    .wrap,.wrap *{visibility:visible!important}
+    .wrap{background:#fff;padding:0;position:absolute;left:0;top:0;width:100%}
+    .no-print{display:none!important}
+    .a4{box-shadow:none;max-width:none;padding:0}
+    @page{size:A4;margin:12mm}
+  }
 `;
 
 export default function DocA4(d: DocA4Props) {

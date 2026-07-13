@@ -8,6 +8,11 @@ import DocA4, { type DocA4Item } from "@/components/DocA4";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  return { title: `Documento ${code}` };
+}
+
 const dmy = (iso: string | null) => {
   if (!iso) return "—";
   try {
