@@ -114,6 +114,8 @@ export type OSEntryTicketData = {
   phone?: string;
   device: string;
   imei?: string;
+  condicoes?: string;
+  acessorios?: string;
   problem?: string;
   devicePassword?: string;
   rodape?: string;
@@ -154,6 +156,8 @@ export function osEntryTicketHtml(d: OSEntryTicketData): string {
     ${d.phone ? linha("Telefone:", d.phone) : ""}
     <div class="sep"></div>
     <div class="block"><b>Aparelho:</b> ${esc(d.device)}${d.imei ? `<br><b>IMEI/Série:</b> ${esc(d.imei)}` : ""}</div>
+    ${d.condicoes ? `<div class="block"><b>Condições na entrada:</b> ${esc(d.condicoes)}</div>` : ""}
+    ${d.acessorios ? `<div class="block"><b>Acessórios entregues:</b> ${esc(d.acessorios)}</div>` : ""}
     ${d.problem ? `<div class="block"><b>Defeito relatado:</b> ${esc(d.problem)}</div>` : ""}
     ${d.devicePassword ? `<div class="block"><b>Senha do aparelho:</b> ${esc(d.devicePassword)}</div>` : ""}
     <div class="sep"></div>

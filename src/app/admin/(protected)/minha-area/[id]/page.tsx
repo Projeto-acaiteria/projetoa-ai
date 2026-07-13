@@ -66,6 +66,8 @@ export default async function TecOSPage({ params }: { params: Promise<{ id: stri
             <Row label="Cliente" value={os.customerName || "—"} />
             <Row label="Aparelho" value={os.device || "—"} />
             {os.imei && <Row label="IMEI / série" value={os.imei} mono />}
+            {os.condicoes && <Row label="Condições na entrada" value={os.condicoes} />}
+            {os.acessorios && <Row label="Acessórios" value={os.acessorios} />}
             {os.devicePassword && <Row label="Senha do aparelho" value={os.devicePassword} mono />}
             {os.problem && <Row label="Defeito / pedido" value={os.problem} />}
             {os.customerPhone && (

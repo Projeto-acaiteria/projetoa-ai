@@ -23,6 +23,8 @@ export type ServiceOrder = {
   cpf: string | null; // CPF do cliente (só dígitos) — recepção identifica cliente recorrente por ele
   device: string;
   imei: string | null;
+  condicoes: string | null; // estado do aparelho na entrada (proteção contra disputa)
+  acessorios: string | null; // o que veio junto (carregador, cabo, capa…)
   problem: string;
   diagnosis: string | null;
   status: OSStatus;
@@ -57,6 +59,8 @@ const toOS = (r: Record<string, unknown>): ServiceOrder => ({
   cpf: str(r.cpf),
   device: String(r.device ?? ""),
   imei: str(r.imei),
+  condicoes: str(r.condicoes),
+  acessorios: str(r.acessorios),
   problem: String(r.problem ?? ""),
   diagnosis: str(r.diagnosis),
   status: asStatus(r.status),
@@ -157,6 +161,8 @@ export type NewOSInput = {
   cpf?: string;
   device: string;
   imei?: string;
+  condicoes?: string;
+  acessorios?: string;
   devicePassword?: string;
   problem?: string;
   staffId?: string;
@@ -185,6 +191,8 @@ export async function createServiceOrder(input: NewOSInput, storeId?: string): P
     cpf: input.cpf?.replace(/\D/g, "") || null,
     device: input.device.trim(),
     imei: input.imei?.trim() || null,
+    condicoes: input.condicoes?.trim() || null,
+    acessorios: input.acessorios?.trim() || null,
     device_password: input.devicePassword?.trim() || null,
     problem: (input.problem ?? "").trim(),
     staff_id: input.staffId ?? null,

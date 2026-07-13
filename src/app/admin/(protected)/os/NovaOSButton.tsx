@@ -15,7 +15,7 @@ const fmtCpf = (s: string) => {
 };
 
 type OSResp = {
-  os?: { id: string; code: string | null; customerName: string; customerPhone: string; cpf: string | null; device: string; imei: string | null; problem: string; devicePassword: string | null; createdAt: string };
+  os?: { id: string; code: string | null; customerName: string; customerPhone: string; cpf: string | null; device: string; imei: string | null; condicoes: string | null; acessorios: string | null; problem: string; devicePassword: string | null; createdAt: string };
   store?: { loja: string; cnpj?: string; endereco?: string; tel?: string; rodape?: string };
 };
 
@@ -26,7 +26,7 @@ export default function NovaOSButton() {
   const [looking, setLooking] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
+  const [f, setF] = useState({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", servico: "" });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   // busca cliente recorrente pelo CPF (recepção): acha a OS mais recente e auto-preenche
@@ -62,6 +62,8 @@ export default function NovaOSButton() {
         cpf: os.cpf ? fmtCpf(os.cpf) : undefined,
         phone: os.customerPhone || undefined,
         device: os.device, imei: os.imei || undefined,
+        condicoes: os.condicoes || undefined,
+        acessorios: os.acessorios || undefined,
         problem: os.problem || undefined,
         devicePassword: os.devicePassword || undefined,
       }));
@@ -80,11 +82,13 @@ export default function NovaOSButton() {
         cpf: onlyDigits(f.cpf) || undefined,
         device: f.device.trim(),
         imei: f.imei.trim() || undefined,
+        condicoes: f.condicoes.trim() || undefined,
+        acessorios: f.acessorios.trim() || undefined,
         devicePassword: f.devicePassword.trim() || undefined,
         problem: f.problem.trim() || undefined,
         serviceValueCents: f.servico ? Math.round((parseFloat(f.servico.replace(",", ".")) || 0) * 100) : undefined,
       } }, `Check-in ${nome}`);
-      setF({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", devicePassword: "", problem: "", servico: "" });
+      setF({ cpf: "", customerName: "", customerPhone: "", device: "", imei: "", condicoes: "", acessorios: "", devicePassword: "", problem: "", servico: "" });
       if ("queued" in res) {
         // offline: fica pendente (λ.prova-na-fonte) — avisa sem fechar, o indicador mostra a fila
         setInfo("Sem conexão — o check-in ficou salvo aqui e sobe sozinho quando a internet voltar.");
@@ -119,6 +123,8 @@ export default function NovaOSButton() {
               <input value={f.imei} onChange={(e) => set("imei", e.target.value)} placeholder="IMEI / série" className={`${inputCls} font-mono`} />
               <input value={f.devicePassword} onChange={(e) => set("devicePassword", e.target.value)} placeholder="Senha do aparelho (pra o técnico testar)" className={inputCls} />
               <textarea value={f.problem} onChange={(e) => set("problem", e.target.value)} placeholder="Defeito relatado" rows={2} className={inputCls} />
+              <textarea value={f.condicoes} onChange={(e) => set("condicoes", e.target.value)} placeholder="Condições na entrada (ex: tela trincada, riscos na tampa)" rows={2} className={inputCls} />
+              <input value={f.acessorios} onChange={(e) => set("acessorios", e.target.value)} placeholder="Acessórios entregues (carregador, cabo, capa…)" className={inputCls} />
               <input value={f.servico} onChange={(e) => set("servico", e.target.value)} inputMode="decimal" placeholder="Valor do serviço R$ (opcional)" className={inputCls} />
             </div>
             {err && <p className="mt-2 text-xs text-red-500">{err}</p>}

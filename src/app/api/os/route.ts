@@ -66,6 +66,8 @@ export async function POST(req: Request) {
           cpf: p.cpf ? String(p.cpf) : undefined,
           device,
           imei: p.imei ? String(p.imei) : undefined,
+          condicoes: p.condicoes ? String(p.condicoes) : undefined,
+          acessorios: p.acessorios ? String(p.acessorios) : undefined,
           devicePassword: p.devicePassword ? String(p.devicePassword) : undefined,
           problem: p.problem ? String(p.problem) : undefined,
           serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined,

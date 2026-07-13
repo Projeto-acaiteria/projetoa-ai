@@ -34,6 +34,8 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
             {os.customerPhone && <Row label="WhatsApp" value={os.customerPhone} />}
             <Row label="Aparelho" value={os.device || "—"} />
             {os.imei && <Row label="IMEI / série" value={os.imei} mono />}
+            {os.condicoes && <Row label="Condições na entrada" value={os.condicoes} />}
+            {os.acessorios && <Row label="Acessórios" value={os.acessorios} />}
             {os.problem && <Row label="Defeito / pedido" value={os.problem} />}
             {os.diagnosis && <Row label="Laudo" value={os.diagnosis} />}
           </Card>
