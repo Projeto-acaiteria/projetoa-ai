@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       qty: Math.max(0, Number(b.qty) || 0),
       unit: (b.unit || "un").trim(),
       minQty: Math.max(0, Number(b.minQty) || 0),
+      maxQty: b.maxQty ? Math.max(0, Number(b.maxQty)) || undefined : undefined,
       expiry: b.expiry || undefined,
       sellPriceCents: b.sellPriceCents ? Math.max(0, Math.round(Number(b.sellPriceCents))) : undefined,
       dosesPerBottle: b.dosesPerBottle ? Math.max(1, Math.round(Number(b.dosesPerBottle))) : undefined,

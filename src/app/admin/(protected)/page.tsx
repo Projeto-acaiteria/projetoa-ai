@@ -21,6 +21,7 @@ import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
 import { listServiceOrders } from "@/lib/service-orders-store";
+import { listStock } from "@/lib/stock-store";
 
 const kgFmt = (n: number) => (n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const prontaDias = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -210,7 +211,8 @@ export default async function AdminHome() {
 
 // Início do vertical de ASSISTÊNCIA TÉCNICA: agenda de OS, não vendas/cardápio.
 async function ATHome() {
-  const orders = await listServiceOrders();
+  const [orders, stock] = await Promise.all([listServiceOrders(), listStock()]);
+  const lowStock = stock.filter((i) => i.qty <= i.minQty).length;
   const abertas = orders.filter((o) => o.status !== "entregue" && o.status !== "cancelado");
   const emReparo = orders.filter((o) => o.status === "em_reparo").length;
   const prontas = orders.filter((o) => o.status === "pronto").length;
@@ -250,6 +252,16 @@ async function ATHome() {
         </span>
         <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">Ver OS</span>
       </Link>
+
+      {lowStock > 0 && (
+        <Link href="/admin/estoque" className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--red-no)]/40 bg-[var(--red-no)]/5 p-4 transition hover:border-[var(--red-no)]">
+          <span className="text-sm">
+            <span className="block font-bold text-ink">{lowStock} {lowStock === 1 ? "item no estoque mínimo" : "itens no estoque mínimo"}</span>
+            <span className="text-[var(--text-muted)]">Veja o que repor e registre a compra.</span>
+          </span>
+          <span className="shrink-0 rounded-lg brand-gradient px-3 py-2 text-xs font-bold text-white">Ver estoque</span>
+        </Link>
+      )}
     </>
   );
 }
@@ -257,8 +269,9 @@ async function ATHome() {
 // Cockpit da RECEPÇÃO (assistência técnica): operação de front-desk — vender, montar PC, abrir OS,
 // receber/entregar, caixa. SEM o faturamento da loja (recepção é bloqueada do Financeiro).
 async function ReceptionHome() {
-  const [orders, os, session, store, staffRaw] = await Promise.all([listOrders(), listServiceOrders(), getOpenSession(), getStore(), listStaff()]);
+  const [orders, os, session, store, staffRaw, stock] = await Promise.all([listOrders(), listServiceOrders(), getOpenSession(), getStore(), listStaff(), listStock()]);
   const staff = staffRaw.map((s) => ({ id: s.id, name: s.name }));
+  const lowStock = stock.filter((i) => i.qty <= i.minQty).length;
   const prontas = os.filter((o) => o.status === "pronto");
   const aguardando = os.filter((o) => o.status === "aguardando");
   const emReparo = os.filter((o) => o.status === "em_reparo");
@@ -269,7 +282,7 @@ async function ReceptionHome() {
   const now = Date.now();
   const atrasadas = os.filter((o) => o.estimatedAt && (o.status === "aguardando" || o.status === "em_reparo") && new Date(o.estimatedAt).getTime() < now);
   const encalhadas = prontas.filter((o) => o.readyAt && prontaDias(o.readyAt) >= 3);
-  const temAtencao = atrasadas.length > 0 || encalhadas.length > 0 || pedidosSite.length > 0;
+  const temAtencao = atrasadas.length > 0 || encalhadas.length > 0 || pedidosSite.length > 0 || lowStock > 0;
 
   return (
     <>
@@ -297,6 +310,7 @@ async function ReceptionHome() {
           {atrasadas.length > 0 && <Badge tone="accent">{atrasadas.length} OS atrasada{atrasadas.length === 1 ? "" : "s"}</Badge>}
           {encalhadas.length > 0 && <Badge tone="gold">{encalhadas.length} pronta{encalhadas.length === 1 ? "" : "s"} há 3+ dias</Badge>}
           {pedidosSite.length > 0 && <Badge tone="brand">{pedidosSite.length} pedido{pedidosSite.length === 1 ? "" : "s"} do site pra confirmar</Badge>}
+          {lowStock > 0 && <Link href="/admin/estoque"><Badge tone="accent">{lowStock} {lowStock === 1 ? "item" : "itens"} no estoque mínimo</Badge></Link>}
         </div>
       )}
 

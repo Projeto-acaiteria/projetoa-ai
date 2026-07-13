@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { StatCard } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
@@ -137,6 +138,8 @@ export default function EstoqueClient({ family, doseMl = 50, stockDose = false }
   );
 
   const low = items.filter((i) => i.qty <= i.minQty);
+  // compra sugerida: se tem máximo, repõe até o máximo; senão, um lote do mínimo (folga)
+  const reorderQty = (i: StockItem) => (i.maxQty && i.maxQty > i.qty ? i.maxQty - i.qty : Math.max(i.minQty, 1));
   const expAlert = items.filter((i) => {
     const d = daysTo(i.expiry);
     return d !== null && d <= 7;
@@ -201,6 +204,33 @@ export default function EstoqueClient({ family, doseMl = 50, stockDose = false }
           </button>
         </div>
       </div>
+
+      {/* REPOSIÇÃO — o que atingiu o mínimo e quanto comprar (alvo = máximo) */}
+      {loaded && low.length > 0 && (
+        <div className="card mt-4 overflow-hidden p-0">
+          <div className="flex items-center justify-between gap-2 border-b border-line bg-[var(--red-no)]/5 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconAlert width={17} height={17} className="text-[var(--red-no)]" />
+              <h2 className="text-sm font-extrabold text-ink">Repor estoque <span className="font-medium text-[var(--text-muted)]">· {low.length} {low.length === 1 ? "item no" : "itens no"} mínimo</span></h2>
+            </div>
+            {family === "service" && (
+              <Link href="/admin/compras" className="shrink-0 rounded-lg brand-gradient px-3 py-1.5 text-xs font-bold text-white">Registrar compra</Link>
+            )}
+          </div>
+          <div className="divide-y divide-line">
+            {low.slice(0, 12).map((i) => (
+              <div key={i.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-ink">{i.name}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">tem {i.qty} {i.unit} · mínimo {i.minQty}{i.maxQty ? ` · máx ${i.maxQty}` : ""}</div>
+                </div>
+                <span className="shrink-0 rounded-full bg-[var(--red-no)]/10 px-2.5 py-1 text-xs font-bold text-[var(--red-no)]">comprar ~{reorderQty(i)} {i.unit}</span>
+              </div>
+            ))}
+            {low.length > 12 && <div className="px-4 py-2 text-center text-[11px] text-[var(--text-faded)]">+ {low.length - 12} outros no mínimo</div>}
+          </div>
+        </div>
+      )}
 
       {/* Açaí vendido (kg) — dia / semana / mês. O que o Vidal quer bater o olho. */}
       {acaiVendido && (acaiVendido.mes.totalKg > 0 || acaiVendido.mes.copoCount > 0) && (
@@ -398,6 +428,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
   const [qty, setQty] = useState("0");
   const [unit, setUnit] = useState("un");
   const [minQty, setMinQty] = useState("0");
+  const [maxQty, setMaxQty] = useState("");
   const [expiry, setExpiry] = useState("");
   const [sell, setSell] = useState("");
   const [byDose, setByDose] = useState(false); // controlar por dose (destilado/garrafa)
@@ -438,6 +469,7 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         qty: doses > 0 ? Math.round((+qty || 0) * doses) : +qty,
         unit: doses > 0 ? "dose" : unit,
         minQty: +minQty,
+        maxQty: maxQty ? +maxQty : undefined,
         expiry: expiry || undefined,
         sellPriceCents: sellable && sell ? Math.round(parseFloat(sell) * 100) : undefined,
         dosesPerBottle: doses > 0 ? doses : undefined,
@@ -477,6 +509,10 @@ function AddModal({ family, doseMl = 50, stockDose = false, onClose, onSaved }: 
         <input className={inp} type="number" min={0} placeholder={byDose ? "Garrafas" : "Qtd"} value={qty} onChange={(e) => setQty(e.target.value)} />
         <input className={inp} placeholder="Unid" value={byDose ? "dose" : unit} onChange={(e) => setUnit(e.target.value)} disabled={byDose} />
         <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-line bg-bg-base px-3 py-2 text-[11px] text-[var(--text-faded)]">Mínimo = alerta de repor</div>
+        <input className={inp} type="number" min={0} placeholder="Máximo (repor até)" value={maxQty} onChange={(e) => setMaxQty(e.target.value)} />
       </div>
       {isService && <AtSpecsFields category={category} value={specs} onChange={setSpecs} />}
       {isService && (
@@ -657,6 +693,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
   const [category, setCategory] = useState<StockCategory>(item.category);
   const [unit, setUnit] = useState(item.unit);
   const [minQty, setMinQty] = useState(String(item.minQty));
+  const [maxQty, setMaxQty] = useState(item.maxQty ? String(item.maxQty) : "");
   const [expiry, setExpiry] = useState(item.expiry ?? "");
   const [sell, setSell] = useState(item.sellPriceCents ? String(item.sellPriceCents / 100) : "");
   const [cost, setCost] = useState(() => {
@@ -684,6 +721,7 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
         category,
         unit,
         minQty: +minQty,
+        maxQty: maxQty ? +maxQty : 0,
         expiry: expiry || "",
         sellPriceCents: isVenda && sell ? Math.round(parseFloat(sell) * 100) : 0,
         ...(isDose ? { costPerBottleCents: costC } : { costCents: costC }),
@@ -706,10 +744,12 @@ function EditModal({ item, family, onClose, onSaved }: { item: StockItem; family
           </optgroup>
         ))}
       </select>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <input className={inp} placeholder="Unid" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={isDose} />
         <input className={inp} type="number" min={0} placeholder="Mínimo" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
+        <input className={inp} type="number" min={0} placeholder="Máximo" value={maxQty} onChange={(e) => setMaxQty(e.target.value)} />
       </div>
+      <p className="-mt-1 text-[11px] text-[var(--text-faded)]">Mínimo dispara o alerta de repor. Máximo = alvo (compra sugerida = máximo − atual).</p>
       {isVenda && (
         <div>
           <label className="text-xs font-semibold text-[var(--text-muted)]">Preço de venda</label>

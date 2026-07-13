@@ -35,7 +35,8 @@ export type StockItem = {
   category: StockCategory;
   qty: number;
   unit: string; // kg, g, L, un... (com dose/garrafa, qty = nº de DOSES)
-  minQty: number; // alerta de estoque baixo
+  minQty: number; // alerta de estoque baixo (ponto de reposição)
+  maxQty?: number; // estoque máximo (alvo de reposição) — compra sugerida = max − atual. 0/vazio = sem alvo
   expiry?: string; // YYYY-MM-DD (validade do lote atual)
   sellPriceCents?: number; // preço de venda (só p/ produtos de revenda)
   // bar (opt-in): destilado controlado em DOSE/GARRAFA. qty fica em doses; entrada por garrafa
