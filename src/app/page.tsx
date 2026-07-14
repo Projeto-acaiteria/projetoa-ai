@@ -27,8 +27,10 @@ const FAQS: { q: string; a: string }[] = [
   { q: "Preciso pagar comissão por pedido?", a: "Não. Você paga só a mensalidade. O pedido chega pelo seu link e o valor da venda é todo seu — sem o marketplace levando percentual." },
   { q: "Meu cliente precisa baixar aplicativo?", a: "Não. Ele faz o pedido pelo link do seu cardápio, direto no navegador do celular, sem instalar nada." },
   { q: "Serve pro meu tipo de negócio?", a: "Sim. Açaiteria, bar, petiscaria, hamburgueria, pizzaria, sushi e mais — cada negócio liga só as funcionalidades que usa." },
-  { q: "Funciona com impressora térmica?", a: "Sim. Impressão térmica 80mm, roteando a via da cozinha e do balcão para a impressora certa de cada estação." },
+  { q: "Preciso de impressora? Qual serve?", a: "Serve qualquer impressora térmica 80mm (não precisa ser fiscal). Tem um instalador de 1 clique que configura tudo, e a via da cozinha e a do balcão vão roteadas pra impressora certa de cada estação." },
   { q: "Consigo vender por peso, tipo açaí e marmita?", a: "Sim. O ComandaPRO trabalha com venda por peso (R$/kg) integrando a balança ou digitando as gramas." },
+  { q: "Como funciona a maquininha de cartão?", a: "O sistema registra a forma de pagamento (Pix, cartão ou dinheiro com troco) em cada venda, pro seu caixa fechar certo. A maquininha continua sendo a sua, à parte — o ComandaPRO não processa o cartão nem cobra taxa sobre a venda." },
+  { q: "Tem suporte se eu precisar?", a: "Tem. Suporte humano direto no WhatsApp — você fala com a gente, não com robô." },
   { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no plano anual (R$ ${BILLING.planos.mensal.equivMes}/mês no mensal), com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
   { q: "Preciso de vários sistemas diferentes?", a: "Não. Cardápio, comanda, mesa, cozinha, delivery, caixa e estoque estão num sistema só, e todos conversam entre si." },
 ];
@@ -107,7 +109,8 @@ function MesasMockup() {
 // ── Seção SEGMENTOS: cards de acesso às segmentadas (destaque no topo). Foto de comida + nicho.
 const SEG_IMG: Record<string, { img: string; tag: string }> = {
   acaiteria: { img: "/site/food-acai.jpg", tag: "Monta no copo · venda por peso" },
-  bar: { img: "/site/food-burger.jpg", tag: "Comanda por mesa · couvert e dose" },
+  bar: { img: "/site/food-bar.jpg", tag: "Comanda por mesa · couvert e dose" },
+  hamburgueria: { img: "/site/food-burger.jpg", tag: "Combos e adicionais · delivery e fidelidade" },
   pizzaria: { img: "/site/food-pizza.jpg", tag: "Meio a meio · combos e bordas" },
   sushi: { img: "/site/food-sushi.jpg", tag: "Combos · barcas · rodízio" },
 };
@@ -119,11 +122,11 @@ function SegmentosSection() {
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ color: INK }}>Escolha o seu segmento</h2>
         <p className="mt-4 text-lg text-[#6B5D52]">Cada tipo de food service já vem com o cardápio e as regras certas.</p>
       </div>
-      <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-10 flex flex-wrap justify-center gap-5">
         {NICHOS.map((n) => {
           const s = SEG_IMG[n.slug];
           return (
-            <Link key={n.slug} href={`/segmentos/${n.slug}`} className="site-lift group overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm">
+            <Link key={n.slug} href={`/segmentos/${n.slug}`} className="site-lift group w-full overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm sm:w-[calc(50%-0.625rem)] lg:w-[260px]">
               <div className="h-40 w-full overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s?.img} alt={n.nome} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
@@ -144,7 +147,7 @@ function SegmentosSection() {
 // ── Seção DOR: dor antes da solução (método Expresso). Cada dor é respondida por uma
 // funcionalidade mais abaixo na página. Tom de dono, direto.
 const DORES = [
-  { Icon: IconCard, t: "O iFood leva quase 30% de cada pedido", d: "Você trabalha, o cliente paga — e o app fica com o pedaço que era seu lucro." },
+  { Icon: IconCard, t: "O marketplace leva até ~30% de cada pedido", d: "Você trabalha, o cliente paga — e o app fica com o pedaço que era seu lucro." },
   { Icon: IconReceipt, t: "Pedido no caderno e no WhatsApp", d: "Comanda perdida, item esquecido, cozinha fazendo o que não foi pedido. No corre, o erro sai caro." },
   { Icon: IconBox, t: "Um sistema pro delivery, outro pra mesa, outro pro caixa", d: "Nenhum conversa com o outro. Você digita a mesma coisa três vezes e ainda dá diferença." },
   { Icon: IconChart, t: "Fim da noite e você não sabe o resultado", d: "Quanto vendeu, quanto sobrou no caixa, o que saiu do estoque. Decisão no achismo." },
@@ -400,7 +403,7 @@ function FidelidadeSection() {
         accent="motivo pra voltar."
         desc="O cliente ganha pontos por compra e troca por um item seu — nunca por dinheiro nem desconto. Ele consulta o saldo pelo telefone, vê quanto falta pro prêmio, e o próprio cupom imprime 'faltam X pontos pro açaí grátis'. Você define as regras: pontos por real ou fixos por compra, valor mínimo, dia turbo e validade."
         pills={["Pontos por compra", "Resgate por item", "Meus pontos por telefone", "Dia turbo (2×)", "Nunca vira dinheiro"]}
-        mock={<ScreenMock title="Meus pontos" badge="cliente" rows={[{ label: "Seu saldo", value: "120 pts", on: true }, { label: "Copo 350ml grátis", value: "100 pts" }, { label: "Cerveja grátis", value: "180 pts" }]} footer={{ label: "Falta pro próximo prêmio", value: "60 pts" }} />}
+        mock={<ScreenMock title="Meus pontos" badge="cliente" rows={[{ label: "Seu saldo", value: "120 pts", on: true }, { label: "Copo 350ml grátis", value: "100 pts" }, { label: "Combo grátis", value: "180 pts" }]} footer={{ label: "Falta pro próximo prêmio", value: "60 pts" }} />}
       />
     </section>
   );
@@ -413,7 +416,7 @@ function PrecoSection() {
       <div className="mx-auto max-w-2xl text-center">
         <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Preço</span>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Um plano. Tudo incluso.</h2>
-        <p className="mt-4 text-lg text-[#6B5D52]">Sem taxa de setup, sem comissão por pedido, sem fidelidade.</p>
+        <p className="mt-4 text-lg text-[#6B5D52]">Sem taxa de setup, sem comissão por pedido, sem contrato de permanência.</p>
       </div>
       <div className="mx-auto mt-12 max-w-md rounded-3xl border border-black/[0.06] bg-white shadow-sm p-8 text-center" style={{ boxShadow: `0 30px 80px -30px ${ACCENT}55` }}>
         <div className="text-sm font-semibold text-[#6B5D52]">a partir de</div>

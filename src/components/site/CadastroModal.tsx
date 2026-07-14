@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck } from "@/components/Icons";
+import { BILLING } from "@/config/billing";
 
 const ACCENT = "#6366F1";
 const INK = "#241C17";
@@ -90,7 +91,7 @@ export default function CadastroModal() {
             <h2 className="mt-3 text-3xl font-extrabold leading-[1.1] tracking-tight">Crie seu cardápio grátis em 2 minutos</h2>
             <p className="mt-3 text-white/85">Sem instalar nada. Sem cartão pra testar. Pronto pra receber pedido hoje.</p>
             <ul className="mt-6 space-y-3 text-[15px] font-semibold">
-              {["Cardápio digital + link de delivery", "0% de comissão por pedido", "14 dias grátis, cancela quando quiser"].map((b) => (
+              {["Cardápio digital no seu link", "Sem comissão de marketplace", `${BILLING.trialDias} dias grátis, cancela quando quiser`].map((b) => (
                 <li key={b} className="flex items-center gap-2.5"><span className="text-[#FFD84D]"><IconCheck width={18} height={18} /></span> {b}</li>
               ))}
             </ul>
@@ -122,7 +123,7 @@ export default function CadastroModal() {
               style={{ background: ACCENT, boxShadow: `0 12px 34px ${ACCENT}55` }}>
               Criar meu cardápio grátis <IconArrowRight width={18} height={18} />
             </button>
-            <div className="mt-3 text-center text-xs text-[#8A7B6E]">14 dias grátis · sem cartão · leva 2 minutos</div>
+            <div className="mt-3 text-center text-xs text-[#8A7B6E]">{BILLING.trialDias} dias grátis · sem cartão · leva 2 minutos</div>
           </div>
         </div>
       </div>

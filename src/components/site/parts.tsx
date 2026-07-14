@@ -118,6 +118,35 @@ function PanelWatermark() {
   );
 }
 
+// Mock de tela claro (card branco) pra painéis sem screenshot real (couvert/dose, venda por peso).
+type Row = { label: string; value?: string; on?: boolean };
+export function ScreenMock({ title, badge, rows, footer }: { title: string; badge?: string; rows: Row[]; footer?: { label: string; value: string } }) {
+  return (
+    <div className="site-lift w-full max-w-sm rounded-[22px] border border-black/[0.06] bg-white p-2.5" style={{ boxShadow: `0 26px 70px -24px ${ACCENT}30, 0 10px 30px rgba(80,40,20,.14)` }}>
+      <div className="rounded-[15px] bg-[#FBF7F1] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-bold" style={{ color: INK }}>{title}</span>
+          {badge && <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-[#6B5D52]">{badge}</span>}
+        </div>
+        <div className="space-y-1.5">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+              <span className="text-[13px] font-semibold" style={{ color: r.on ? ACCENT : INK }}>{r.label}</span>
+              {r.value && <span className="text-[13px] font-bold tabular-nums" style={{ color: r.on ? ACCENT : "#6B5D52" }}>{r.value}</span>}
+            </div>
+          ))}
+        </div>
+        {footer && (
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-3 py-2.5 shadow-sm">
+            <span className="text-[12px] font-semibold text-[#6B5D52]">{footer.label}</span>
+            <span className="text-sm font-extrabold tabular-nums" style={{ color: INK }}>{footer.value}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // PAINEL COLORIDO de funcionalidade (estilo Expresso): cor cheia + marca d'água + texto branco com
 // palavra-destaque amarela + pills contornadas + card branco de UI real ao lado. Igual ao site-mãe.
 export function ColorPanel({ color, eyebrow, EyeIcon, title, accent, desc, pills, img, imgAlt, mock, reverse }: {
@@ -163,7 +192,7 @@ export function PrecoSection({ incluso }: { incluso: string[] }) {
       <div className="mx-auto max-w-2xl text-center">
         <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Preço</span>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ color: INK }}>Um plano. Tudo incluso.</h2>
-        <p className="mt-4 text-lg text-[#6B5D52]">Sem taxa de setup, sem comissão por pedido, sem fidelidade.</p>
+        <p className="mt-4 text-lg text-[#6B5D52]">Sem taxa de setup, sem comissão por pedido, sem contrato de permanência.</p>
       </div>
       <div className="mx-auto mt-12 max-w-md rounded-3xl border border-black/[0.06] bg-white p-8 text-center shadow-sm" style={{ boxShadow: `0 30px 80px -30px ${ACCENT}55` }}>
         <div className="text-sm font-semibold text-[#6B5D52]">a partir de</div>
