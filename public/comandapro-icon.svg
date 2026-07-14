@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <linearGradient id="iconBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1F2937"/>
-      <stop offset="100%" stop-color="#030712"/>
+      <stop offset="0%" stop-color="#FF8A3D"/>
+      <stop offset="100%" stop-color="#F5480C"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220" fill="url(#iconBg)"/>
-  <text x="512" y="640" font-family="Arial Black, Arial, 'Segoe UI', sans-serif" font-weight="900" font-size="380" letter-spacing="-12" text-anchor="middle" fill="#FFFFFF">PRO</text>
+  <!-- Ícone = a pílula "PRO" da logo (Direção A): gradiente coral/laranja + perfuração de canhoto -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#iconBg)"/>
+  <!-- perfuração de canhoto (tracejado + furo), o aceno de "comanda/ticket" -->
+  <line x1="232" y1="150" x2="232" y2="874" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="14" stroke-dasharray="34 30" stroke-linecap="round"/>
+  <circle cx="232" cy="512" r="26" fill="#FFFFFF" fill-opacity="0.9"/>
+  <text x="590" y="640" font-family="Arial Black, Arial, 'Segoe UI', sans-serif" font-weight="900" font-size="360" letter-spacing="-14" text-anchor="middle" fill="#FFFFFF">PRO</text>
 </svg>

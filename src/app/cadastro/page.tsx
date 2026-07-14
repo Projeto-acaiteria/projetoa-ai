@@ -78,6 +78,16 @@ export default function CadastroPage() {
     if (!slugTouched) setSlug(slugify(negocio));
   }, [negocio, slugTouched]);
 
+  // Pré-preenche a partir do modal de captura da home (?negocio=&nome=&wa=) — self-service em 2 min.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const neg = q.get("negocio"), nm = q.get("nome"), wa = q.get("wa");
+    if (neg) setNegocio(neg);
+    if (nm) setNome(nm);
+    if (wa) setWhatsapp(formatPhone(wa));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // checa disponibilidade do link ao vivo (debounce)
   useEffect(() => {
     if (step !== 2 || slugFinal.length < 3) { setCheck(null); return; }

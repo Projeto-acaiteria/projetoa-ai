@@ -12,7 +12,17 @@ export const metadata: Metadata = {
   description: "Cardápio digital, comanda, mesa, delivery, balcão e gestão — num sistema só.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "ComandaPRO" },
-  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  // Favicon espalhada em TODAS as rotas (root layout): SVG crisp + PNG fallback + apple. Admin,
+  // cardápio (/[slug]) e segmentadas herdam daqui (metadata do Next faz merge, não sobrescreve).
+  icons: {
+    icon: [
+      { url: "/comandapro-icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
