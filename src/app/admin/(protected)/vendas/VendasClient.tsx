@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { IconSearch, IconTrash, IconCart } from "@/components/Icons";
@@ -35,6 +35,20 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
   const [bip, setBip] = useState("");
   const [bipMsg, setBipMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const bipRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const finalizarRef = useRef<HTMLButtonElement>(null);
+
+  // Atalhos de balcão (operador não tira a mão do teclado): F2 buscar · F3 bipar · F4 finalizar.
+  // Refs (estáveis) evitam closure velha; F4 clica o botão → sempre com o estado fresco.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "F2") { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
+      else if (e.key === "F3") { e.preventDefault(); bipRef.current?.focus(); }
+      else if (e.key === "F4") { e.preventDefault(); finalizarRef.current?.click(); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -156,13 +170,15 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
             {bipMsg && (
               <p className={`mt-1.5 px-1 text-xs font-bold ${bipMsg.ok ? "text-[var(--green-ok)]" : "text-red-500"}`}>{bipMsg.text}</p>
             )}
+            <p className="mt-1 px-1 text-[10px] text-[var(--text-faded)]">Atalhos: <b>F2</b> buscar · <b>F3</b> bipar · <b>F4</b> finalizar</p>
           </div>
           <div className="relative">
             <IconSearch width={16} height={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
+              ref={searchRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar peça, categoria, SKU..."
+              placeholder="Buscar peça, categoria, SKU... (F2)"
               className="w-full rounded-xl border border-line bg-bg-base py-2.5 pl-10 pr-3 text-sm text-ink outline-none focus:border-brand-600"
             />
           </div>
@@ -303,11 +319,12 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
           {done && <div className="rounded-lg bg-[var(--green-ok)]/10 px-3 py-2 text-xs text-[var(--green-ok)]">Venda {done} registrada ✓</div>}
 
           <button
+            ref={finalizarRef}
             onClick={finalizar}
             disabled={!cart.length || busy}
             className="w-full rounded-xl brand-gradient py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
           >
-            {busy ? "Registrando..." : `Finalizar venda · ${brl(total)}`}
+            {busy ? "Registrando..." : `Finalizar venda · ${brl(total)} (F4)`}
           </button>
         </Card>
       </div>
