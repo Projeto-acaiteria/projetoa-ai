@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { IconSearch, IconTrash, IconCart } from "@/components/Icons";
+import { useToast } from "@/components/admin/toast";
 import PedidosPendentes, { type Pedido } from "./PedidosPendentes";
 
 type Product = { sku: string; name: string; category: string; priceCents: number; stock: number; barcode: string | null };
@@ -21,6 +22,7 @@ const PAYS: { id: Pay; label: string }[] = [
 
 export default function VendasClient({ products, recentes, pedidos, machines, pixDiscountPercent }: { products: Product[]; recentes: Recente[]; pedidos: Pedido[]; machines: Machine[]; pixDiscountPercent: number }) {
   const router = useRouter();
+  const toast = useToast();
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
   const [pay, setPay] = useState<Pay>("dinheiro");
@@ -119,13 +121,15 @@ export default function VendasClient({ products, recentes, pedidos, machines, pi
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
       setDone(d.display + (d.stockWarning ? " · ⚠ confira o estoque" : ""));
+      toast(`Venda ${d.display} registrada${d.stockWarning ? " · confira o estoque" : ""}`);
       setCart([]);
       setDiscInput("");
       setCustomer("");
       setTimeout(() => setDone(null), 4000);
       router.refresh();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Erro ao registrar.");
+      const msg = e instanceof Error ? e.message : "Erro ao registrar.";
+      setErr(msg); toast(msg, "error");
     } finally {
       setBusy(false);
     }

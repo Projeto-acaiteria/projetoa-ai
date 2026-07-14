@@ -30,6 +30,7 @@ import type { Role } from "@/lib/auth/store";
 import { canSeeNav } from "@/lib/auth/roles";
 import type { Family } from "@/config/segments";
 import { brandVars } from "@/lib/brand-theme";
+import { ToastProvider } from "@/components/admin/toast";
 
 // Marca do painel: logo da loja se houver, senão a INICIAL do nome (neutro — nada de ícone de açaí).
 function BrandMark({ logoUrl, name }: { logoUrl?: string; name: string }) {
@@ -103,6 +104,7 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
   );
 
   return (
+    <ToastProvider>
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={brandVars(brandColor)}>
       {/* Vigias de impressão GLOBAIS: rodam em qualquer página, mas só imprimem na máquina do caixa
           (com impressora configurada). Fila sob demanda (conta do garçom) + vias de preparo novas. */}
@@ -170,5 +172,6 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

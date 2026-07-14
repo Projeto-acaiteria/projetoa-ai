@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { useToast } from "@/components/admin/toast";
 
 type Status = "pendente" | "aprovado" | "recusado" | "expirado";
 type ItemKind = "produto" | "servico";
@@ -37,6 +38,8 @@ function budgetTotal(b: Budget): number {
 
 export default function OrcamentosClient({ storeName }: { storeName?: string }) {
   const { ask, confirmDialog } = useConfirm();
+  const toast = useToast();
+  const OR_MSG: Record<string, string> = { aprovar: "Orçamento aprovado · OS gerada", delete: "Orçamento excluído", status: "Orçamento atualizado" };
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,7 +58,8 @@ export default function OrcamentosClient({ storeName }: { storeName?: string }) 
     try {
       const r = await fetch("/api/orcamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
       const d = await r.json();
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return; }
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return; }
+      toast(OR_MSG[action] ?? "Feito");
       await reload();
     } finally { setSaving(false); }
   }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/admin/ui";
+import { useToast } from "@/components/admin/toast";
 
 const brl = (c: number) => "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const toCents = (s: string) => Math.max(0, Math.round((parseFloat((s || "").replace(",", ".")) || 0) * 100));
@@ -13,6 +14,7 @@ const inputCls = "w-full rounded-lg border border-line bg-bg-base px-3 py-2 text
 // do editor de peças. Total e comissão recalculam ao vivo. Some quando a OS é quitada.
 export default function OSValuesEditor({ osId, serviceValueCents, discountCents, partsValueCents, commissionPercent }: { osId: string; serviceValueCents: number; discountCents: number; partsValueCents: number; commissionPercent: number }) {
   const router = useRouter();
+  const toast = useToast();
   const [sv, setSv] = useState(str(serviceValueCents));
   const [dc, setDc] = useState(discountCents ? str(discountCents) : "");
   const [busy, setBusy] = useState(false);
@@ -29,8 +31,8 @@ export default function OSValuesEditor({ osId, serviceValueCents, discountCents,
     try {
       const r = await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update-values", payload: { id: osId, serviceValueCents: service, discountCents: disc } }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return; }
-      setOk(true); router.refresh();
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return; }
+      setOk(true); toast("Valores atualizados"); router.refresh();
     } finally { setBusy(false); }
   }
 

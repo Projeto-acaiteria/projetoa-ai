@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/admin/ui";
+import { useToast } from "@/components/admin/toast";
 
 // Observação da OS que SAI no documento pro cliente (recepção/dono edita). Diferente das anotações
 // internas do técnico, que nunca aparecem no documento.
 export default function OSObsEditor({ id, initial }: { id: string; initial: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [text, setText] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -17,7 +19,7 @@ export default function OSObsEditor({ id, initial }: { id: string; initial: stri
     setSaving(true);
     try {
       await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "printObs", payload: { id, text } }) });
-      setSaved(true);
+      setSaved(true); toast("Observação salva");
       setTimeout(() => setSaved(false), 2000);
       router.refresh();
     } finally { setSaving(false); }

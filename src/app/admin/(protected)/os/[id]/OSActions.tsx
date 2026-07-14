@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { useToast } from "@/components/admin/toast";
 import { OS_PRIORITY_ORDER, OS_PRIORITY_META } from "@/lib/os-priority";
+
+const MSG: Record<string, string> = { status: "Situação atualizada", quitar: "OS quitada · comissão gerada", priority: "Prioridade atualizada", situacao: "Situação atualizada", assign: "Técnico atribuído", entregar: "OS entregue" };
 
 const STATUSES = [
   { k: "aguardando", label: "Aguardando" },
@@ -17,13 +20,17 @@ const PAYS: [string, string][] = [["pix", "PIX"], ["dinheiro", "Dinheiro"], ["ca
 export default function OSActions({ id, status, situacao, situacoes, paymentStatus, priority, staffId, staff }: { id: string; status: string; situacao: string | null; situacoes: string[]; paymentStatus: string; priority: string | null; staffId: string | null; staff: { id: string; name: string }[] }) {
   const router = useRouter();
   const { ask, confirmDialog } = useConfirm();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
   async function api(action: string, payload: Record<string, unknown>) {
     setBusy(true);
     try {
-      await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
+      const r = await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Não consegui salvar.", "error"); return; }
+      toast(MSG[action] ?? "Feito");
       router.refresh();
     } finally { setBusy(false); }
   }

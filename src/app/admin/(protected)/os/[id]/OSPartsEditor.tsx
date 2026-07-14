@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/admin/ui";
+import { useToast } from "@/components/admin/toast";
 
 type Part = { id: string; sku: string | null; name: string; qty: number; unitCostCents: number };
 type Produto = { id: string; name: string; priceCents: number };
@@ -13,6 +14,7 @@ const inputCls = "rounded-lg border border-line bg-bg-elevated px-3 py-2 text-sm
 
 export default function OSPartsEditor({ osId, parts, quitada, produtos }: { osId: string; parts: Part[]; quitada: boolean; produtos: Produto[] }) {
   const router = useRouter();
+  const toast = useToast();
   const byName = useMemo(() => new Map(produtos.map((p) => [p.name.toLowerCase(), p])), [produtos]);
   const [name, setName] = useState("");
   const [sku, setSku] = useState<string>("");
@@ -34,7 +36,8 @@ export default function OSPartsEditor({ osId, parts, quitada, produtos }: { osId
     try {
       const r = await fetch("/api/os", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return false; }
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return false; }
+      toast(action === "remove-part" ? "Peça removida" : "Peça adicionada");
       router.refresh();
       return true;
     } finally { setBusy(false); }

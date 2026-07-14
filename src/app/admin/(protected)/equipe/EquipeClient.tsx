@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { useToast } from "@/components/admin/toast";
 
 type PayType = "comissao" | "diaria" | "salario";
 type LoginRole = "technician" | "reception";
@@ -52,8 +53,11 @@ const inputCls = "rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 tex
 const PAY_LABEL: Record<PayType, string> = { comissao: "Comissão", diaria: "Diária", salario: "Salário" };
 const reaisToCents = (s: string) => Math.round((parseFloat(s.replace(",", ".")) || 0) * 100);
 
+const EQ_MSG: Record<string, string> = { create: "Membro adicionado", update: "Atualizado", delete: "Removido", createAccess: "Acesso criado", payCommission: "Comissão paga", reverseCommission: "Comissão estornada", payFixed: "Pagamento registrado", reverseFixed: "Pagamento estornado" };
+
 export default function EquipeClient() {
   const { ask, confirmDialog } = useConfirm();
+  const toast = useToast();
   const [acerto, setAcerto] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -104,7 +108,8 @@ export default function EquipeClient() {
     try {
       const r = await fetch("/api/equipe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
       const d = await r.json();
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return false; }
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return false; }
+      toast(EQ_MSG[action] ?? "Feito");
       await reload();
       return true;
     } finally { setSaving(false); }

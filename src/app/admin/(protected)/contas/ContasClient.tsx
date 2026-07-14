@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { useToast } from "@/components/admin/toast";
 
 type Kind = "pagar" | "receber";
 type Payment = { amountCents: number; date: string; note?: string | null };
@@ -30,6 +31,8 @@ const statusOf = (b: Bill): "pendente" | "parcial" | "pago" => {
 
 export default function ContasClient() {
   const { ask, confirmDialog } = useConfirm();
+  const toast = useToast();
+  const MSG: Record<string, string> = { create: "Conta criada", update: "Conta salva", baixa: "Baixa registrada", estornar: "Baixa estornada", delete: "Conta excluída" };
   const [tab, setTab] = useState<Kind>("pagar");
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +83,8 @@ export default function ContasClient() {
     try {
       const r = await fetch("/api/contas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
       const d = await r.json();
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return false; }
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return false; }
+      toast(MSG[action] ?? "Feito");
       await reload();
       return true;
     } finally { setSaving(false); }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { useToast } from "@/components/admin/toast";
 
 type Produto = { id: string; name: string; costCents: number };
 type PItem = { stockId?: string | null; name: string; qty: number; unitCostCents: number };
@@ -27,7 +28,9 @@ function purchaseTotal(p: Purchase): number {
 
 export default function ComprasClient({ produtos }: { produtos: Produto[] }) {
   const { ask, confirmDialog } = useConfirm();
+  const toast = useToast();
   const byName = useMemo(() => new Map(produtos.map((p) => [p.name.toLowerCase(), p])), [produtos]);
+  const MSG: Record<string, string> = { create: "Compra criada", update: "Compra salva", receber: "Compra recebida · estoque + despesa", delete: "Compra excluída" };
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,7 +76,8 @@ export default function ComprasClient({ produtos }: { produtos: Produto[] }) {
     try {
       const r = await fetch("/api/compras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, payload }) });
       const d = await r.json();
-      if (!r.ok) { setErr(d.error || "Não consegui salvar."); return false; }
+      if (!r.ok) { setErr(d.error || "Não consegui salvar."); toast(d.error || "Não consegui salvar.", "error"); return false; }
+      toast(MSG[action] ?? "Feito");
       await reload();
       return true;
     } finally { setSaving(false); }
