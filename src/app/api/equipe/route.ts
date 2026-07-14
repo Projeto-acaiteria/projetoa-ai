@@ -18,6 +18,7 @@ import {
   payCommission,
   reverseCommissionPayment,
 } from "@/lib/commission-payments-store";
+import { payFixed, listFixedPayments, reverseFixedPayment } from "@/lib/staff-pay-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,9 +65,10 @@ export async function GET(req: Request) {
 
   // DETALHE de 1 técnico (base do wizard "Registrar Pagamento"): OS pendentes + histórico de pagamentos.
   if (staffParam) {
-    const [pending, payments] = await Promise.all([
+    const [pending, payments, fixedPayments] = await Promise.all([
       pendingOSForStaff(staffParam, sid),
       listCommissionPayments(staffParam, sid),
+      listFixedPayments(staffParam, sid),
     ]);
     const pendingOut = pending.map((os) => ({
       id: os.id,
@@ -78,7 +80,7 @@ export async function GET(req: Request) {
       commissionPercent: os.commissionPercent,
       comissaoCents: osCommissionCents(os),
     }));
-    return NextResponse.json({ pending: pendingOut, payments });
+    return NextResponse.json({ pending: pendingOut, payments, fixedPayments });
   }
 
   const from = url.searchParams.get("from") || undefined;
@@ -189,6 +191,24 @@ export async function POST(req: Request) {
       }
       case "reverseCommission": {
         await reverseCommissionPayment(String(p.paymentId ?? ""), sid);
+        return NextResponse.json({ ok: true });
+      }
+      case "payFixed": { // pagamento salário/diária → vira despesa (salarios) + histórico
+        const e = await payFixed(
+          {
+            staffId: String(p.staffId ?? ""),
+            staffName: p.staffName != null ? String(p.staffName) : undefined,
+            amountCents: Number(p.amountCents ?? 0),
+            periodStart: p.periodStart != null ? String(p.periodStart) : undefined,
+            periodEnd: p.periodEnd != null ? String(p.periodEnd) : undefined,
+            note: p.note != null ? String(p.note) : undefined,
+          },
+          sid,
+        );
+        return NextResponse.json({ ok: true, id: e.id });
+      }
+      case "reverseFixed": {
+        await reverseFixedPayment(String(p.expenseId ?? ""), String(p.staffId ?? ""), sid);
         return NextResponse.json({ ok: true });
       }
       default:

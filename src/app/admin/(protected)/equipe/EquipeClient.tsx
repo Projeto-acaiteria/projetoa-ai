@@ -45,6 +45,7 @@ type PaymentRow = {
   paidAt: string;
 };
 
+type FixedPayment = { id: string; amountCents: number; periodStart: string | null; periodEnd: string | null; description: string; date: string };
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const dmy = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const inputCls = "rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
@@ -62,7 +63,8 @@ export default function EquipeClient() {
   // novo membro
   const [name, setName] = useState("");
   const [papel, setPapel] = useState<LoginRole>("technician");
-  const [value, setValue] = useState(""); // % comissão (técnico) ou R$ salário (recepção)
+  const [fixType, setFixType] = useState<"salario" | "diaria">("salario"); // não-técnico: salário ou diária
+  const [value, setValue] = useState(""); // % comissão (técnico) ou R$ salário/diária (recepção)
   // criar acesso (login) inline por membro
   const [accessFor, setAccessFor] = useState<string | null>(null);
   const [accessRole, setAccessRole] = useState<LoginRole>("technician");
@@ -78,6 +80,13 @@ export default function EquipeClient() {
   const [payNotes, setPayNotes] = useState("");
   const [payDate, setPayDate] = useState("");
   const [partial, setPartial] = useState(""); // override opcional do valor de comissão pago (parcial)
+  // modal de pagamento FIXO (salário/diária) — recepção contratada, ajudante por dia
+  const [payFixedFor, setPayFixedFor] = useState<Membro | null>(null);
+  const [fixedHistory, setFixedHistory] = useState<FixedPayment[]>([]);
+  const [fixedAmount, setFixedAmount] = useState("");
+  const [fixedFrom, setFixedFrom] = useState("");
+  const [fixedTo, setFixedTo] = useState("");
+  const [fixedNote, setFixedNote] = useState("");
 
   const reload = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -105,8 +114,25 @@ export default function EquipeClient() {
     // técnico ganha comissão (% sobre o serviço da OS); recepção não tem comissão (salário opcional).
     const payload = papel === "technician"
       ? { name: name.trim(), pay_type: "comissao", commission_percent: parseFloat(value.replace(",", ".")) || 0 }
-      : { name: name.trim(), pay_type: "salario", pay_value_cents: reaisToCents(value) };
-    if (await api("create", payload)) { setName(""); setValue(""); setPapel("technician"); }
+      : { name: name.trim(), pay_type: fixType, pay_value_cents: reaisToCents(value) };
+    if (await api("create", payload)) { setName(""); setValue(""); setPapel("technician"); setFixType("salario"); }
+  }
+
+  // pagamento FIXO (salário/diária): abre o modal e carrega o histórico do funcionário
+  async function openFixed(m: Membro) {
+    setPayFixedFor(m); setFixedHistory([]); setFixedAmount(m.pay_value_cents ? String(m.pay_value_cents / 100).replace(".", ",") : "");
+    setFixedFrom(""); setFixedTo(""); setFixedNote(""); setErr("");
+    const r = await fetch(`/api/equipe?staff=${m.id}`, { cache: "no-store" });
+    const d = await r.json();
+    setFixedHistory(d.fixedPayments ?? []);
+  }
+  async function doPayFixed() {
+    if (!payFixedFor) return;
+    const ok = await api("payFixed", {
+      staffId: payFixedFor.id, staffName: payFixedFor.name, amountCents: reaisToCents(fixedAmount),
+      periodStart: fixedFrom || undefined, periodEnd: fixedTo || undefined, note: fixedNote.trim() || undefined,
+    });
+    if (ok) await openFixed(payFixedFor); // recarrega histórico, mantém o modal aberto
   }
   async function grantAccess(id: string) {
     if (!email.trim() || senha.length < 6) { setErr("Informe email e senha (mín. 6)."); return; }
@@ -159,7 +185,13 @@ export default function EquipeClient() {
             <option value="technician">Técnico</option>
             <option value="reception">Recepção</option>
           </select>
-          <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" placeholder={papel === "technician" ? "Comissão %" : "Salário R$ (opc.)"} className={`${inputCls} w-40`} />
+          {papel === "reception" && (
+            <select value={fixType} onChange={(e) => setFixType(e.target.value as "salario" | "diaria")} className={`${inputCls} w-32`}>
+              <option value="salario">Salário</option>
+              <option value="diaria">Diária</option>
+            </select>
+          )}
+          <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" placeholder={papel === "technician" ? "Comissão %" : fixType === "diaria" ? "Diária R$ (opc.)" : "Salário R$ (opc.)"} className={`${inputCls} w-40`} />
           <button onClick={add} disabled={saving || !name.trim()} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Adicionar</button>
         </div>
         <p className="mt-2 text-xs text-[var(--text-faded)]">O <b>técnico</b> executa as OS e ganha comissão (% sobre o serviço da OS quitada — peça nunca entra na base). A <b>recepção</b> atende o balcão/vendas e não tem comissão. Esses valores são do Adm — não aparecem pro funcionário. O login (e-mail + senha) leva cada um pra sua área.</p>
@@ -224,8 +256,10 @@ export default function EquipeClient() {
             <div><div className="text-xs text-[var(--text-muted)]">Comissão{(from || to) ? " (período)" : ""}</div><div className="font-bold text-ink">{m.pay_type === "comissao" ? brl(m.comissaoCents) : brl(m.pay_value_cents)}</div></div>
             <div><div className="text-xs text-[var(--text-muted)]">Pendente (a pagar)</div><div className="font-extrabold text-[var(--green-ok)]">{brl(m.pendenteCents)}</div></div>
             <div className="flex items-end">
-              {m.pay_type === "comissao" && m.pendenteCents > 0 && (
-                <button onClick={() => openPay(m)} disabled={saving} className="w-full rounded-xl brand-gradient px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Registrar pagamento</button>
+              {m.pay_type === "comissao" ? (
+                m.pendenteCents > 0 && <button onClick={() => openPay(m)} disabled={saving} className="w-full rounded-xl brand-gradient px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Registrar pagamento</button>
+              ) : (
+                <button onClick={() => openFixed(m)} disabled={saving} className="w-full rounded-xl brand-gradient px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Registrar pagamento</button>
               )}
             </div>
           </div>
@@ -233,7 +267,7 @@ export default function EquipeClient() {
       ))}
 
       <p className="rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
-        A comissão do técnico nasce só quando a OS é <b>quitada</b> e sempre sobre o valor do <b>serviço</b> (mão de obra) — peça nunca entra na base. Recepção/salário: o fixo é acertado à parte. Encargos de folha (13º, FGTS) = contador.
+        A comissão do técnico nasce só quando a OS é <b>quitada</b> e sempre sobre o valor do <b>serviço</b> (mão de obra) — peça nunca entra na base. Salário/diária (recepção, ajudante) você paga em <b>Registrar pagamento</b> — entra como despesa no Financeiro. Encargos de folha (13º, FGTS) = contador.
       </p>
 
       {payFor && (
@@ -318,6 +352,58 @@ export default function EquipeClient() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de pagamento FIXO (salário/diária) — sem OS, gera despesa "Salários" + histórico */}
+      {payFixedFor && (
+        <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center" onClick={() => setPayFixedFor(null)}>
+          <div className="card w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-ink">Pagar {PAY_LABEL[payFixedFor.pay_type].toLowerCase()} · {payFixedFor.name}</h3>
+              <button onClick={() => setPayFixedFor(null)} className="text-xl leading-none text-[var(--text-muted)]">×</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Valor pago</label>
+                <input value={fixedAmount} onChange={(e) => setFixedAmount(e.target.value)} inputMode="decimal" placeholder="0,00" className={`${inputCls} w-full`} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">Período de (opc.)</label>
+                <input type="date" value={fixedFrom} onChange={(e) => setFixedFrom(e.target.value)} className={`${inputCls} w-full`} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">até (opc.)</label>
+                <input type="date" value={fixedTo} onChange={(e) => setFixedTo(e.target.value)} className={`${inputCls} w-full`} />
+              </div>
+            </div>
+            <input value={fixedNote} onChange={(e) => setFixedNote(e.target.value)} placeholder="Observação (ex.: adiantamento, vale)" className={`${inputCls} mt-2 w-full`} />
+            <p className="mt-2 text-[11px] text-[var(--text-faded)]">Entra como despesa <b>Salários</b> no Financeiro automaticamente — não lance de novo lá.</p>
+            {err && <p className="mt-2 text-sm font-semibold text-red-600">{err}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setPayFixedFor(null)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)]">Fechar</button>
+              <button onClick={doPayFixed} disabled={saving || reaisToCents(fixedAmount) <= 0} className="flex-1 rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Registrar pagamento</button>
+            </div>
+
+            {fixedHistory.length > 0 && (
+              <div className="mt-5 border-t border-line pt-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Histórico de pagamentos</div>
+                <div className="space-y-1">
+                  {fixedHistory.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg-surface-2 px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-ink">{brl(p.amountCents)} <span className="text-xs font-normal text-[var(--text-muted)]">· {dmy(p.date)}</span></div>
+                        {p.periodStart && <div className="text-xs text-[var(--text-muted)]">{dmy(p.periodStart)} – {dmy(p.periodEnd)}</div>}
+                      </div>
+                      <button onClick={async () => { if (await ask({ message: "Estornar este pagamento? A despesa é removida do Financeiro.", danger: true, confirmLabel: "Estornar" })) { await api("reverseFixed", { expenseId: p.id, staffId: payFixedFor.id }); openFixed(payFixedFor); } }} disabled={saving} className="shrink-0 text-xs font-bold text-red-500">estornar</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

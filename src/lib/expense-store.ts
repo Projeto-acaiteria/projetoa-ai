@@ -13,6 +13,10 @@ export type Expense = {
   amountCents: number;
   date: string; // YYYY-MM-DD (data da despesa)
   createdAt: string;
+  // pagamento de equipe (salário/diária): amarra a despesa ao funcionário p/ histórico em Equipe
+  staffId?: string;
+  periodStart?: string; // YYYY-MM-DD
+  periodEnd?: string; // YYYY-MM-DD
 };
 
 export const EXPENSE_CATS: ExpenseCategory[] = [
