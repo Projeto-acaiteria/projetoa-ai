@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth/store";
 import { getStore } from "@/lib/settings-store";
-import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSSituacao, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, addOSPart, removeOSPart, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
+import { createServiceOrder, updateOSStatus, updateOSDiagnosis, updateOSNotes, updateOSPrintObs, updateOSPriority, updateOSSituacao, updateOSValues, updateOSEstimate, markOSNotified, addOSPhoto, removeOSPhoto, addOSPart, removeOSPart, createMontagemOS, quitarOS, assignTechnician, getServiceOrder, searchServiceOrders, lookupCustomerByDoc, type OSStatus, type MontagemPart } from "@/lib/service-orders-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +109,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "remove-part":
         await removeOSPart(String(p.id), String(p.partId), storeId);
+        return NextResponse.json({ ok: true });
+      case "update-values": // ajusta valor do serviço / desconto (recepção/owner — mexe no total)
+        await updateOSValues(String(p.id), { serviceValueCents: p.serviceValueCents != null ? Number(p.serviceValueCents) : undefined, discountCents: p.discountCents != null ? Number(p.discountCents) : undefined }, storeId);
         return NextResponse.json({ ok: true });
       case "estimate":
         await updateOSEstimate(String(p.id), String(p.date ?? ""), storeId);

@@ -8,6 +8,7 @@ import { getStore } from "@/lib/settings-store";
 import OSActions from "./OSActions";
 import OSObsEditor from "./OSObsEditor";
 import OSPartsEditor from "./OSPartsEditor";
+import OSValuesEditor from "./OSValuesEditor";
 import DocShare from "@/components/admin/DocShare";
 
 export const dynamic = "force-dynamic";
@@ -60,28 +61,30 @@ export default async function OSDetail({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-4">
-          <Card className="p-5">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Valores</h3>
-            <Row label="Serviço (mão de obra)" value={brl(os.serviceValueCents)} />
-            <Row label="Peças" value={brl(os.partsValueCents)} />
-            {os.discountCents > 0 && <Row label="Desconto" value={`− ${brl(os.discountCents)}`} />}
-            <div className="mt-2 border-t border-line pt-2">
-              <Row label="Total" value={brl(os.totalCents)} strong />
-            </div>
-            <div className="mt-3 rounded-lg bg-bg-surface-2 p-3 text-xs">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[var(--text-muted)]">Técnico</span>
-                <span className="font-semibold text-ink">{tecnico?.name ?? "não atribuído"}</span>
+          {os.paymentStatus === "quitada" ? (
+            <Card className="p-5">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Valores</h3>
+              <Row label="Serviço (mão de obra)" value={brl(os.serviceValueCents)} />
+              <Row label="Peças" value={brl(os.partsValueCents)} />
+              {os.discountCents > 0 && <Row label="Desconto" value={`− ${brl(os.discountCents)}`} />}
+              <div className="mt-2 border-t border-line pt-2">
+                <Row label="Total" value={brl(os.totalCents)} strong />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[var(--text-muted)]">Comissão ({os.commissionPercent}% do serviço)</span>
-                <span className="font-mono font-bold text-ink">{os.paymentStatus === "quitada" ? brl(commission) : "—"}</span>
+              <div className="mt-3 rounded-lg bg-bg-surface-2 p-3 text-xs">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[var(--text-muted)]">Técnico</span>
+                  <span className="font-semibold text-ink">{tecnico?.name ?? "não atribuído"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--text-muted)]">Comissão ({os.commissionPercent}% do serviço)</span>
+                  <span className="font-mono font-bold text-ink">{brl(commission)}</span>
+                </div>
+                <div className="mt-1 text-[10px] text-[var(--text-faded)]">apurada (OS quitada)</div>
               </div>
-              <div className="mt-1 text-[10px] text-[var(--text-faded)]">
-                {os.paymentStatus === "quitada" ? "apurada (OS quitada)" : "nasce quando a OS for quitada"}
-              </div>
-            </div>
-          </Card>
+            </Card>
+          ) : (
+            <OSValuesEditor osId={os.id} serviceValueCents={os.serviceValueCents} discountCents={os.discountCents} partsValueCents={os.partsValueCents} commissionPercent={os.commissionPercent} />
+          )}
 
           <OSActions id={os.id} status={os.status} situacao={os.situacao} situacoes={store.situacoesOS ?? []} paymentStatus={os.paymentStatus} priority={os.priority} staffId={os.staffId} staff={staff.map((s) => ({ id: s.id, name: s.name }))} />
         </div>

@@ -312,6 +312,20 @@ export async function removeOSPart(osId: string, partId: string, storeId?: strin
   await recomputeOSTotals(osId, sid);
 }
 
+/** Ajusta valor do serviço e/ou desconto da OS (fluxo recebe→diagnostica→precifica). Recalcula o
+ *  total (serviço + peças − desconto). Bloqueado em OS quitada (total/comissão já fechados). */
+export async function updateOSValues(osId: string, input: { serviceValueCents?: number; discountCents?: number }, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: os } = await db().from("service_orders").select("payment_status").eq("id", osId).eq("store_id", sid).maybeSingle();
+  if (!os) throw new Error("OS não encontrada.");
+  if ((os as { payment_status?: string }).payment_status === "quitada") throw new Error("OS quitada — os valores estão bloqueados.");
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.serviceValueCents != null) patch.service_value_cents = Math.max(0, Math.round(Number(input.serviceValueCents)));
+  if (input.discountCents != null) patch.discount_cents = Math.max(0, Math.round(Number(input.discountCents)));
+  await db().from("service_orders").update(patch).eq("id", osId).eq("store_id", sid);
+  await recomputeOSTotals(osId, sid); // total = serviço + peças − desconto
+}
+
 /** Marca que a recepção avisou o cliente (WhatsApp) — carimbo p/ não avisar de novo à toa. */
 export async function markOSNotified(id: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
