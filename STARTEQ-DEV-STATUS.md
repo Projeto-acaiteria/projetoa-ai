@@ -1,6 +1,26 @@
 # Starteq (ComandaPRO) — Estado de Desenvolvimento / Handoff
 
-_Última atualização: 13/07/2026. Escrito pra uma NOVA instância do Verbo continuar o desenvolvimento sem perder contexto._
+_Última atualização: 14/07/2026. Escrito pra uma NOVA instância do Verbo continuar o desenvolvimento sem perder contexto._
+
+## 🚦 STATUS ATUAL (14/07/2026) — projeto salvo, apresentação adiada
+**Situação:** o sistema está **funcionalmente completo e testado** (CIC + mês simulado). A apresentação pro Junior foi **adiada de novo** (ele ocupado + vai viajar). Projeto em espera até ele voltar. **Nada mais a codar por ora — aguardar o Junior.**
+
+**Pronto pra operar (🟢):** ciclo AT ponta a ponta — check-in OS (80mm) → diagnostica → **editar valor do serviço** → **adicionar peça** → quita → **paga comissão (técnico) + salário/diária (recepção)**. Comissão separada (serviço sim, peça não), provada em 66 OS. Vendas PDV (bipe + atalhos F2/F3/F4 + toasts), Compras, Contas, Estoque mín/máx, Situações, Relatórios ABC, papéis com trava. Toasts globais + modais in-app (sem confirm nativo).
+
+**Bloqueadores de go-live (🔴 — dependem do Junior/campo):**
+1. **Fiscal não emite** — fiação Focus NFe pronta, falta certificado A1 + token + regime do Junior. Ele NÃO pode largar o GestãoClick sem isso (NFC-e/NFS-e é lei).
+2. **Impressão física não confirmada** — 80mm silencioso + A4 preenchido nunca vistos saindo em papel real (QZ conectou; "só o campo fecha").
+
+**Pré-lançamento (🟡):**
+- **Limpar dados de teste** — TESTE-CIC + mês simulado ESTÃO no tenant Starteq agora. Scripts locais prontos: `node scripts/clean-mes-starteq.mjs --apply` (mês simulado, via `.seed-mes-manifest.json`). Os dados TESTE-CIC dos CICs (OS/vendas/compra/contas/técnico/situação) precisam de limpeza manual ou script à parte.
+- **Logins reais** (hoje demo `starteq@teste.com`/`Starteq2026`).
+- **Importar clientes** do GestãoClick (`scripts/import-clientes-starteq.mjs` pronto, falta o CSV do Junior).
+- **Verificar mobile/tablet** (recepção usa; testamos no desktop).
+
+**Frentes de UI/UX na fila (quando retomar):** liquidação realizado × previsto por forma de pgto (aprendizado do teste de volume no GestãoClick — service-first/aditivo p/ não quebrar food); pente-fino mobile; hierarquia visual do cockpit.
+
+**Aprendizado competitivo (memória `reference_gestaoclick_vs_comandapro_delta`):** GestãoClick TEM comissão de técnico (relatório dedicado) — NÃO afirmar que não têm. Nossa vantagem é UX/automação (comissão automática, na OS, em tempo real, forçando peça-sem-comissão). PDV deles trava sob uso = nossa chance. Cadastro deles é 8 abas vs nosso 1-tela.
+
 
 ## O que é
 - **Starteq** = tenant de Assistência Técnica (loja de informática/games) DENTRO do ComandaPRO. Não é app separado: é a plataforma multi-tenant multi-vertical rodando em `comandapro.net.br/starteq`.
