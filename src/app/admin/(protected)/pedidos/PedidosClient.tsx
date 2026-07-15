@@ -148,7 +148,9 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/pedidos", { cache: "no-store" });
+      // ?board=1: só a janela recente (7 dias) — o board só mostra ativos + entregues de hoje.
+      // Evita rebaixar o histórico inteiro a cada 4s (payload cresceria sem limite).
+      const res = await fetch("/api/pedidos?board=1", { cache: "no-store" });
       const data = await res.json();
       setOrders(data.orders ?? []);
       // apito + auto-impressão de pedido novo agora é do OrderWatcher (vigia global, em qualquer tela)

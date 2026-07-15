@@ -92,6 +92,16 @@ export async function ordersSince(sinceId: number, storeId?: string): Promise<Or
   return (data ?? []).map((r) => (r as { data: Order }).data);
 }
 
+// Pedidos recentes (createdAt >= `sinceIso`) — pro BOARD da tela Pedidos, que só mostra ativos +
+// entregues de HOJE. Evita rebaixar o histórico inteiro a cada 4s: o payload fica limitado à
+// janela, não cresce com o histórico. createdAt é ISO UTC → comparável direto no banco (JSONB).
+export async function recentOrders(sinceIso: string, storeId?: string): Promise<Order[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("orders").select("data").eq("store_id", sid).gte("data->>createdAt", sinceIso);
+  if (error) throw new Error("Erro ao ler pedidos: " + error.message);
+  return (data ?? []).map((r) => (r as { data: Order }).data).sort((a, b) => b.id - a.id);
+}
+
 export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 
 // INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.

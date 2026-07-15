@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addOrder, listOrders, maxOrderId, ordersSince, type OrderItem } from "@/lib/orders-store";
+import { addOrder, listOrders, maxOrderId, ordersSince, recentOrders, type OrderItem } from "@/lib/orders-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStore } from "@/lib/settings-store";
 import { db } from "@/lib/supabase";
@@ -33,7 +33,13 @@ export async function GET(req: Request) {
   if (desde !== null) {
     return NextResponse.json({ orders: await ordersSince(Number(desde) || 0, loja.id) });
   }
-  // lista completa: tela Pedidos
+  // board da tela Pedidos: só a janela recente (7 dias) — cobre ativos + entregues de hoje sem
+  // rebaixar o histórico inteiro a cada 4s. O client já filtra (colunas de status + entregue-hoje).
+  if (searchParams.has("board")) {
+    const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    return NextResponse.json({ orders: await recentOrders(sinceIso, loja.id) });
+  }
+  // lista completa: outros consumidores
   const orders = await listOrders(loja.id);
   return NextResponse.json({ orders });
 }
