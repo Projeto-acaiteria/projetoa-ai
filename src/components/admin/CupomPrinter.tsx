@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { brl } from "@/lib/format";
 import { IconPrinter, IconCheck } from "@/components/Icons";
 import { printVias } from "@/lib/print";
@@ -34,7 +34,13 @@ const row = { display: "flex", justifyContent: "space-between", gap: "8px" } as 
 const hr = <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />;
 
 export default function CupomPrinter({ data, onClose }: { data: CupomData; onClose: () => void }) {
+  // Imprime UMA vez por montagem. O `data` é montado inline no pai (cupomFromOrder(...)), e telas
+  // como Pedidos/Mesas re-renderizam por polling (4-5s): sem esse guard, cada render recriava `data`
+  // e o efeito reimprimia em LOOP a cada ciclo. Reimpressão explícita = botão "Imprimir de novo".
+  const printedRef = useRef(false);
   useEffect(() => {
+    if (printedRef.current) return;
+    printedRef.current = true;
     void printVias((via) => ticketHtml({ ...data, origem: "balcao", via }));
   }, [data]);
 
