@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addOrder, listOrders, type OrderItem } from "@/lib/orders-store";
+import { addOrder, listOrders, maxOrderId, ordersSince, type OrderItem } from "@/lib/orders-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStore } from "@/lib/settings-store";
 import { db } from "@/lib/supabase";
@@ -19,10 +19,21 @@ async function resolveOrderStore(slug?: string): Promise<string> {
   return resolveStoreId();
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   // listar pedidos = ADMIN (sem login não pode varrer os pedidos do tenant default)
   const loja = await getCurrentStore();
   if (!loja) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const { searchParams } = new URL(req.url);
+  // baseline do vigia: só o maior id atual (não baixa o histórico)
+  if (searchParams.has("maxid")) {
+    return NextResponse.json({ maxId: await maxOrderId(loja.id) });
+  }
+  // delta do vigia: só o que entrou depois do último id visto (quase sempre vazio)
+  const desde = searchParams.get("desde");
+  if (desde !== null) {
+    return NextResponse.json({ orders: await ordersSince(Number(desde) || 0, loja.id) });
+  }
+  // lista completa: tela Pedidos
   const orders = await listOrders(loja.id);
   return NextResponse.json({ orders });
 }

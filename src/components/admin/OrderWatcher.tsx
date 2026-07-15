@@ -11,8 +11,7 @@ import type { Order } from "@/lib/orders-store";
 // na tela Pedidos). Os toggles ficam na tela Pedidos e gravam no localStorage; aqui eu releio o
 // estado a cada ciclo, então ligar/desligar lá vale aqui em até ~4s. Renderiza null (sem UI).
 export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRodape }: { storeName: string; endereco: string; cnpj: string; tel: string; cupomRodape: string }) {
-  const seen = useRef<Set<number>>(new Set());
-  const first = useRef(true);
+  const lastId = useRef<number | null>(null); // maior id já visto; null = ainda sem baseline
   const audioCtx = useRef<AudioContext | null>(null);
 
   // bipe de novo pedido (Web Audio, sem arquivo) — 2 toques curtos
@@ -36,17 +35,21 @@ export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRoda
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/pedidos", { cache: "no-store" });
-      const data = await res.json();
-      const list: Order[] = data.orders ?? [];
-      // 1ª carga só marca os existentes (sem tempestade de impressão); depois trata os NOVOS do link
-      if (first.current) {
-        list.forEach((o) => seen.current.add(o.id));
-        first.current = false;
+      // 1ª vez: pega só o MAIOR id atual (baseline leve, sem baixar o histórico nem tempestade
+      // de impressão). Enquanto não tiver baseline, retenta aqui — rede instável não trava o vigia.
+      if (lastId.current === null) {
+        const res = await fetch("/api/pedidos?maxid=1", { cache: "no-store" });
+        const data = await res.json();
+        lastId.current = Number(data.maxId ?? 0);
         return;
       }
-      const novos = list.filter((o) => !seen.current.has(o.id));
-      novos.forEach((o) => seen.current.add(o.id));
+      // ciclos seguintes: só o que entrou DEPOIS do último id visto (quase sempre vazio)
+      const res = await fetch(`/api/pedidos?desde=${lastId.current}`, { cache: "no-store" });
+      const data = await res.json();
+      // só pedidos já gravados por completo (id numérico) — ignora row em meio de escrita
+      const novos: Order[] = (data.orders ?? []).filter((o: Order) => Number.isFinite(o?.id));
+      if (!novos.length) return;
+      lastId.current = Math.max(lastId.current, ...novos.map((o) => o.id));
       const novosLink = novos.filter((o) => o.mode !== "balcao");
       if (!novosLink.length) return;
       // relê os toggles a cada ciclo (mudança na tela Pedidos vale aqui sem remontar)

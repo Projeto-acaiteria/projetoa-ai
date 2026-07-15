@@ -75,6 +75,23 @@ export async function listOrders(storeId?: string): Promise<Order[]> {
   return (await readAll(storeId)).sort((a, b) => b.id - a.id);
 }
 
+// Só o MAIOR id (baseline do vigia de pedidos) — 1 row via índice PK, não baixa o histórico.
+export async function maxOrderId(storeId?: string): Promise<number> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("orders").select("id").eq("store_id", sid).order("id", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error("Erro ao ler pedidos: " + error.message);
+  return data ? Number((data as { id: number }).id) : 0;
+}
+
+// Só os pedidos com id > `sinceId` (delta do vigia) — normalmente ZERO linha. Filtro no índice PK,
+// em vez de baixar a tabela inteira a cada 4s. Ordena crescente pro cliente avançar o último id.
+export async function ordersSince(sinceId: number, storeId?: string): Promise<Order[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data, error } = await db().from("orders").select("data").eq("store_id", sid).gt("id", sinceId).order("id", { ascending: true });
+  if (error) throw new Error("Erro ao ler pedidos: " + error.message);
+  return (data ?? []).map((r) => (r as { data: Order }).data);
+}
+
 export type NewOrder = Omit<Order, "id" | "display" | "createdAt" | "status">;
 
 // INSERT de UMA linha — o banco gera o id (identity). Sem race de id, sem delete-all.
