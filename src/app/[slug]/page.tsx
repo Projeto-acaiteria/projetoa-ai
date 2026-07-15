@@ -14,7 +14,16 @@ import TemplateBar from "@/components/bar/TemplateBar";
 import TemplateGrid from "@/components/grid/TemplateGrid";
 import InstallApp from "@/components/InstallApp";
 
-export const dynamic = "force-dynamic"; // reflete edições do adm na hora
+// ISR: cacheia o cardápio por 30s (era force-dynamic). Corta a leitura do banco de "1 por visita"
+// pra "1 a cada 30s por loja" — o maior dreno de egress do cliente (QR/delivery). Edição do adm
+// aparece pro cliente em até 30s. Badge aberto/fechado idem (irrelevante nesse intervalo).
+export const revalidate = 30;
+// slugs são dinâmicos (não dá pra pré-gerar no build), mas declarar generateStaticParams habilita
+// o ISR ON-DEMAND: o Next passa a CACHEAR o render por slug por 30s. Sem isto, `revalidate` é
+// ignorado e a rota fica 100% dinâmica (relê o banco a cada visita). dynamicParams=true (default).
+export function generateStaticParams() {
+  return [];
+}
 
 // título/preview por LOJA (compartilhar o link no WhatsApp mostra o nome da loja, não "ComandaPRO")
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {

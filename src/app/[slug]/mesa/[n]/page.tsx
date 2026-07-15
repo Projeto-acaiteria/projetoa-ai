@@ -7,7 +7,14 @@ import { getStore, isOpenNow } from "@/lib/settings-store";
 import TemplateBar from "@/components/bar/TemplateBar";
 import TemplateGrid from "@/components/grid/TemplateGrid";
 
-export const dynamic = "force-dynamic";
+// ISR 30s (era force-dynamic): cada scan de QR de mesa relia o cardápio inteiro do banco.
+// Agora cacheia por (loja, mesa) por 30s. Cardápio é igual em toda mesa; edição aparece em ≤30s.
+export const revalidate = 30;
+// habilita ISR on-demand (cacheia o render por loja+mesa por 30s). Sem generateStaticParams o
+// Next ignora o revalidate e relê o cardápio do banco a cada scan de QR. dynamicParams=true.
+export function generateStaticParams() {
+  return [];
+}
 
 // Pedido PELA MESA (QR /[slug]/mesa/N). O cliente na mesa monta e envia — cai na comanda da mesa
 // já roteado por estação (cozinha/bar) → KDS. Por ora só o modelo bar usa pedido pela mesa.
