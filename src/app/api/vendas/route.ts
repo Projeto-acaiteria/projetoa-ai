@@ -38,113 +38,120 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  // sem caixa aberto, não vende (regra de PDV)
-  if (!(await getOpenSession())) {
-    return NextResponse.json({ error: "Abra o caixa antes de vender" }, { status: 409 });
-  }
-
-  const items = (b.items || []).filter((i) => i.qty > 0);
-  if (!items.length) return NextResponse.json({ error: "Comanda vazia" }, { status: 400 });
-  if (!b.paymentMethod || !METHODS.includes(b.paymentMethod)) {
-    return NextResponse.json({ error: "Forma de pagamento inválida" }, { status: 400 });
-  }
-
-  const subtotalCents = items.reduce((s, i) => s + i.unitCents * i.qty, 0);
-  // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
-  const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
-  const totalCents = subtotalCents - discountCents;
-  // split de pagamento: 2+ formas. Valida a soma; taxa do cartão só sobre a parte no cartão.
-  const isCard = (m?: string) => m === "debito" || m === "credito";
-  const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && METHODS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
-  const isSplit = rawPays.length >= 2;
-  if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
-    return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
-  }
-  const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : b.paymentMethod;
-  // taxa do cartão sobre o TOTAL pago (forma única) OU soma de TODAS as parcelas no cartão (split)
-  const storeId = await resolveStoreId();
-  const card = isSplit
-    ? await resolveSplitCardFee(rawPays.filter((p) => isCard(p.method)), storeId, { machineId: b.machineId, parcelas: b.parcelas })
-    : await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
-  const orderItems: OrderItem[] = items.map((i) => ({
-    group: i.group || "Venda",
-    name: i.name,
-    qty: i.qty,
-    paidCents: i.unitCents * i.qty,
-  }));
-  const nowIso = new Date().toISOString();
-  // congela o custo dos insumos no consumes → CMV histórico estável (não-fatal)
-  const consumes = await snapshotConsumes(b.consumes || [], storeId);
-
-  const order = await addOrder(
-    {
-      customerName: b.customerName?.trim() || "Balcão",
-      phone: b.customerPhone?.trim() || "",
-      mode: "balcao",
-      sizeLabel: `${items.length} ${items.length === 1 ? "item" : "itens"}`,
-      items: orderItems,
-      subtotalCents,
-      feeCents: 0, // sem taxa de entrega no balcão
-      totalCents,
-      discountCents,
-      paymentMethod: effMethod,
-      payments: isSplit ? rawPays : undefined,
-      cardFeeCents: card.feeCents,
-      cardMachineId: card.machineId,
-      cardMachineName: card.machineName,
-      cardFeePercent: card.feePercent,
-      parcelas: card.parcelas,
-      consumes, // ficha técnica aplicada (custo congelado — rastro de auditoria + CMV)
-    },
-    nowIso,
-    "entregue", // balcão = já entregue/pago
-  );
-
-  // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
-  // Mas NÃO engole o resultado: se alguma baixa falhar, o operador é avisado (stockWarning).
-  const stock = await applyConsumes(consumes, `Venda ${order.display}`, dateBR(nowIso));
-  const stockWarning = stock.failed.length
-    ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
-    : undefined;
-
-  // pontos (só se identificou o cliente por telefone)
-  let pointsAwarded = 0;
-  let pointsInfo: string | undefined;
-  if (b.customerPhone?.trim()) {
-    const phone = b.customerPhone.trim();
-    const cfg = await getLoyalty();
-    const existing = await getByPhone(phone);
-    const isFirstPurchase = !existing || existing.history.length === 0;
-    // fidelidade por categoria (açaí): a montagem do copo (sem stockId) SEMPRE pontua; a revenda
-    // pontua só se a categoria do estoque não estiver desligada. Lookup server-side (não confia no client).
-    const nonEarning = new Set(cfg.nonEarningCategories ?? []);
-    let eligibleSubtotal = subtotalCents;
-    if (nonEarning.size) {
-      const catById = new Map((await listStock(storeId)).map((s) => [s.id, s.category]));
-      eligibleSubtotal = items.reduce((s, i) => {
-        const cat = i.stockId ? catById.get(i.stockId) : undefined;
-        const earns = !cat || !nonEarning.has(cat); // sem categoria de revenda = montagem = pontua
-        return s + (earns ? i.unitCents * i.qty : 0);
-      }, 0);
+  // Todo o corpo vai em try/catch: um throw (INSERT, estoque, taxa…) NÃO pode virar 500 de
+  // corpo vazio — o PDV faz res.json() e some com o erro. Sempre devolver JSON com a causa.
+  try {
+    // sem caixa aberto, não vende (regra de PDV)
+    if (!(await getOpenSession())) {
+      return NextResponse.json({ error: "Abra o caixa antes de vender" }, { status: 409 });
     }
-    // desconto rateado proporcional sobre a parte elegível
-    const eligibleCents = subtotalCents > 0 ? Math.round((eligibleSubtotal * totalCents) / subtotalCents) : 0;
-    pointsAwarded = pointsForSale(eligibleCents, cfg, { isFirstPurchase });
-    if (pointsAwarded > 0) {
-      await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
-      await markPointsAwarded(order.id, pointsAwarded);
+
+    const items = (b.items || []).filter((i) => i.qty > 0);
+    if (!items.length) return NextResponse.json({ error: "Comanda vazia" }, { status: 400 });
+    if (!b.paymentMethod || !METHODS.includes(b.paymentMethod)) {
+      return NextResponse.json({ error: "Forma de pagamento inválida" }, { status: 400 });
     }
-    const balanceAfter = validBalance(existing?.history ?? [], cfg.validityDays) + pointsAwarded;
-    if (balanceAfter > 0) pointsInfo = loyaltyReceiptInfo(pointsAwarded, balanceAfter, cfg.rewards);
+
+    const subtotalCents = items.reduce((s, i) => s + i.unitCents * i.qty, 0);
+    // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
+    const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
+    const totalCents = subtotalCents - discountCents;
+    // split de pagamento: 2+ formas. Valida a soma; taxa do cartão só sobre a parte no cartão.
+    const isCard = (m?: string) => m === "debito" || m === "credito";
+    const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && METHODS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
+    const isSplit = rawPays.length >= 2;
+    if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
+      return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
+    }
+    const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : b.paymentMethod;
+    // taxa do cartão sobre o TOTAL pago (forma única) OU soma de TODAS as parcelas no cartão (split)
+    const storeId = await resolveStoreId();
+    const card = isSplit
+      ? await resolveSplitCardFee(rawPays.filter((p) => isCard(p.method)), storeId, { machineId: b.machineId, parcelas: b.parcelas })
+      : await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+    const orderItems: OrderItem[] = items.map((i) => ({
+      group: i.group || "Venda",
+      name: i.name,
+      qty: i.qty,
+      paidCents: i.unitCents * i.qty,
+    }));
+    const nowIso = new Date().toISOString();
+    // congela o custo dos insumos no consumes → CMV histórico estável (não-fatal)
+    const consumes = await snapshotConsumes(b.consumes || [], storeId);
+
+    const order = await addOrder(
+      {
+        customerName: b.customerName?.trim() || "Balcão",
+        phone: b.customerPhone?.trim() || "",
+        mode: "balcao",
+        sizeLabel: `${items.length} ${items.length === 1 ? "item" : "itens"}`,
+        items: orderItems,
+        subtotalCents,
+        feeCents: 0, // sem taxa de entrega no balcão
+        totalCents,
+        discountCents,
+        paymentMethod: effMethod,
+        payments: isSplit ? rawPays : undefined,
+        cardFeeCents: card.feeCents,
+        cardMachineId: card.machineId,
+        cardMachineName: card.machineName,
+        cardFeePercent: card.feePercent,
+        parcelas: card.parcelas,
+        consumes, // ficha técnica aplicada (custo congelado — rastro de auditoria + CMV)
+      },
+      nowIso,
+      "entregue", // balcão = já entregue/pago
+    );
+
+    // baixa automática de estoque pela ficha técnica — NÃO-FATAL (a venda já está commitada).
+    // Mas NÃO engole o resultado: se alguma baixa falhar, o operador é avisado (stockWarning).
+    const stock = await applyConsumes(consumes, `Venda ${order.display}`, dateBR(nowIso));
+    const stockWarning = stock.failed.length
+      ? `Venda registrada, mas ${stock.failed.length} item(ns) não baixaram do estoque — confira o estoque.`
+      : undefined;
+
+    // pontos (só se identificou o cliente por telefone)
+    let pointsAwarded = 0;
+    let pointsInfo: string | undefined;
+    if (b.customerPhone?.trim()) {
+      const phone = b.customerPhone.trim();
+      const cfg = await getLoyalty();
+      const existing = await getByPhone(phone);
+      const isFirstPurchase = !existing || existing.history.length === 0;
+      // fidelidade por categoria (açaí): a montagem do copo (sem stockId) SEMPRE pontua; a revenda
+      // pontua só se a categoria do estoque não estiver desligada. Lookup server-side (não confia no client).
+      const nonEarning = new Set(cfg.nonEarningCategories ?? []);
+      let eligibleSubtotal = subtotalCents;
+      if (nonEarning.size) {
+        const catById = new Map((await listStock(storeId)).map((s) => [s.id, s.category]));
+        eligibleSubtotal = items.reduce((s, i) => {
+          const cat = i.stockId ? catById.get(i.stockId) : undefined;
+          const earns = !cat || !nonEarning.has(cat); // sem categoria de revenda = montagem = pontua
+          return s + (earns ? i.unitCents * i.qty : 0);
+        }, 0);
+      }
+      // desconto rateado proporcional sobre a parte elegível
+      const eligibleCents = subtotalCents > 0 ? Math.round((eligibleSubtotal * totalCents) / subtotalCents) : 0;
+      pointsAwarded = pointsForSale(eligibleCents, cfg, { isFirstPurchase });
+      if (pointsAwarded > 0) {
+        await awardPoints(phone, order.customerName, pointsAwarded, order.display, nowIso);
+        await markPointsAwarded(order.id, pointsAwarded);
+      }
+      const balanceAfter = validBalance(existing?.history ?? [], cfg.validityDays) + pointsAwarded;
+      if (balanceAfter > 0) pointsInfo = loyaltyReceiptInfo(pointsAwarded, balanceAfter, cfg.rewards);
+    }
+
+    const changeCents =
+      !isSplit && b.paymentMethod === "dinheiro" && b.amountPaidCents
+        ? Math.max(0, b.amountPaidCents - totalCents)
+        : 0;
+
+    return NextResponse.json(
+      { ok: true, order, pointsAwarded, pointsInfo, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
+      { status: 201 },
+    );
+  } catch (e) {
+    console.error("vendas:", e);
+    return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });
   }
-
-  const changeCents =
-    !isSplit && b.paymentMethod === "dinheiro" && b.amountPaidCents
-      ? Math.max(0, b.amountPaidCents - totalCents)
-      : 0;
-
-  return NextResponse.json(
-    { ok: true, order, pointsAwarded, pointsInfo, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
-    { status: 201 },
-  );
 }

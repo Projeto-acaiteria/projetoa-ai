@@ -640,6 +640,7 @@ function PayModal({
   const [method, setMethod] = useState<PayMethod>("dinheiro");
   const [received, setReceived] = useState("");
   const [sending, setSending] = useState(false);
+  const [err, setErr] = useState("");
   const activeMachines = machines.filter((m) => m.active);
   const [machineId, setMachineId] = useState<string>(activeMachines[0]?.id ?? "");
   const [parcelas, setParcelas] = useState(1);
@@ -679,7 +680,7 @@ function PayModal({
   }
 
   async function finalize() {
-    setSending(true);
+    setSending(true); setErr("");
     try {
       const res = await fetch("/api/vendas", {
         method: "POST",
@@ -696,8 +697,15 @@ function PayModal({
           discountCents: discountCents || undefined,
         }),
       });
-      const data = await res.json();
-      if (res.ok) onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, pointsInfo: data.pointsInfo, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
+      // corpo pode vir vazio (500 não-tratado do Next) → parse tolerante, nunca deixa o erro invisível
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErr(data?.error || `Erro ${res.status} — a venda não foi registrada. Tente de novo.`);
+        return;
+      }
+      onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, pointsInfo: data.pointsInfo, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
+    } catch {
+      setErr("Sem conexão com o servidor. A venda não foi registrada — confira a internet e tente de novo.");
     } finally {
       setSending(false);
     }
@@ -804,6 +812,10 @@ function PayModal({
               <span className="text-lg font-extrabold tabular-nums text-ink">{brl(Math.abs(splitRemaining))}</span>
             </div>
           </div>
+        )}
+
+        {err && (
+          <p className="mt-4 rounded-xl border border-[var(--red-no)] bg-[#FDECEC] px-4 py-2.5 text-sm font-semibold text-[var(--red-no)]">{err}</p>
         )}
 
         <button
