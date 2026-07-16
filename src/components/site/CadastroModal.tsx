@@ -20,7 +20,7 @@ function formatPhone(s: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export default function CadastroModal() {
+export default function CadastroModal({ source = "home" }: { source?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [nome, setNome] = useState("");
@@ -67,9 +67,18 @@ export default function CadastroModal() {
 
   if (!open) return null;
 
-  function enviar() {
+  async function enviar() {
     if (!valido) return;
-    const q = new URLSearchParams({ negocio: negocio.trim(), nome: nome.trim(), wa: whatsapp.replace(/\D+/g, "") });
+    const wa = whatsapp.replace(/\D+/g, "");
+    // salva o lead ANTES de mandar pro wizard — se ele abandonar o cadastro, o contato não se perde.
+    try {
+      await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: nome.trim(), negocio: negocio.trim(), whatsapp: wa, source }),
+      });
+    } catch { /* não trava o lead: segue pro wizard mesmo se a captura falhar */ }
+    const q = new URLSearchParams({ negocio: negocio.trim(), nome: nome.trim(), wa });
     router.push(`/cadastro?${q.toString()}`);
   }
 

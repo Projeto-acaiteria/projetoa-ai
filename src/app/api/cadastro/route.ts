@@ -120,5 +120,16 @@ export async function POST(req: Request) {
     await seedStarterMenu(storeId, seg);
   } catch { /* segue sem seed — o dono cadastra do zero em Cardápio */ }
 
+  // 7. se esse WhatsApp veio de um lead capturado no modal, marca como convertido + vincula a loja.
+  //    Não bloqueia o cadastro — é só telemetria de funil pro follow-up.
+  try {
+    const waDigits = (b.whatsapp ?? "").replace(/\D+/g, "");
+    if (waDigits.length >= 10) {
+      await db().from("leads")
+        .update({ status: "convertido", store_id: storeId, updated_at: new Date().toISOString() })
+        .eq("whatsapp", waDigits).eq("status", "novo");
+    }
+  } catch { /* segue: lead não capturado ou update falhou não deve derrubar o cadastro */ }
+
   return NextResponse.json({ ok: true, slug, storeId });
 }

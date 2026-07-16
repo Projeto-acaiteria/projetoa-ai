@@ -122,7 +122,7 @@ function SegmentLP({ nicho: n }: { nicho: Nicho }) {
       <Reveal><CtaFinal heading={`Bota sua ${n.nome.toLowerCase()} num sistema só.`} /></Reveal>
       <SiteFooter />
       <JsonLd name={`ComandaPRO para ${n.nome}`} faqs={n.faqs} />
-      <CadastroModal />
+      <CadastroModal source={n.slug} />
     </main>
   );
 }
