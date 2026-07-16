@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck } from "@/components/Icons";
 import { BILLING } from "@/config/billing";
 
-const ACCENT = "#6366F1";
+const ACCENT = "#F5480C"; // coral (marca ComandaPRO)
 const INK = "#241C17";
 const SESSION_KEY = "cpro_lead_modal_v1";
 
@@ -95,7 +95,7 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
         <button aria-label="Fechar" onClick={() => setOpen(false)} className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-[#6B5D52] transition hover:bg-black/10">✕</button>
         <div className="grid md:grid-cols-2">
           {/* Painel de valor (esquerda) — colorido, food-alegre */}
-          <div className="relative hidden flex-col justify-center overflow-hidden p-8 text-white md:flex" style={{ background: "linear-gradient(150deg, #6D5DF6 0%, #8B5CF6 55%, #A855F7 100%)" }}>
+          <div className="relative hidden flex-col justify-center overflow-hidden p-8 text-white md:flex" style={{ background: "linear-gradient(150deg, #FF8A3D 0%, #F5480C 100%)" }}>
             <div className="text-sm font-bold uppercase tracking-wider text-white/85">Comece grátis</div>
             <h2 className="mt-3 text-3xl font-extrabold leading-[1.1] tracking-tight">Crie seu cardápio grátis em 2 minutos</h2>
             <p className="mt-3 text-white/85">Sem instalar nada. Sem cartão pra testar. Pronto pra receber pedido hoje.</p>
@@ -114,17 +114,17 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
               <div>
                 <label className="mb-1 block text-sm font-semibold" style={{ color: INK }}>Seu nome</label>
                 <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Como você se chama" autoFocus
-                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-indigo-400" style={{ color: INK }} />
+                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-[#F5480C]" style={{ color: INK }} />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold" style={{ color: INK }}>Nome do estabelecimento</label>
                 <input value={negocio} onChange={(e) => setNegocio(e.target.value)} placeholder="Ex: Açaí do João"
-                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-indigo-400" style={{ color: INK }} />
+                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-[#F5480C]" style={{ color: INK }} />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold" style={{ color: INK }}>WhatsApp</label>
                 <input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="(99) 99999-9999" inputMode="tel"
-                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-indigo-400" style={{ color: INK }} />
+                  className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 outline-none transition focus:border-[#F5480C]" style={{ color: INK }} />
               </div>
             </div>
             <button onClick={enviar} disabled={!valido}

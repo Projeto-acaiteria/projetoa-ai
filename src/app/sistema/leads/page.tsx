@@ -1,5 +1,6 @@
 import { db } from "@/lib/supabase";
 import { getNicho } from "@/config/marketing";
+import { BRAND } from "@/config/brand";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leads · ComandaPRO", robots: { index: false } };
@@ -51,34 +52,34 @@ export default async function LeadsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold">Leads</h1>
-      <p className="mt-1 text-sm text-white/50">Quem preencheu o modal de captura — inclusive quem não terminou o cadastro.</p>
+      <h1 className="text-xl font-bold" style={{ color: BRAND.ink }}>Leads</h1>
+      <p className="mt-1 text-sm" style={{ color: BRAND.mut }}>Quem preencheu o modal de captura — inclusive quem não terminou o cadastro.</p>
 
       {/* contadores */}
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat label="Novos" value={novos} tone="amber" />
-        <Stat label="Convertidos" value={convertidos} tone="emerald" />
-        <Stat label="Conversão" value={`${taxa}%`} tone="indigo" />
+        <Stat label="Novos" value={novos} tone="coral" />
+        <Stat label="Convertidos" value={convertidos} tone="green" />
+        <Stat label="Conversão" value={`${taxa}%`} tone="ink" />
       </div>
 
       {leads.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-white/40">Nenhum lead ainda. Assim que alguém preencher o modal, aparece aqui.</p>
+        <p className="mt-10 text-center text-sm" style={{ color: BRAND.mut }}>Nenhum lead ainda. Assim que alguém preencher o modal, aparece aqui.</p>
       ) : (
         <ul className="mt-5 space-y-2.5">
           {leads.map((l) => (
-            <li key={l.id} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <li key={l.id} className="rounded-2xl border bg-white p-4" style={{ borderColor: BRAND.line, boxShadow: BRAND.shadowCard }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-semibold">{l.name}</span>
+                    <span className="truncate font-semibold" style={{ color: BRAND.ink }}>{l.name}</span>
                     {l.status === "convertido" ? (
-                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">convertido</span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "#E6F5EC", color: "#0f9d58" }}>convertido</span>
                     ) : (
-                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-200">novo</span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: BRAND.coral }}>novo</span>
                     )}
                   </div>
-                  <div className="mt-0.5 truncate text-sm text-white/70">{l.business_name}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-white/40">
+                  <div className="mt-0.5 truncate text-sm" style={{ color: BRAND.ink2 }}>{l.business_name}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" style={{ color: BRAND.mut }}>
                     <span>{fmtData(l.created_at)}</span>
                     <span>·</span>
                     <span>{sourceLabel(l.source)}</span>
@@ -90,7 +91,8 @@ export default async function LeadsPage() {
                   href={waLink(l)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                  className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                  style={{ background: "#22A45D" }}
                 >
                   WhatsApp
                 </a>
@@ -103,12 +105,12 @@ export default async function LeadsPage() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number | string; tone: "amber" | "emerald" | "indigo" }) {
-  const ring = tone === "amber" ? "text-amber-300" : tone === "emerald" ? "text-emerald-300" : "text-indigo-300";
+function Stat({ label, value, tone }: { label: string; value: number | string; tone: "coral" | "green" | "ink" }) {
+  const color = tone === "coral" ? BRAND.coral : tone === "green" ? "#0f9d58" : BRAND.ink;
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
-      <div className={`text-2xl font-extrabold tabular-nums ${ring}`}>{value}</div>
-      <div className="mt-0.5 text-[11px] uppercase tracking-wide text-white/40">{label}</div>
+    <div className="rounded-2xl border bg-white p-3 text-center" style={{ borderColor: BRAND.line }}>
+      <div className="text-2xl font-extrabold tabular-nums" style={{ color }}>{value}</div>
+      <div className="mt-0.5 text-[11px] uppercase tracking-wide" style={{ color: BRAND.mut }}>{label}</div>
     </div>
   );
 }

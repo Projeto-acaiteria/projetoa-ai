@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase";
 import { BILLING } from "@/config/billing";
 import PagarClient from "./PagarClient";
 import LogoutButton from "./LogoutButton";
+import { Logo } from "@/components/site/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -46,27 +47,25 @@ export default async function BloqueadoPage() {
 
   const auroraBg = {
     background:
-      "radial-gradient(ellipse 80% 60% at 20% 20%, rgba(16,185,129,0.30) 0%, transparent 55%), radial-gradient(ellipse 70% 50% at 85% 80%, rgba(59,130,246,0.20) 0%, transparent 55%), #050713",
+      "radial-gradient(ellipse 80% 60% at 20% 20%, rgba(245,72,12,0.28) 0%, transparent 55%), radial-gradient(ellipse 70% 50% at 85% 80%, rgba(255,138,61,0.18) 0%, transparent 55%), #140f0d",
   };
   const cardStyle = {
-    background: "rgba(15, 23, 42, 0.72)",
-    border: "1px solid rgba(16, 185, 129, 0.25)",
-    boxShadow: "0 30px 80px -30px rgba(16, 185, 129, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+    background: "rgba(26, 20, 18, 0.78)",
+    border: "1px solid rgba(245, 72, 12, 0.28)",
+    boxShadow: "0 30px 80px -30px rgba(245, 72, 12, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
   };
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden p-4" style={auroraBg}>
       <div className="relative w-full max-w-sm">
-        <div className="mb-5 text-center">
-          <h1 className="text-2xl font-bold tracking-wide text-white">
-            Comanda<span className="text-emerald-300">PRO</span>
-          </h1>
+        <div className="mb-5 flex flex-col items-center text-center">
+          <Logo light />
           <div
             className="mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
             style={{
-              background: "linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)",
-              color: "#5EEAD4",
-              border: "1px solid rgba(16,185,129,0.3)",
+              background: "linear-gradient(135deg, rgba(245,72,12,0.22) 0%, rgba(255,138,61,0.22) 100%)",
+              color: "#FF8A3D",
+              border: "1px solid rgba(245,72,12,0.32)",
             }}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
@@ -83,14 +82,14 @@ export default async function BloqueadoPage() {
           </div>
 
           {/* Plano em destaque */}
-          <div className="rounded-2xl p-4" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(16,185,129,0.2)" }}>
+          <div className="rounded-2xl p-4" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(245,72,12,0.22)" }}>
             <div className="mb-3 flex items-start justify-between">
               <div>
                 <p className="text-base font-bold text-white">Plano ComandaPRO</p>
                 <p className="text-xs text-slate-400">Mensalidade · sem setup</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold leading-none text-emerald-300">R$ {mensalReais}</p>
+                <p className="text-2xl font-bold leading-none text-[#FF8A3D]">R$ {mensalReais}</p>
                 <p className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-500">por mês</p>
               </div>
             </div>

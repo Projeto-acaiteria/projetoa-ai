@@ -207,8 +207,8 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
               onClick={() => handleSelect(opt.key)}
               className="w-full rounded-xl p-3 text-left transition-all"
               style={{
-                background: isSel ? "rgba(16,185,129,0.10)" : "rgba(0,0,0,0.25)",
-                border: isSel ? "1.5px solid rgba(16,185,129,0.6)" : "1px solid rgba(255,255,255,0.08)",
+                background: isSel ? "rgba(245,72,12,0.10)" : "rgba(0,0,0,0.25)",
+                border: isSel ? "1.5px solid rgba(245,72,12,0.6)" : "1px solid rgba(255,255,255,0.08)",
               }}
             >
               <div className="flex items-start gap-3">
@@ -217,7 +217,7 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
                   style={{
                     width: 18,
                     height: 18,
-                    border: isSel ? "5px solid #10B981" : "2px solid rgba(255,255,255,0.25)",
+                    border: isSel ? "5px solid #F5480C" : "2px solid rgba(255,255,255,0.25)",
                   }}
                 />
                 <div className="min-w-0 flex-1">
@@ -227,7 +227,7 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
                       <p className="mt-0.5 text-[11px] text-slate-400">{opt.descricao}</p>
                     </div>
                     <div className="flex-shrink-0 text-right">
-                      <p className="text-base font-bold leading-none text-emerald-300">{opt.valor}</p>
+                      <p className="text-base font-bold leading-none text-[#FF8A3D]">{opt.valor}</p>
                       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-500">{opt.subValor}</p>
                     </div>
                   </div>
@@ -238,10 +238,10 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
                         className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                         style={{
                           background: opt.destaque
-                            ? "linear-gradient(90deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))"
-                            : "rgba(16,185,129,0.15)",
+                            ? "linear-gradient(90deg, rgba(245,72,12,0.18), rgba(255,138,61,0.18))"
+                            : "rgba(245,72,12,0.15)",
                           color: "#5EEAD4",
-                          border: "1px solid rgba(16,185,129,0.35)",
+                          border: "1px solid rgba(245,72,12,0.35)",
                         }}
                       >
                         {opt.destaque ? "🔥 " : ""}Economiza {opt.economia}
@@ -269,8 +269,8 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
       </div>
 
       {needsCustomerData && (
-        <div className="space-y-2 rounded-xl p-3" style={{ background: "rgba(16,185,129,0.08)", border: "1.5px solid rgba(16,185,129,0.4)" }}>
-          <p className="text-xs font-semibold text-emerald-200">Pra emitir a cobrança a gente precisa de 2 dados rápidos:</p>
+        <div className="space-y-2 rounded-xl p-3" style={{ background: "rgba(245,72,12,0.08)", border: "1.5px solid rgba(245,72,12,0.4)" }}>
+          <p className="text-xs font-semibold text-[#FFB380]">Pra emitir a cobrança a gente precisa de 2 dados rápidos:</p>
           <input
             type="text"
             placeholder="Nome ou razão social"
@@ -297,7 +297,7 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
         onClick={pagar}
         disabled={loading || (needsCustomerData && (!nome.trim() || cpf.replace(/\D/g, "").length < 11))}
         className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all disabled:opacity-40"
-        style={{ background: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)", boxShadow: "0 8px 20px -6px rgba(16,185,129,0.5)" }}
+        style={{ background: "linear-gradient(135deg, #FF8A3D 0%, #F5480C 100%)", boxShadow: "0 8px 20px -6px rgba(245,72,12,0.5)" }}
       >
         {loading ? "Abrindo pagamento…" : needsCustomerData ? "Continuar pro pagamento" : labelBotao}
       </button>
@@ -305,8 +305,8 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
       {erro && <p className="text-center text-sm text-red-400">{erro}</p>}
 
       {fallbackUrl && (
-        <div className="space-y-2 rounded-lg p-3 text-center" style={{ background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.35)" }}>
-          <p className="text-xs text-emerald-200">
+        <div className="space-y-2 rounded-lg p-3 text-center" style={{ background: "rgba(245,72,12,0.10)", border: "1px solid rgba(245,72,12,0.35)" }}>
+          <p className="text-xs text-[#FFB380]">
             Pagamento aberto em <strong>nova aba</strong>. Fechou sem querer? Reabre:
           </p>
           <a
@@ -314,19 +314,19 @@ export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; loj
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block rounded-lg px-4 py-2 text-sm font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)" }}
+            style={{ background: "linear-gradient(135deg, #FF8A3D 0%, #F5480C 100%)" }}
           >
             Reabrir pagamento →
           </a>
         </div>
       )}
 
-      <div className="flex items-start gap-2 rounded-lg px-3 py-2.5" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0">
+      <div className="flex items-start gap-2 rounded-lg px-3 py-2.5" style={{ background: "rgba(245,72,12,0.08)", border: "1px solid rgba(245,72,12,0.25)" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F5480C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0">
           <path d="M9 12l2 2 4-4" />
           <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
         </svg>
-        <p className="text-[11px] leading-snug text-emerald-100">
+        <p className="text-[11px] leading-snug text-[#FFD8C2]">
           <strong>Garantia de 7 dias.</strong> Cancelou em até 7 dias? A gente devolve a grana sem burocracia.
         </p>
       </div>
@@ -389,7 +389,7 @@ function PixInline({
     <div className="mt-6 space-y-4">
       <div className="space-y-1 pt-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-3xl font-bold text-emerald-300">{brl(valorCents)}</p>
+        <p className="text-3xl font-bold text-[#FF8A3D]">{brl(valorCents)}</p>
       </div>
 
       {qrImage ? (
@@ -426,7 +426,7 @@ function PixInline({
               type="button"
               onClick={copiar}
               className="flex-shrink-0 rounded-lg px-4 text-xs font-bold text-white transition-all"
-              style={{ background: copiado ? "linear-gradient(135deg,#22C55E,#16A34A)" : "linear-gradient(135deg,#10B981,#06B6D4)" }}
+              style={{ background: copiado ? "linear-gradient(135deg,#22C55E,#16A34A)" : "linear-gradient(135deg,#FF8A3D,#F5480C)" }}
             >
               {copiado ? "Copiado!" : "Copiar"}
             </button>
@@ -434,12 +434,12 @@ function PixInline({
         </div>
       )}
 
-      <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{ background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.30)" }}>
+      <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{ background: "rgba(245,72,12,0.10)", border: "1px solid rgba(245,72,12,0.30)" }}>
         <span className="relative flex h-2 w-2 flex-shrink-0">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
         </span>
-        <p className="text-[11px] leading-snug text-emerald-200">{statusMsg}</p>
+        <p className="text-[11px] leading-snug text-[#FFB380]">{statusMsg}</p>
       </div>
 
       <button type="button" onClick={onTrocar} className="w-full pt-1 text-[11px] text-slate-400 underline hover:text-slate-200">

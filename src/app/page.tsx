@@ -49,7 +49,7 @@ const INCLUSO = [
 // Blueprint: segundo-cerebro/.../ESTUDO-SITE-COMANDAPRO.md. NÃO é o app (admin/[slug]).
 
 const NAVY = "#05070f";
-const ACCENT = "#6366F1";
+const ACCENT = "#F5480C";
 // Novo tema CLARO / food alegre (decisão 13/07) — em migração seção por seção a partir do hero.
 const CREAM = "#FFF9F2"; // fundo creme quente
 const INK = "#241C17";   // texto quente escuro
@@ -87,7 +87,7 @@ function MesasMockup() {
             <div
               key={m.n}
               className={`rounded-xl border p-2 text-center ${
-                m.on ? "border-transparent bg-[#6366F1]/15" : "border-black/[0.06] bg-white/[0.02]"
+                m.on ? "border-transparent bg-[#F5480C]/15" : "border-black/[0.06] bg-white/[0.02]"
               }`}
             >
               <div className="text-[11px] font-bold text-[#6B5D52]">Mesa {m.n}</div>
@@ -331,14 +331,14 @@ const JORNADA = [
   },
 ];
 
-// Paleta COERENTE (cool: índigo → azul → violeta → sky → índigo) — unificada pelo amarelo do
-// destaque + cards brancos + marca d'água. Estilo painéis do Expresso.
+// Paleta COERENTE — família QUENTE (coral → laranja → telha → framboesa), unificada pelo destaque
+// amarelo + cards brancos + marca d'água. Coerente com o logo coral. Estilo painéis do Expresso.
 const PANEL_COLORS = [
-  "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
-  "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
-  "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
-  "linear-gradient(135deg, #0EA5E9 0%, #0369A1 100%)",
-  "linear-gradient(135deg, #6D5DF6 0%, #4F46E5 100%)",
+  "linear-gradient(135deg, #FF8A3D 0%, #F5480C 100%)",
+  "linear-gradient(135deg, #FB923C 0%, #EA580C 100%)",
+  "linear-gradient(135deg, #F97316 0%, #C2410C 100%)",
+  "linear-gradient(135deg, #FB7185 0%, #E11D48 100%)",
+  "linear-gradient(135deg, #F5480C 0%, #B91C1C 100%)",
 ];
 function FuncionalidadesSection() {
   return (
@@ -482,7 +482,7 @@ function CtaFinal() {
 // ── Rodapé (links pras segmentadas + institucional)
 function SiteFooter() {
   return (
-    <footer className="relative z-10 mt-10 text-white" style={{ background: "linear-gradient(135deg, #2A2358 0%, #1C1740 100%)" }}>
+    <footer className="relative z-10 mt-10 text-white" style={{ background: "linear-gradient(135deg, #241C17 0%, #141018 100%)" }}>
       <div className="mx-auto max-w-6xl px-6 py-14">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div>
@@ -554,7 +554,7 @@ export default function Home() {
       </div>
 
       {/* NAV com menu (header colorido, sticky) */}
-      <div className="sticky top-0 z-30 text-white shadow-lg" style={{ background: "linear-gradient(90deg, #6D5DF6 0%, #8B5CF6 55%, #A855F7 100%)" }}>
+      <div className="sticky top-0 z-30 text-white shadow-lg" style={{ background: "linear-gradient(90deg, #FF8A3D 0%, #F5480C 100%)" }}>
         <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-10">
             <Logo light />
@@ -579,7 +579,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login" className="hidden text-[15px] font-semibold text-white/85 transition hover:text-white sm:block">Entrar</Link>
-            <Link href="/cadastro" className="rounded-full bg-white px-5 py-2.5 text-sm font-extrabold transition hover:bg-white/90" style={{ color: "#6D5DF6" }}>Começar agora</Link>
+            <Link href="/cadastro" className="rounded-full bg-white px-5 py-2.5 text-sm font-extrabold transition hover:bg-white/90" style={{ color: "#F5480C" }}>Começar agora</Link>
           </div>
         </header>
       </div>
