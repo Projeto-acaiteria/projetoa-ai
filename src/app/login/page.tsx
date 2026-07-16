@@ -23,7 +23,8 @@ export default function LoginPage() {
       setErro("E-mail ou senha inválidos.");
       return;
     }
-    router.push("/admin");
+    // despachante decide a porta pelo papel (operador → /sistema/leads, dono → /admin)
+    router.push("/entrar");
     router.refresh();
   }
 
