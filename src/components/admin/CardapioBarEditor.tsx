@@ -7,6 +7,9 @@ import { IMAGE_BANK } from "@/config/image-bank";
 import { compressImage } from "@/lib/compress-image";
 import ModifierManager from "@/components/admin/ModifierManager";
 import RecipeManager from "@/components/admin/RecipeManager";
+import MenuModelModal from "@/components/admin/MenuModelModal";
+import { getMenuModel } from "@/config/menu-models";
+import type { BusinessType } from "@/config/segments";
 
 const brl = (c: number) => "R$ " + (c / 100).toFixed(2).replace(".", ",");
 const STATIONS = ["cozinha", "bar"];
@@ -122,10 +125,12 @@ function Modal({ title, onClose, onSave, saving, children }: { title: string; on
   );
 }
 
-export default function CardapioBarEditor() {
+export default function CardapioBarEditor({ segment }: { segment?: BusinessType }) {
   const [cats, setCats] = useState<BarCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const model = segment ? getMenuModel(segment) : null;
   const [catModal, setCatModal] = useState<CatForm | null>(null);
   const [prodModal, setProdModal] = useState<ProdForm | null>(null);
   const [modProduct, setModProduct] = useState<BarProduct | null>(null);
@@ -178,16 +183,33 @@ export default function CardapioBarEditor() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {model && (
+          <button onClick={() => setModelOpen(true)} className="rounded-xl border border-[var(--brand-600)] px-4 py-2.5 text-sm font-bold text-[var(--brand-600)]">
+            ✨ Montar a partir do modelo
+          </button>
+        )}
         <button onClick={() => setCatModal({ name: "", station: "cozinha", description: "", active: true, earns_points: true, no_prep: false })} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">
           + Nova categoria
         </button>
       </div>
 
       {cats.length === 0 && (
-        <Card className="p-6 text-center text-sm text-[var(--text-muted)]">
-          Nenhuma categoria ainda. Crie a primeira — ex: <b>Petiscos</b> (cozinha), <b>Bebidas</b> (bar).
+        <Card className="p-6 text-center">
+          {model ? (
+            <>
+              <p className="text-sm text-[var(--text-secondary)]">Seu cardápio está vazio. Comece pelo modelo pronto de <b>{model.label}</b> — categorias e produtos do seu ramo, já com preços de mercado.</p>
+              <button onClick={() => setModelOpen(true)} className="mt-4 rounded-xl brand-gradient px-5 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-brand)]">✨ Montar cardápio de {model.label}</button>
+              <p className="mt-3 text-xs text-[var(--text-muted)]">ou crie categoria por categoria no botão acima.</p>
+            </>
+          ) : (
+            <span className="text-sm text-[var(--text-muted)]">Nenhuma categoria ainda. Crie a primeira — ex: <b>Petiscos</b> (cozinha), <b>Bebidas</b> (bar).</span>
+          )}
         </Card>
+      )}
+
+      {modelOpen && model && (
+        <MenuModelModal model={model} onClose={() => setModelOpen(false)} onApplied={async () => { setModelOpen(false); await reload(); }} />
       )}
 
       {cats.map((c) => (

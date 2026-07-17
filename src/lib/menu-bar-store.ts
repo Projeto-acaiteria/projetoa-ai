@@ -4,6 +4,7 @@
 // Valores em CENTAVOS. Convive com o modelo açaí (menu-store/blob); menu_template decide qual a loja usa.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { flattenGroupOptions } from "@/config/menu-models";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -17,6 +18,7 @@ export type Modifier = {
   price_cents: number;
   sort: number;
   active: boolean;
+  tier_label: string | null; // faixa (pizza: Tradicional/Especial/Premium) — o público agrupa por isto
 };
 
 export type PriceMode = "sum" | "highest" | "average"; // sum=adicionais · highest=pizza meio-a-meio · average
@@ -105,6 +107,7 @@ const toModifier = (r: Record<string, unknown>): Modifier => ({
   price_cents: num(r.price_cents),
   sort: num(r.sort),
   active: Boolean(r.active),
+  tier_label: r.tier_label ? String(r.tier_label) : null,
 });
 
 const toGroup = (r: Record<string, unknown>, modifiers: Modifier[]): ModifierGroup => ({
@@ -379,12 +382,13 @@ export async function deleteGroup(id: string, storeId?: string): Promise<void> {
   await db().from("menu_modifier_groups").delete().eq("id", id).eq("store_id", sid);
 }
 
-export type ModifierInput = { group_id: string; name: string; price_cents?: number; sort?: number; active?: boolean };
+export type ModifierInput = { group_id: string; name: string; price_cents?: number; sort?: number; active?: boolean; tier_label?: string | null };
 export async function createModifier(input: ModifierInput, storeId?: string): Promise<Modifier> {
   const sid = storeId ?? (await resolveStoreId());
   const { data, error } = await db().from("menu_modifiers").insert({
     store_id: sid, group_id: input.group_id, name: input.name.trim(),
     price_cents: Math.max(0, Math.round(input.price_cents ?? 0)), sort: input.sort ?? 0, active: input.active ?? true,
+    tier_label: input.tier_label ?? null,
   }).select("*").single();
   if (error || !data) throw new Error(error?.message ?? "Falha ao criar opção.");
   return toModifier(data);
@@ -396,4 +400,45 @@ export async function updateModifier(id: string, patch: Partial<ModifierInput>, 
 export async function deleteModifier(id: string, storeId?: string): Promise<void> {
   const sid = storeId ?? (await resolveStoreId());
   await db().from("menu_modifiers").delete().eq("id", id).eq("store_id", sid);
+}
+
+// ── Motor de criação segmentado: cria o cardápio-modelo (já filtrado pelo dono no modal) em LOTE ──
+// Ordem: categoria → produtos → grupos de modificador → opções, encadeando os ids. img_key é
+// resolvido na fase de imagens (por ora entra sem foto). Reusa os creates acima (RLS/validação).
+export async function applyMenuModel(
+  model: import("@/config/menu-models").MenuModel,
+  storeId?: string,
+): Promise<{ categories: number; products: number }> {
+  const sid = storeId ?? (await resolveStoreId());
+  let nCat = 0, nProd = 0;
+  for (let ci = 0; ci < model.categories.length; ci++) {
+    const cat = model.categories[ci];
+    if (!cat.products?.length) continue;
+    const category = await createCategory(
+      { name: cat.name, station: cat.station, description: cat.description ?? null, no_prep: cat.no_prep, sort: ci },
+      sid,
+    );
+    nCat++;
+    for (let pi = 0; pi < cat.products.length; pi++) {
+      const p = cat.products[pi];
+      const product = await createProduct(
+        { category_id: category.id, name: p.name, price_cents: p.price_cents, size_label: p.size_label ?? null, img: p.img ?? null, sort: pi },
+        sid,
+      );
+      nProd++;
+      for (let gi = 0; gi < (p.groups?.length ?? 0); gi++) {
+        const g = p.groups![gi];
+        const opts = flattenGroupOptions(g); // faixas → opções (sabor herda preço + rótulo da faixa)
+        if (!opts.length) continue;
+        const group = await createGroup(
+          { product_id: product.id, title: g.title, min_select: g.min_select, max_select: g.max_select, free_up_to: g.free_up_to, price_mode: g.price_mode, sort: gi },
+          sid,
+        );
+        for (let oi = 0; oi < opts.length; oi++) {
+          await createModifier({ group_id: group.id, name: opts[oi].name, price_cents: opts[oi].price_cents, tier_label: opts[oi].tier_label ?? null, sort: oi }, sid);
+        }
+      }
+    }
+  }
+  return { categories: nCat, products: nProd };
 }

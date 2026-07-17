@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import {
   readBarMenu,
@@ -14,7 +16,9 @@ import {
   createModifier,
   updateModifier,
   deleteModifier,
+  applyMenuModel,
 } from "@/lib/menu-bar-store";
+import type { MenuModel } from "@/config/menu-models";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +41,7 @@ export async function POST(req: Request) {
   }
   const p = b.payload ?? {};
   try {
+    const res = await (async (): Promise<NextResponse> => {
     switch (b.action) {
       case "cat.create": {
         const c = await createCategory(p as never, storeId);
@@ -78,9 +83,23 @@ export async function POST(req: Request) {
       case "mod.delete":
         await deleteModifier(String(p.id), storeId);
         return NextResponse.json({ ok: true });
+      case "model.apply": {
+        const model = p.model as MenuModel | undefined;
+        if (!model?.categories?.length) return NextResponse.json({ error: "modelo vazio" }, { status: 400 });
+        const r = await applyMenuModel(model, storeId);
+        return NextResponse.json({ ok: true, ...r });
+      }
       default:
         return NextResponse.json({ error: "ação inválida" }, { status: 400 });
     }
+    })();
+    // menu mudou → revalida o cardápio público da loja na hora (senão fica stale até 30s do ISR)
+    if (res.ok) {
+      const { data: s } = await db().from("stores").select("slug").eq("id", storeId).maybeSingle();
+      const slug = (s as { slug?: string } | null)?.slug;
+      if (slug) { revalidatePath(`/${slug}`); revalidatePath(`/${slug}/mesa/[n]`, "page"); }
+    }
+    return res;
   } catch (e) {
     console.error("cardapio-bar:", e);
     return NextResponse.json({ error: "Não consegui salvar. Tente de novo." }, { status: 500 });

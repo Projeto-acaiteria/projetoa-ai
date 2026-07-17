@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
+import PizzaWheel from "@/components/grid/PizzaWheel";
 import { fromPrice } from "@/lib/menu-price";
 import { brandVars } from "@/lib/brand-theme";
 
@@ -221,12 +222,26 @@ export default function TemplateGrid({
       </header>
 
       <div className="mx-auto max-w-3xl space-y-8 px-4 pb-40">
-        {categories.map((cat) => (
+        {categories.map((cat) => {
+          const banner = cat.img || cat.products.find((p) => p.img)?.img || null;
+          return (
           <section key={cat.id}>
-            <div className="mb-3">
-              <h2 className="text-xl font-extrabold">{cat.name}</h2>
-              {cat.description && <p className="text-sm text-zinc-400">{cat.description}</p>}
-            </div>
+            {banner ? (
+              <div className="relative mb-4 h-32 overflow-hidden rounded-2xl sm:h-36">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+                <div className="absolute bottom-3 left-4 right-4">
+                  <h2 className="text-2xl font-extrabold tracking-tight text-white drop-shadow">{cat.name}</h2>
+                  {cat.description && <p className="mt-0.5 text-sm text-white/85 drop-shadow">{cat.description}</p>}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <h2 className="text-xl font-extrabold">{cat.name}</h2>
+                {cat.description && <p className="text-sm text-zinc-400">{cat.description}</p>}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {cat.products.map((p) => {
                 const hasGroups = p.groups && p.groups.length > 0;
@@ -263,7 +278,8 @@ export default function TemplateGrid({
               })}
             </div>
           </section>
-        ))}
+          );
+        })}
       </div>
 
       {count > 0 && !open && (
@@ -274,12 +290,22 @@ export default function TemplateGrid({
       )}
 
       {customizing && (
-        <ProductCustomizer
-          product={customizing.product}
-          accent={ACCENT_HI}
-          onClose={() => setCustomizing(null)}
-          onConfirm={(r: CustomizeResult) => { addLine(customizing.product, customizing.station, r.modifierIds, r.mods, r.unitPriceCents, r.qty); setCustomizing(null); }}
-        />
+        customizing.product.groups.some((g) => g.price_mode === "highest") ? (
+          // pizza (grupo meio-a-meio) → montador visual em roda, estilo Dom João
+          <PizzaWheel
+            product={customizing.product}
+            accent={branding?.primaryColor || ACCENT}
+            onClose={() => setCustomizing(null)}
+            onConfirm={(r: CustomizeResult) => { addLine(customizing.product, customizing.station, r.modifierIds, r.mods, r.unitPriceCents, r.qty); setCustomizing(null); }}
+          />
+        ) : (
+          <ProductCustomizer
+            product={customizing.product}
+            accent={ACCENT_HI}
+            onClose={() => setCustomizing(null)}
+            onConfirm={(r: CustomizeResult) => { addLine(customizing.product, customizing.station, r.modifierIds, r.mods, r.unitPriceCents, r.qty); setCustomizing(null); }}
+          />
+        )
       )}
 
       {open && (

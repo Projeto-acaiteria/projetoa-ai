@@ -39,7 +39,7 @@ export default async function CardapioAdminPage() {
       />
 
       {isBar ? (
-        <CardapioBarEditor />
+        <CardapioBarEditor segment={cfg?.business_type} />
       ) : (
         <>
           <QRCardapio storeName={store.name} storeTagline={store.tagline} slug={slug} />
