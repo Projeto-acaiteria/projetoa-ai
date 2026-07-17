@@ -5,7 +5,7 @@ import { setStore, waMsgsForSegment } from "@/lib/settings-store";
 import { seedStarterMenu } from "@/lib/seed-menu";
 import { ensureTables } from "@/lib/tables-store";
 
-const SEED_MESAS = 10; // ponto de partida pros negócios de salão; o dono ajusta no /admin/mesas
+const MESAS_DEFAULT = 10, MESAS_MAX = 200; // nº de mesas do salão vem do cadastro; o dono ajusta depois
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     nome?: string;
     email?: string;
     senha?: string;
+    mesas?: number;
   };
   try {
     b = await req.json();
@@ -128,7 +129,10 @@ export async function POST(req: Request) {
   //     petiscaria. Balcão/delivery (açaí/sorvete/marmita) NÃO semeia — lá a mesa é opcional.
   //     Nasce com SEED_MESAS mesas; o dono ajusta no /admin/mesas. Não bloqueia o cadastro.
   try {
-    if (f.hasTables && f.hasStations) await ensureTables(SEED_MESAS, storeId);
+    if (f.hasTables && f.hasStations) {
+      const nMesas = Math.min(MESAS_MAX, Math.max(1, Math.floor(Number(b.mesas) || MESAS_DEFAULT)));
+      await ensureTables(nMesas, storeId);
+    }
   } catch { /* segue sem mesas — o dono cria no /admin/mesas */ }
 
   // 7. se esse WhatsApp veio de um lead capturado no modal, marca como convertido + vincula a loja.

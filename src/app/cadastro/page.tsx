@@ -64,6 +64,7 @@ export default function CadastroPage() {
   const [step, setStep] = useState(1);
   const [negocio, setNegocio] = useState("");
   const [segmento, setSegmento] = useState<BusinessType | "">("");
+  const [mesas, setMesas] = useState(10);
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [whatsapp, setWhatsapp] = useState("");
@@ -114,7 +115,7 @@ export default function CadastroPage() {
     try {
       const r = await fetch("/api/cadastro", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ negocio, segmento, slug: slugFinal, whatsapp, nome, email, senha }),
+        body: JSON.stringify({ negocio, segmento, slug: slugFinal, whatsapp, nome, email, senha, mesas: isSalao ? mesas : undefined }),
       });
       const d = await r.json();
       if (!r.ok) { setErro(d.error ?? "Não consegui criar a loja."); return; }
@@ -125,6 +126,8 @@ export default function CadastroPage() {
   }
 
   const segData = segmento ? SEGMENTOS[segmento] : null;
+  // salão (mesa é âncora) = mesa + estações. Só aí perguntamos quantas mesas (balcão/delivery não).
+  const isSalao = !!(segData && segData.features.hasTables && segData.features.hasStations);
   const coralBtn = "w-full rounded-xl py-3 font-bold text-white transition enabled:hover:opacity-90 disabled:opacity-40";
   const coralBtnStyle = { background: BRAND.coralGrad, boxShadow: BRAND.shadowCoral };
 
@@ -185,6 +188,20 @@ export default function CadastroPage() {
                         <span key={c} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: BRAND.coralSoft, color: BRAND.ink2 }}>{c}</span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {isSalao && (
+                  <div className="mt-4">
+                    <label className="mb-1 block text-sm font-semibold" style={{ color: BRAND.ink }}>Quantas mesas você tem?</label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min={1} max={200} value={mesas}
+                        onChange={(e) => setMesas(Math.max(1, Math.min(200, Math.floor(Number(e.target.value) || 1))))}
+                        className="w-24 rounded-xl border px-3.5 py-3 text-center font-semibold outline-none transition focus:ring-4"
+                        style={{ borderColor: BRAND.line, color: BRAND.ink, ["--tw-ring-color" as string]: BRAND.coralRing }} />
+                      <span className="text-sm" style={{ color: BRAND.mut }}>mesas com QR numerado</span>
+                    </div>
+                    <p className="mt-1 text-xs" style={{ color: BRAND.mut }}>Já nascem prontas pra imprimir o QR. Dá pra adicionar ou tirar mesas depois no painel.</p>
                   </div>
                 )}
 
