@@ -9,6 +9,9 @@ import { BILLING } from "@/config/billing";
 // Nicho do site = uma segmentada em /segmentos/<slug>. NÃO usar rota top-level: /<slug> já é
 // o cardápio dos tenants (colidiria). O slug do site é próprio (pode diferir do BusinessType).
 export type Faq = { q: string; a: string };
+// Segmento-IRMÃO que uma LP também cobre (mesma operação). Ganha slug indexável próprio (SEO do
+// termo) e renderiza a MESMA LP-família. Ex: sorveteria → LP de açaiteria; petiscaria → LP de bar.
+export type NichoAlias = { slug: string; businessType: BusinessType; nome: string; seoTitle: string; seoDescription: string };
 export type Nicho = {
   slug: string;              // /segmentos/<slug>
   businessType: BusinessType; // liga ao onboarding/segments.ts
@@ -25,6 +28,7 @@ export type Nicho = {
   destaques: string[];       // pills do que importa pro nicho
   dores: string[];           // 3 dores específicas do nicho
   faqs: Faq[];               // FAQ do nicho (munição AEO)
+  aliases?: NichoAlias[];    // segmentos-irmãos que ESTA LP cobre (slug indexável próprio, mesma página)
 };
 
 // 1ª rodada = 4 nichos food (decisão do Eduardo 13/07). AT/Starteq = site próprio, depois.
@@ -32,10 +36,10 @@ export const NICHOS: Nicho[] = [
   {
     slug: "acaiteria",
     businessType: "acaiteria",
-    nome: "Açaiteria",
-    seoTitle: "Sistema para Açaiteria — Cardápio Digital, Balança e Delivery | ComandaPRO",
+    nome: "Açaiteria & Sorveteria",
+    seoTitle: "Sistema para Açaiteria e Sorveteria — Cardápio, Balança e Delivery | ComandaPRO",
     seoDescription:
-      "Sistema para açaiteria: monta o copo no cardápio digital, vende por peso na balança, delivery próprio sem comissão, comanda e caixa num sistema só. Testa o ComandaPRO.",
+      "Sistema para açaiteria e sorveteria: monta o copo no cardápio digital, vende por peso na balança, fidelidade por pontos, delivery próprio sem comissão, comanda e caixa num sistema só. Testa o ComandaPRO.",
     heroH1: "Sistema pra açaiteria que",
     heroAccent: "monta o copo sozinho.",
     heroSub: "O cliente monta o açaí no seu link — tamanho, adicionais (os primeiros grátis), sabor — e o preço nunca sai errado. Venda por peso, delivery próprio sem comissão e fidelidade por pontos, num sistema só.",
@@ -48,7 +52,18 @@ export const NICHOS: Nicho[] = [
       { q: "Dá pra vender por peso (R$/kg)?", a: "Sim. O ComandaPRO integra com a balança (protocolo Toledo) ou você digita as gramas, e o preço sai pelo peso automaticamente." },
       { q: "Como funciona a fidelidade da açaiteria?", a: "O cliente ganha pontos por compra e troca por um item seu (ex: copo 350ml grátis). Ele consulta o saldo pelo telefone e o cupom imprime quanto falta pro próximo prêmio. Pontos nunca viram dinheiro." },
       { q: "Preciso pagar comissão no delivery?", a: "Não. O pedido vem pelo seu link, com sua taxa por bairro, e o valor é todo seu — sem marketplace levando percentual." },
+      { q: "Serve pra sorveteria também?", a: "Serve, e funciona igual: o cliente monta o copo/pote no link, você vende por peso na balança (R$/kg), roda fidelidade por pontos e delivery próprio sem comissão. Açaí e sorvete operam do mesmo jeito no ComandaPRO." },
       { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
+    aliases: [
+      {
+        slug: "sorveteria",
+        businessType: "sorveteria",
+        nome: "Sorveteria",
+        seoTitle: "Sistema para Sorveteria — Cardápio Digital, Balança e Fidelidade | ComandaPRO",
+        seoDescription:
+          "Sistema para sorveteria: venda por peso na balança (R$/kg), cardápio digital no seu link, fidelidade por pontos, delivery próprio sem comissão e caixa num sistema só. Testa o ComandaPRO.",
+      },
     ],
   },
   {
@@ -72,7 +87,18 @@ export const NICHOS: Nicho[] = [
       { q: "O sistema controla couvert e dose?", a: "Sim. O couvert entra por pessoa quando tem atração, e a dose/garrafa baixa certo do estoque — sem confundir dose com garrafa." },
       { q: "O garçom consegue ver o meu financeiro?", a: "Não. O garçom só lança e vê os pedidos dele; abrir comanda e lançar sim, fechar conta e ver dinheiro não — isso é do dono e da recepção." },
       { q: "Dá pra rotear pedido pra cozinha e pro bar separados?", a: "Sim. Cada item vai pra estação certa: o chopp e o drink caem no bar, o petisco na cozinha — cada um imprime na sua impressora, sem preço na via de preparo." },
+      { q: "Serve pra petiscaria e espetinho?", a: "Serve. A operação é a mesma do bar: comanda por mesa, garçom lançando pelo celular e pedido roteado pra cozinha/bar. A petiscaria costuma ligar também o delivery próprio (sem comissão), que o sistema atende no mesmo caixa." },
       { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
+    aliases: [
+      {
+        slug: "petiscaria",
+        businessType: "petiscaria",
+        nome: "Petiscaria & Espetinho",
+        seoTitle: "Sistema para Petiscaria e Espetinho — Comanda por Mesa e Delivery | ComandaPRO",
+        seoDescription:
+          "Sistema para petiscaria e espetinho: comanda por mesa, app do garçom, pedido roteado pra cozinha e bar, delivery próprio sem comissão e caixa. Testa o ComandaPRO.",
+      },
     ],
   },
   {
@@ -145,13 +171,64 @@ export const NICHOS: Nicho[] = [
       { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
     ],
   },
+  {
+    // RESTAURANTE & MARMITARIA — refeição: salão com comanda de mesa + cozinha roteada, OU comida a
+    // quilo/marmita vendida por peso na balança. Uma LP pros dois (mesa ou quilo). Sem fidelidade.
+    slug: "restaurante",
+    businessType: "restaurante",
+    nome: "Restaurante & Marmitaria",
+    seoTitle: "Sistema para Restaurante e Marmitaria — Comanda, Comida a Quilo e Delivery | ComandaPRO",
+    seoDescription:
+      "Sistema para restaurante e marmitaria: comanda por mesa, cozinha com pedido roteado, comida a quilo por peso na balança (R$/kg), delivery próprio sem comissão e caixa num sistema só. Testa o ComandaPRO.",
+    heroH1: "Sistema pra restaurante que",
+    heroAccent: "não perde comanda.",
+    heroSub: "Comanda por mesa, cozinha recebendo o pedido roteado e delivery próprio sem comissão — e se você vende comida a quilo, a marmita sai pelo peso na balança. Do salão ao caixa, num sistema só.",
+    cardapioImg: null,
+    cardapioCaption: "Cardápio digital · prato a prato ou por peso",
+    destaques: ["Comanda por mesa", "Cozinha com pedido roteado", "Comida a quilo (R$/kg)", "Delivery 0% comissão", "Caixa unificado"],
+    dores: ["Comanda de papel que some e leva a venda junto", "Prato a quilo pesado no olho, sem bater com o caixa", "Marketplace levando percentual de cada marmita entregue"],
+    faqs: [
+      { q: "Serve pra restaurante de salão e pra comida a quilo?", a: "Serve pros dois. No salão, cada mesa abre comanda e o garçom lança pelo celular; na comida a quilo, a marmita sai pelo peso na balança (R$/kg) ou você digita as gramas. Dá pra usar os dois modos ao mesmo tempo." },
+      { q: "A cozinha recebe o pedido certo?", a: "Sim. Cada pedido vai roteado pra estação certa e imprime na cozinha em 80mm, sem preço na via de preparo — só o prato e as observações." },
+      { q: "Vende marmita por peso na balança?", a: "Vende. O ComandaPRO integra com a balança (protocolo Toledo) ou você digita as gramas, e o preço sai pelo peso na hora — sem calcular no olho." },
+      { q: "Preciso pagar comissão no delivery?", a: "Não. O pedido de marmita ou de prato vem pelo seu link, com sua taxa por bairro e 0% de comissão — o valor é todo seu." },
+      { q: "Quanto custa?", a: `A partir de R$ ${BILLING.planos.anual.equivMes}/mês no anual, com ${BILLING.trialDias} dias grátis e sem taxa de setup.` },
+    ],
+    aliases: [
+      {
+        slug: "marmitaria",
+        businessType: "marmitaria",
+        nome: "Marmitaria / Comida a quilo",
+        seoTitle: "Sistema para Marmitaria e Comida a Quilo — Balança, Delivery e Caixa | ComandaPRO",
+        seoDescription:
+          "Sistema para marmitaria e comida a quilo: venda por peso na balança (R$/kg), cardápio digital no seu link, delivery próprio sem comissão, cozinha e caixa num sistema só. Testa o ComandaPRO.",
+      },
+    ],
+  },
 ];
 
-export const getNicho = (slug: string) => NICHOS.find((n) => n.slug === slug);
+// Resolve um slug pra sua LP: bate no slug principal OU num alias (segmento-irmão). Usado pela rota
+// e por qualquer lugar que precise da LP a partir do slug.
+export const getNicho = (slug: string) =>
+  NICHOS.find((n) => n.slug === slug || n.aliases?.some((a) => a.slug === slug));
+
+// Resolve slug → { nicho (LP-família), alias (o irmão, se o acesso veio pelo slug dele) }. O alias
+// carrega o SEO próprio do termo (title/description) pra rankear "sorveteria", "marmitaria" etc.
+export const resolveNicho = (slug: string): { nicho: Nicho; alias: NichoAlias | null } | null => {
+  for (const n of NICHOS) {
+    if (n.slug === slug) return { nicho: n, alias: null };
+    const a = n.aliases?.find((x) => x.slug === slug);
+    if (a) return { nicho: n, alias: a };
+  }
+  return null;
+};
+
+// Todos os slugs indexáveis (principais + aliases) — pra generateStaticParams e sitemap.
+export const ALL_NICHO_SLUGS = NICHOS.flatMap((n) => [n.slug, ...(n.aliases?.map((a) => a.slug) ?? [])]);
 
 // Rotas do site institucional (pra sitemap). Não inclui o app (admin) nem os tenants (/<slug>).
 export const MARKETING_ROUTES = [
   "/",
   "/funcionalidades",
-  ...NICHOS.map((n) => `/segmentos/${n.slug}`),
+  ...ALL_NICHO_SLUGS.map((slug) => `/segmentos/${slug}`),
 ];

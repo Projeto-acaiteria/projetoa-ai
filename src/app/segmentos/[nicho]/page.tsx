@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { IconArrowRight, IconMoto, IconTable, IconWallet, IconReceipt, IconBag } from "@/components/Icons";
-import { NICHOS, getNicho, type Nicho } from "@/config/marketing";
+import { getNicho, resolveNicho, ALL_NICHO_SLUGS, type Nicho } from "@/config/marketing";
 import { SEGMENTOS, type Features } from "@/config/segments";
 import { ACCENT, CREAM, INK, MUT, PANEL_COLORS, SiteGlows, SiteNav, PhoneFrame, ColorPanel, ScreenMock, Pill, PrecoSection, FaqSection, CtaFinal, SiteFooter, JsonLd } from "@/components/site/parts";
 import { Reveal } from "@/components/site/Reveal";
@@ -10,17 +10,20 @@ import CadastroModal from "@/components/site/CadastroModal";
 
 export const dynamic = "force-static";
 export function generateStaticParams() {
-  return NICHOS.map((n) => ({ nicho: n.slug }));
+  return ALL_NICHO_SLUGS.map((slug) => ({ nicho: slug }));
 }
 export async function generateMetadata({ params }: { params: Promise<{ nicho: string }> }): Promise<Metadata> {
   const { nicho } = await params;
-  const n = getNicho(nicho);
-  if (!n) return { title: "Segmento — ComandaPRO" };
+  const r = resolveNicho(nicho);
+  if (!r) return { title: "Segmento — ComandaPRO" };
+  // acesso por alias (ex: /segmentos/sorveteria) usa o SEO do TERMO; canonical aponta pra si mesmo
+  // (URL indexável própria), não pra LP-família — senão o Google não ranqueia o termo do irmão.
+  const seo = r.alias ?? r.nicho;
   return {
-    title: n.seoTitle,
-    description: n.seoDescription,
-    alternates: { canonical: `/segmentos/${n.slug}` },
-    openGraph: { title: n.seoTitle, description: n.seoDescription, type: "website" },
+    title: seo.seoTitle,
+    description: seo.seoDescription,
+    alternates: { canonical: `/segmentos/${seo.slug}` },
+    openGraph: { title: seo.seoTitle, description: seo.seoDescription, type: "website" },
   };
 }
 
