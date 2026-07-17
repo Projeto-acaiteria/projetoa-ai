@@ -3,6 +3,9 @@ import { db } from "@/lib/supabase";
 import { SEGMENTOS, type BusinessType } from "@/config/segments";
 import { setStore, waMsgsForSegment } from "@/lib/settings-store";
 import { seedStarterMenu } from "@/lib/seed-menu";
+import { ensureTables } from "@/lib/tables-store";
+
+const SEED_MESAS = 10; // ponto de partida pros negócios de salão; o dono ajusta no /admin/mesas
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,6 +122,14 @@ export async function POST(req: Request) {
   try {
     await seedStarterMenu(storeId, seg);
   } catch { /* segue sem seed — o dono cadastra do zero em Cardápio */ }
+
+  // 6b. MESAS + QR pros negócios de SALÃO (mesa é âncora: cliente pede da mesa, o sistema
+  //     identifica qual). Gate = has_tables && has_stations → bar/restaurante/pizza/sushi/burguer/
+  //     petiscaria. Balcão/delivery (açaí/sorvete/marmita) NÃO semeia — lá a mesa é opcional.
+  //     Nasce com SEED_MESAS mesas; o dono ajusta no /admin/mesas. Não bloqueia o cadastro.
+  try {
+    if (f.hasTables && f.hasStations) await ensureTables(SEED_MESAS, storeId);
+  } catch { /* segue sem mesas — o dono cria no /admin/mesas */ }
 
   // 7. se esse WhatsApp veio de um lead capturado no modal, marca como convertido + vincula a loja.
   //    Não bloqueia o cadastro — é só telemetria de funil pro follow-up.

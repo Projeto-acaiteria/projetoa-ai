@@ -174,9 +174,9 @@ export async function getTables(): Promise<TableCard[]> {
 }
 
 /** Cria as mesas 1..n (area 'salao') que ainda não existem. Idempotente. */
-export async function ensureTables(n: number): Promise<void> {
+export async function ensureTables(n: number, storeId?: string): Promise<void> {
   const d = db();
-  const sid = await resolveStoreId();
+  const sid = storeId ?? (await resolveStoreId()); // storeId explícito no cadastro (server-side, sem sessão)
   const { data: existing } = await d.from("tables").select("number").eq("store_id", sid);
   const have = new Set((existing ?? []).map((t) => num(t.number)));
   const missing: { number: number; area: string; store_id: string }[] = [];
