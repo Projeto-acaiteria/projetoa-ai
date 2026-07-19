@@ -11,7 +11,8 @@ export async function printTicket(html: string, station = "caixa"): Promise<"qz"
       await qzPrintHtml(printer, html);
       // impressoras que não cortam pelo driver HTML (ex.: 3nStar) → corte cru por-máquina/estação
       if (typeof window !== "undefined" && localStorage.getItem("cut:" + station) === "1") {
-        try { await qzCutPaper(printer); } catch { /* corte é best-effort — nunca trava a impressão */ }
+        const cutMode = localStorage.getItem("cutmode:" + station) === "parcial" ? "parcial" : "total";
+        try { await qzCutPaper(printer, cutMode); } catch { /* corte é best-effort — nunca trava a impressão */ }
       }
       return "qz";
     } catch {

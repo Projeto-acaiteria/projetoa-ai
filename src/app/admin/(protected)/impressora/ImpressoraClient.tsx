@@ -55,8 +55,14 @@ function PrinterPicker({
   const [sel, setSel] = useState("");
   const [busy, setBusy] = useState(false);
   const [cut, setCut] = useState(false); // impressora não corta pelo driver → manda comando de corte (ex.: 3nStar)
-  useEffect(() => { setSel(getStationPrinter(destKey) ?? ""); setCut(localStorage.getItem("cut:" + destKey) === "1"); }, [destKey]);
+  const [cutMode, setCutMode] = useState<"total" | "parcial">("total"); // modelo que ignora corte total aceita o parcial
+  useEffect(() => {
+    setSel(getStationPrinter(destKey) ?? "");
+    setCut(localStorage.getItem("cut:" + destKey) === "1");
+    setCutMode(localStorage.getItem("cutmode:" + destKey) === "parcial" ? "parcial" : "total");
+  }, [destKey]);
   function toggleCut(on: boolean) { setCut(on); localStorage.setItem("cut:" + destKey, on ? "1" : "0"); onMsg(on ? `Corte de papel LIGADO (${label}).` : `Corte de papel desligado (${label}).`); }
+  function changeCutMode(m: "total" | "parcial") { setCutMode(m); localStorage.setItem("cutmode:" + destKey, m); onMsg(`Corte ${m === "parcial" ? "PARCIAL" : "total"} (${label}).`); }
 
   function save(name: string) {
     setSel(name);
@@ -106,7 +112,15 @@ function PrinterPicker({
             <input type="checkbox" checked={cut} onChange={(e) => toggleCut(e.target.checked)} /> Cortar papel
             <span className="font-normal text-[var(--text-faded)]">— ligue se a impressora não corta/não solta o papel sozinha</span>
           </label>
-          {cut && <button onClick={async () => { try { await qzCutPaper(sel); onMsg("Comando de corte enviado."); } catch (e) { onMsg("Falha no corte: " + (e instanceof Error ? e.message : "erro")); } }} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-bold text-brand-600">Testar corte</button>}
+          {cut && (
+            <div className="flex items-center gap-2">
+              <select value={cutMode} onChange={(e) => changeCutMode(e.target.value as "total" | "parcial")} className="rounded-lg border border-line bg-bg-base px-2 py-1.5 text-xs font-semibold text-ink" title="Se marcou 'Cortar papel' e mesmo assim não cortou, troque pra Parcial">
+                <option value="total">Corte total</option>
+                <option value="parcial">Corte parcial</option>
+              </select>
+              <button onClick={async () => { try { await qzCutPaper(sel, cutMode); onMsg("Comando de corte enviado."); } catch (e) { onMsg("Falha no corte: " + (e instanceof Error ? e.message : "erro")); } }} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-bold text-brand-600">Testar corte</button>
+            </div>
+          )}
         </div>
       )}
     </Card>

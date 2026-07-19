@@ -54,13 +54,15 @@ export async function qzKickDrawer(printer: string): Promise<void> {
   await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: "\x1B\x70\x00\x19\xFA" }]);
 }
 
-// Avança o papel e CORTA (ESC/POS): ESC d 5 (feed 5 linhas, pro conteúdo passar da lâmina) + GS V 0
-// (corte total). Algumas impressoras (ex.: 3nStar RPT006W) cortam via comando cru mas não pelo driver
-// HTML — este comando resolve. Enviado só quando a estação está marcada "cortar papel" no print.ts.
-export async function qzCutPaper(printer: string): Promise<void> {
+// Avança o papel e CORTA (ESC/POS): ESC d 5 (feed 5 linhas, pro conteúdo passar da lâmina) + corte.
+// modo "total" = GS V 0 (corte total, padrão — funciona na maioria). modo "parcial" = GS V 1 (deixa
+// um filete unindo; modelos que IGNORAM o GS V 0 costumam aceitar o GS V 1). Escolhido por-estação
+// em Ajustes → Impressora. Enviado só quando a estação está marcada "cortar papel" no print.ts.
+export async function qzCutPaper(printer: string, mode: "total" | "parcial" = "total"): Promise<void> {
   const qz = await qzConnect();
   const cfg = qz.configs.create(printer, { encoding: "ISO-8859-1" });
-  await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: "\x1B\x64\x05\x1D\x56\x00" }]);
+  const cutCmd = mode === "parcial" ? "\x1B\x64\x05\x1D\x56\x01" : "\x1B\x64\x05\x1D\x56\x00";
+  await qz.print(cfg, [{ type: "raw", format: "command", flavor: "plain", data: cutCmd }]);
 }
 
 export async function qzIsActive(): Promise<boolean> {
