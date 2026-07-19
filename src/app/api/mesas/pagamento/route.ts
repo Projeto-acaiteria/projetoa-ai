@@ -3,6 +3,7 @@ import { addPayment, getTabFull } from "@/lib/tables-store";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getOpenSession } from "@/lib/cash-store";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
     const recorded = Math.min(b.amountCents, falta);
     const trocoCents = Math.max(0, b.amountCents - falta);
     if (recorded <= 0) return NextResponse.json({ ok: true, recordedCents: 0, trocoCents }); // já quitado; resto é troco
+    // #2-caixa: dinheiro recebido SÓ com caixa aberto (uniforme com balcao-venda/vendas). Sem isso,
+    // pagamento de mesa com caixa fechado some da conferência da gaveta (λ.reconciliação de caixa).
+    if (!(await getOpenSession())) {
+      return NextResponse.json({ error: "Abra o caixa antes de receber pagamento" }, { status: 409 });
+    }
     // taxa do cartão: máquina escolhida (snapshot) ou flat por método — server-authoritative
     const card = await resolveCardFee(method as PaymentMethod, recorded, sid, { machineId: b.machineId, parcelas: b.parcelas });
     await addPayment(b.tabId, method, recorded, card.feePercent);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
+import { getOpenSession } from "@/lib/cash-store";
 import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
@@ -43,6 +44,11 @@ export async function POST(req: Request) {
     const falta = Math.max(0, grand - full.paidCents);
 
     if (falta > 0) {
+      // #2-caixa: recebe o que falta SÓ com caixa aberto (uniforme com balcao-venda). Comanda já
+      // quitada (falta=0) fecha normal sem exigir caixa — só o recebimento de dinheiro exige.
+      if (!(await getOpenSession())) {
+        return NextResponse.json({ error: "Abra o caixa antes de receber pagamento" }, { status: 409 });
+      }
       const card = await resolveCardFee(method, falta, sid, { machineId: b.machineId, parcelas: b.parcelas });
       await addPayment(b.tabId, method, falta, card.feePercent); // valida dono + grava taxa da máquina escolhida
     }
