@@ -2,9 +2,20 @@
 // pessoa + repasse). A comanda guarda o cover em snapshot na abertura. Server-side, por loja.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
-import { todayBR, inicioDiaBR, addDiasBR } from "@/lib/date-br";
+import { todayBR, addDiasBR, hourBR } from "@/lib/date-br";
 
 const num = (v: unknown) => Number(v ?? 0);
+
+// A "noite" de um bar vai até de madrugada. Antes deste horário, a noite operacional ainda é a do
+// dia ANTERIOR — então o show de sábado segue ativo pra mesa que abre domingo 00:20.
+const CUTOFF_NOITE_HORA = 6;
+/** Data (YYYY-MM-DD) da noite operacional AGORA no fuso BR. Antes das 6h → dia anterior. */
+export function noiteOperacionalBR(): string {
+  return hourBR() < CUTOFF_NOITE_HORA ? addDiasBR(todayBR(), -1) : todayBR();
+}
+/** Janela [início, fim) de timestamps da noite operacional de um show (event_date): das 6h do dia
+ *  do show às 6h do dia seguinte. Casa com getActiveEvent — pega a madrugada pós-meia-noite. */
+const noiteInicio = (ymd: string): string => `${ymd}T${String(CUTOFF_NOITE_HORA).padStart(2, "0")}:00:00-03:00`;
 
 export type EventRow = {
   id: string;
@@ -34,8 +45,9 @@ export async function listEvents(storeId?: string): Promise<EventRow[]> {
  *  atração ao vivo no dia (event_date = hoje + active). Sem show hoje, getActiveEvent=null, cover=0. */
 export async function getActiveEvent(storeId?: string): Promise<EventRow | null> {
   const sid = storeId ?? (await resolveStoreId());
-  const today = todayBR();
-  const { data } = await db().from("events").select("*").eq("store_id", sid).eq("active", true).eq("event_date", today).limit(1).maybeSingle();
+  // noite operacional (não o dia civil): mesa aberta 00:20 numa noite de show ainda pega o cover.
+  const noite = noiteOperacionalBR();
+  const { data } = await db().from("events").select("*").eq("store_id", sid).eq("active", true).eq("event_date", noite).limit(1).maybeSingle();
   return data ? toEvent(data as Record<string, unknown>) : null;
 }
 
@@ -67,13 +79,15 @@ export async function coverReport(storeId?: string): Promise<Array<EventRow & { 
   const events = await listEvents(sid);
   const out: Array<EventRow & { arrecadado_cents: number; comandas: number }> = [];
   for (const e of events) {
-    // soma o cover snapshot das comandas abertas no dia do show
+    // soma o cover das comandas FECHADAS da noite operacional do show (6h→6h). Só comanda fechada =
+    // cover efetivamente arrecadado (mesa aberta ainda pode não pagar/recusar o couvert).
     const { data } = await db()
       .from("tabs")
       .select("cover_cents, opened_at")
       .eq("store_id", sid)
-      .gte("opened_at", inicioDiaBR(e.event_date))
-      .lt("opened_at", inicioDiaBR(addDiasBR(e.event_date, 1)));
+      .eq("status", "fechada")
+      .gte("opened_at", noiteInicio(e.event_date))
+      .lt("opened_at", noiteInicio(addDiasBR(e.event_date, 1)));
     const rows = (data ?? []) as { cover_cents: number }[];
     out.push({ ...e, arrecadado_cents: rows.reduce((s, r) => s + num(r.cover_cents), 0), comandas: rows.filter((r) => num(r.cover_cents) > 0).length });
   }

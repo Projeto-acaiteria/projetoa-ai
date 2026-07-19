@@ -14,6 +14,13 @@ export function dateBR(iso?: string | Date): string {
 /** Hoje (YYYY-MM-DD) no fuso do Brasil. */
 export const todayBR = (): string => dateBR();
 
+/** Hora local-BR (0–23) de um timestamp — ou de AGORA. hourCycle h23 evita o "24" da meia-noite. */
+export function hourBR(iso?: string | Date): number {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return 0;
+  return parseInt(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(d), 10) || 0;
+}
+
 /** Instante ISO da meia-noite BR de um dia YYYY-MM-DD. Fronteira de janela de timestamp:
  *  .gte(col, inicioDiaBR(dia)).lt(col, inicioDiaBR(addDiasBR(dia,1))) fecha 00h→00h LOCAL. */
 export const inicioDiaBR = (ymd: string): string => `${ymd}T00:00:00-03:00`;
