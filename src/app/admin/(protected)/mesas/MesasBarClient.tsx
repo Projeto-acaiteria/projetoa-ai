@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { CardMachine } from "@/lib/settings-store";
-import { IconArrowRight, IconReceipt, IconBag } from "@/components/Icons";
+import { IconArrowRight, IconReceipt, IconBag, IconMinus, IconTrash } from "@/components/Icons";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
@@ -16,7 +16,7 @@ import { ticketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null; contaCalled: boolean };
-type ComItem = { name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null; mods?: { name: string; price_cents: number }[] | null };
+type ComItem = { id: number; name: string; sizeLabel?: string | null; qty: number; unitPriceCents: number; station?: string; note?: string | null; mods?: { name: string; price_cents: number }[] | null };
 type Comanda = { tab: { id: number; label?: string | null; people_count?: number }; orders: { items: ComItem[] }[]; payments: { method: string; amountCents: number }[]; consumoCents: number; coverCents: number; totalCents: number; paidCents: number };
 // linha do carrinho temp: produto simples (qty), com modificadores (modifierIds) ou por peso (grams) + obs
 type TempLine = { uid: string; product: BarProduct; label: string; qty: number; unitPriceCents: number; modifierIds?: string[]; grams?: number; note?: string };
@@ -68,6 +68,10 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [err, setErr] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [addN, setAddN] = useState("");
+  // cancelar item da comanda (só caixa/admin): 'one' tira 1 unidade, 'all' tira a linha toda. parts =
+  // linhas reais do banco que compõem a linha visual consolidada. Pede motivo (registro auditável).
+  const [cancelFor, setCancelFor] = useState<{ parts: { id: number; qty: number }[]; label: string; mode: "one" | "all" } | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -140,15 +144,18 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   // comanda consolidada por estação + item igual (Verbo pegadinha #3)
   const consolid = useMemo(() => {
-    const map = new Map<string, ComItem & { station: string }>();
+    const map = new Map<string, ComItem & { station: string; parts: { id: number; qty: number }[] }>();
     for (const o of comanda?.orders ?? []) for (const it of o.items) {
       const st = it.station ?? "cozinha";
       // chave inclui MODIFICADORES (assinatura ordenada) + obs → mods/obs diferentes NÃO fundem;
       // idênticos (mesmos mods, mesma obs) fundem e somam qty (mantém o #3 sem regressão).
       const modSig = (it.mods ?? []).map((m) => m.name).sort().join("+");
       const k = `${st}|${it.name}|${it.sizeLabel ?? ""}|${it.unitPriceCents}|${modSig}|${it.note ?? ""}`;
-      const cur = map.get(k) ?? { ...it, station: st, qty: 0 };
-      cur.qty += it.qty; map.set(k, cur);
+      const cur = map.get(k) ?? { ...it, station: st, qty: 0, parts: [] };
+      cur.qty += it.qty;
+      // parts = linhas reais do banco que compõem esta linha visual (o cancelar mira por id)
+      cur.parts.push({ id: it.id, qty: it.qty });
+      map.set(k, cur);
     }
     return [...map.values()];
   }, [comanda]);
@@ -252,6 +259,30 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
+    finally { setBusy(false); }
+  }
+
+  // cancela item já lançado na comanda ABERTA. 'one' → 1 unidade da linha-fonte mais recente;
+  // 'all' → cancela todas as linhas-fonte da linha visual. O servidor estorna o estoque e registra
+  // o motivo (log auditável). Read-after-write: recarrega a comanda fresca do banco (λ.prova-na-fonte).
+  async function doCancel() {
+    if (!cancelFor || busy) return;
+    const reason = cancelReason.trim();
+    if (!reason) { setErr("Diga o motivo do cancelamento."); return; }
+    setBusy(true); setErr("");
+    try {
+      const post = (itemId: number, units?: number) =>
+        fetch("/api/mesas/cancelar-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, units, reason }) })
+          .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || "Não consegui cancelar."); });
+      if (cancelFor.mode === "one") {
+        await post(cancelFor.parts[cancelFor.parts.length - 1].id, 1); // tira 1 da linha-fonte mais recente
+      } else {
+        for (const p of cancelFor.parts) await post(p.id); // units ausente = linha-fonte inteira
+      }
+      setCancelFor(null); setCancelReason("");
+      if (drawer?.tabId) await loadComanda(drawer.tabId);
+      loadTables();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao cancelar."); }
     finally { setBusy(false); }
   }
 
@@ -468,7 +499,16 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                       {consolid.map((it, i) => (
                         <li key={i} className="flex items-start justify-between gap-2 px-3 py-2 text-sm">
                           <span className="min-w-0 text-ink"><b className="tabular-nums">{it.qty}×</b> {it.name}{it.sizeLabel ? ` · ${it.sizeLabel}` : ""} <span className="text-[10px] capitalize text-[var(--text-faded)]">({it.station})</span>{it.mods && it.mods.length > 0 ? <span className="block text-[11px] text-[var(--text-muted)]">{it.mods.map((m) => m.name).join(" · ")}</span> : null}{it.note ? <span className="block text-[11px] italic text-[var(--text-muted)]">obs: {it.note}</span> : null}</span>
-                          <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="tabular-nums text-[var(--text-muted)]">{brl(it.qty * it.unitPriceCents)}</span>
+                            {/* cancelar (só caixa/admin): − tira 1 unidade (some se qty=1), 🗑 tira a linha toda */}
+                            {canClose && (
+                              <>
+                                {it.qty > 1 && <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "one" }); setCancelReason(""); setErr(""); }} title="Cancelar 1 unidade" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconMinus width={13} height={13} /></button>}
+                                <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "all" }); setCancelReason(""); setErr(""); }} title="Cancelar item" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconTrash width={13} height={13} /></button>
+                              </>
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -582,6 +622,23 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* cancelar item da comanda: pede o motivo (registro auditável) — z acima do drawer */}
+      {cancelFor && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" onClick={() => { if (!busy) { setCancelFor(null); setErr(""); } }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative w-full max-w-sm rounded-t-3xl bg-bg-elevated p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-extrabold text-ink">Cancelar {cancelFor.mode === "one" ? "1 unidade" : "item"}</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]"><b className="text-ink">{cancelFor.label}</b> — volta pro estoque e fica registrado com o motivo (não some sem rastro).</p>
+            <input autoFocus value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Motivo (ex: bateu errado, cliente desistiu)" className="mt-3 w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600" />
+            {err && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => { setCancelFor(null); setErr(""); }} className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-ink">Voltar</button>
+              <button onClick={doCancel} disabled={busy || !cancelReason.trim()} className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "..." : "Cancelar"}</button>
+            </div>
           </div>
         </div>
       )}

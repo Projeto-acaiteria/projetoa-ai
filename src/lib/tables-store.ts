@@ -5,7 +5,7 @@
 // SEM garçom/comissão. Todos os valores em CENTAVOS (int).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
-import { applyConsumes, listStock, unitCostCents } from "@/lib/stock-store";
+import { applyConsumes, listStock, unitCostCents, moveStock } from "@/lib/stock-store";
 import { todayBR } from "@/lib/date-br";
 import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
@@ -527,6 +527,64 @@ export async function getTabFull(tabId: number, storeId?: string): Promise<TabFu
     totalCents,
     paidCents,
   };
+}
+
+/** Cancela unidades de um item de comanda ABERTA: estorna o estoque, registra o motivo
+ *  (log auditável — não some sem rastro) e tira da comanda (decrementa a linha; some se
+ *  zerar). Se o pedido do KDS esvaziar, apaga o tab_order (sai do quadro de Preparo).
+ *  Só comanda aberta — comanda fechada estorna pelo Caixa (cancelar-venda). Anti-IDOR:
+ *  trava a loja (sid) em cada passo, já que db() bypassa RLS. */
+export async function cancelTabItem(
+  itemId: number,
+  opts: { units?: number; reason: string; by?: string },
+): Promise<{ cancelledQty: number; itemName: string; tabId: number }> {
+  const d = db();
+  const sid = await resolveStoreId();
+  const reason = (opts.reason ?? "").trim().slice(0, 200);
+  if (!reason) throw new Error("Diga o motivo do cancelamento.");
+
+  // 1) item → pedido → comanda (exige item DESTA loja e comanda ABERTA)
+  const { data: item } = await d
+    .from("tab_order_items").select("*").eq("id", itemId).eq("store_id", sid).maybeSingle();
+  if (!item) throw new Error("Item não encontrado.");
+  const it = item as TabItem;
+  const { data: order } = await d
+    .from("tab_orders").select("id, tab_id").eq("id", it.tab_order_id).eq("store_id", sid).maybeSingle();
+  if (!order) throw new Error("Pedido não encontrado.");
+  const tabId = num((order as { tab_id: number }).tab_id);
+  const { data: tab } = await d.from("tabs").select("id, status").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!tab) throw new Error("Comanda não encontrada.");
+  if ((tab as { status: string }).status !== "aberta") throw new Error("Comanda já fechada — estorne pelo Caixa.");
+
+  const have = num(it.qty);
+  const units = Math.max(1, Math.min(opts.units ?? have, have)); // lixeira (units ausente) = linha toda
+
+  // 2) estorna o estoque das unidades canceladas (entrada) — NÃO-FATAL, igual à baixa original
+  const today = todayBR();
+  for (const c of (it.consumes ?? [])) {
+    if (!c.stockId || !(c.qty > 0)) continue;
+    try { await moveStock(c.stockId, "entrada", c.qty * units, "Cancelamento de item", today, sid); }
+    catch (e) { console.error("cancelTabItem estorno estoque:", e); }
+  }
+
+  // 3) registro auditável (o quê, quanto, motivo, quem)
+  await d.from("tab_item_cancellations").insert({
+    store_id: sid, tab_id: tabId, tab_order_id: it.tab_order_id,
+    item_name: it.name, size_label: it.size_label ?? null, qty: units,
+    unit_price_cents: it.unit_price_cents, mods: it.mods ?? null,
+    reason, cancelled_by: opts.by ?? null,
+  });
+
+  // 4) tira da comanda: decrementa; se zerou, apaga a linha; se o pedido esvaziou, apaga o pedido (sai do KDS)
+  if (units >= have) {
+    await d.from("tab_order_items").delete().eq("id", itemId).eq("store_id", sid);
+    const { count } = await d.from("tab_order_items").select("id", { count: "exact", head: true }).eq("tab_order_id", it.tab_order_id).eq("store_id", sid);
+    if (!count) await d.from("tab_orders").delete().eq("id", it.tab_order_id).eq("store_id", sid);
+  } else {
+    await d.from("tab_order_items").update({ qty: have - units }).eq("id", itemId).eq("store_id", sid);
+  }
+
+  return { cancelledQty: units, itemName: it.name, tabId };
 }
 
 /** Registra um pagamento na comanda. */
