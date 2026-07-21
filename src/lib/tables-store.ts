@@ -604,6 +604,65 @@ export async function cancelTabItem(
   return { cancelledQty: units, itemName: it.name, tabId, tabFreed };
 }
 
+/** Transfere a comanda pra outra mesa (cliente trocou de lugar). Mesa destino LIVRE → move
+ *  (table_id/label). Mesa destino OCUPADA + merge → funde: reatribui pedidos (itens/KDS) e
+ *  pagamentos pro tab do destino, soma couvert/pessoas e apaga o tab de origem (mesa de origem
+ *  volta pra Livre). Só comanda ABERTA. Anti-IDOR: sid trava a loja em cada passo. */
+export async function transferTab(
+  tabId: number,
+  toTableNumber: number,
+  opts: { merge?: boolean } = {},
+): Promise<{ mode: "transfer" | "merge"; tabId: number; toTableNumber: number }> {
+  const d = db();
+  const sid = await resolveStoreId();
+
+  const { data: src } = await d.from("tabs").select("*").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  if (!src) throw new Error("Comanda não encontrada.");
+  const srcTab = src as Tab;
+  if (srcTab.status !== "aberta") throw new Error("Comanda já fechada — não dá pra transferir.");
+
+  const toTableId = await getOrCreateTableByNumber(toTableNumber, sid);
+  if (num(srcTab.table_id) === toTableId) throw new Error("A comanda já está nessa mesa.");
+
+  // rótulo pela ÁREA da mesa destino (Balcão N × Mesa N), igual os tiles
+  const { data: destTable } = await d.from("tables").select("area").eq("id", toTableId).eq("store_id", sid).maybeSingle();
+  const label = ((destTable as { area?: string })?.area === "balcao" ? "Balcão " : "Mesa ") + toTableNumber;
+
+  // chamados pendentes da origem (pediu a conta / atendente) viram atendidos — o cliente saiu de lá
+  await d.from("service_calls").update({ status: "atendido" }).eq("tab_id", tabId).eq("store_id", sid).eq("status", "pendente");
+
+  // mesa destino já tem comanda aberta?
+  const { data: destRow } = await d.from("tabs").select("*").eq("store_id", sid).eq("table_id", toTableId).eq("status", "aberta").maybeSingle();
+
+  if (!destRow) {
+    // TRANSFER: move a comanda pra mesa livre
+    const { error } = await d.from("tabs").update({ table_id: toTableId, label }).eq("id", tabId).eq("store_id", sid);
+    if (error) {
+      // corrida: a mesa destino ficou ocupada entre a checagem e o update (índice tabs_one_open_per_table)
+      if ((error as { code?: string }).code === "23505") throw new Error("Mesa destino ficou ocupada agora — tente de novo (dá pra juntar).");
+      throw error;
+    }
+    return { mode: "transfer", tabId, toTableNumber };
+  }
+
+  // MERGE: destino ocupado — funde a origem NO destino (destino fica, origem some)
+  if (!opts.merge) throw new Error(`Mesa ${toTableNumber} está ocupada. Confirme a junção das comandas.`);
+  const destTab = destRow as Tab;
+  // 1) reatribui pedidos (itens/KDS) e pagamentos da origem pro destino
+  await d.from("tab_orders").update({ tab_id: destTab.id }).eq("tab_id", tabId).eq("store_id", sid);
+  await d.from("tab_payments").update({ tab_id: destTab.id }).eq("tab_id", tabId).eq("store_id", sid);
+  // 2) couvert/pessoas somam (snapshots do MESMO show → cover/pessoa consistente)
+  await d.from("tabs").update({
+    cover_cents: num(destTab.cover_cents) + num(srcTab.cover_cents),
+    people_count: num(destTab.people_count) + num(srcTab.people_count),
+  }).eq("id", destTab.id).eq("store_id", sid);
+  // 3) apaga a comanda de origem (já vazia) — mesa de origem volta pra Livre. mt-31: log de
+  //    cancelamento da origem sobrevive (sem cascade por tab_id).
+  await d.from("tabs").delete().eq("id", tabId).eq("store_id", sid);
+
+  return { mode: "merge", tabId: num(destTab.id), toTableNumber };
+}
+
 /** Registra um pagamento na comanda. */
 export async function addPayment(
   tabId: number,

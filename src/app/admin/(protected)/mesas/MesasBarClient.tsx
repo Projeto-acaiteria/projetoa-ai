@@ -72,6 +72,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // linhas reais do banco que compõem a linha visual consolidada. Pede motivo (registro auditável).
   const [cancelFor, setCancelFor] = useState<{ parts: { id: number; qty: number }[]; label: string; mode: "one" | "all" } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  // trocar de mesa (só caixa/admin): abre o seletor de mesas; se a destino estiver ocupada, confirma a junção
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveConfirm, setMoveConfirm] = useState<{ number: number; area: string; occupied: boolean } | null>(null);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -288,6 +291,21 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       else if (drawer?.tabId) await loadComanda(drawer.tabId);
       loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao cancelar."); }
+    finally { setBusy(false); }
+  }
+
+  // transfere a comanda pra outra mesa. Destino livre = move; destino ocupado + merge = funde as
+  // comandas. Depois fecha o drawer e ressincroniza os tiles (a comanda mudou de mesa/id).
+  async function doTransfer(toNumber: number, merge: boolean) {
+    if (!drawer?.tabId || busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/mesas/transferir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, toTableNumber: toNumber, merge }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Não consegui transferir.");
+      setMoveConfirm(null); setMoveOpen(false);
+      closeDrawer(); loadTables();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao transferir."); }
     finally { setBusy(false); }
   }
 
@@ -620,6 +638,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button onClick={() => { setView("pick"); setTemp([]); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconBag width={15} height={15} /> Adicionar item</button>
                       {grand > 0 && <button onClick={conferir} className={`flex items-center gap-1.5 rounded-xl border px-4 py-3 text-sm font-bold ${sentToCaixa ? "border-brand-600 text-brand-600" : "border-line text-ink"}`}><IconReceipt width={15} height={15} /> {sentToCaixa ? "✓ Impresso no caixa" : "Imprimir conta"}</button>}
+                      {canClose && <button onClick={() => { setMoveOpen(true); setErr(""); }} className="flex items-center gap-1.5 rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink"><IconArrowRight width={15} height={15} /> Trocar de mesa</button>}
                       <button onClick={closeDrawer} className="flex-1 rounded-xl brand-gradient py-3 font-bold text-white">Continuar</button>
                       {canClose && grand > 0 && <button onClick={() => { setPaying(true); setErr(""); }} className="rounded-xl border border-line px-4 py-3 text-sm font-bold text-ink">Fechar conta</button>}
                     </div>
@@ -643,6 +662,65 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             <div className="mt-3 flex gap-2">
               <button onClick={() => { setCancelFor(null); setErr(""); }} className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-ink">Voltar</button>
               <button onClick={doCancel} disabled={busy || !cancelReason.trim()} className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "..." : "Cancelar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* trocar de mesa: seletor de mesas (livre = move · ocupada = junta) — z acima do drawer */}
+      {moveOpen && drawer && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" onClick={() => { if (!busy) { setMoveOpen(false); setErr(""); } }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-bg-elevated p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-lg font-extrabold text-ink">Trocar de mesa</h3>
+              <button onClick={() => { setMoveOpen(false); setErr(""); }} className="grid h-8 w-8 place-items-center rounded-full border border-line text-lg">✕</button>
+            </div>
+            <p className="mb-3 text-sm text-[var(--text-muted)]">Da {drawer.table.area === "balcao" ? "Balcão" : "Mesa"} {drawer.table.number} para… <span className="text-[var(--text-faded)]">(mesa ocupada = junta as comandas)</span></p>
+            {err && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+            <div className="space-y-4">
+              {areas.map(({ area, list }) => {
+                const others = list.filter((t) => t.number !== drawer.table.number);
+                if (!others.length) return null;
+                return (
+                  <section key={area}>
+                    <h4 className="mb-1.5 text-xs font-extrabold uppercase text-[var(--text-muted)]">{area === "balcao" ? "Balcão" : area}</h4>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                      {others.map((t) => {
+                        const oc = !!t.tabId;
+                        return (
+                          <button key={t.number} onClick={() => { setMoveConfirm({ number: t.number, area, occupied: oc }); setErr(""); }}
+                            className="flex aspect-square flex-col items-center justify-center rounded-xl border bg-bg-base p-1 text-center active:scale-95"
+                            style={{ borderColor: oc ? "var(--brand-600)" : "#16A34A", borderTopWidth: 3, borderTopColor: oc ? "var(--brand-600)" : "#16A34A" }}>
+                            <span className={`text-xl font-extrabold ${oc ? "text-ink" : "text-lime"}`}>{t.number}</span>
+                            <span className={`text-[9px] font-semibold ${oc ? "text-brand-600" : "text-lime"}`}>{oc ? "ocupada" : "livre"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* confirmação da troca: transferir (destino livre) ou juntar (destino ocupado) */}
+      {moveConfirm && drawer && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" onClick={() => { if (!busy) setMoveConfirm(null); }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative w-full max-w-sm rounded-t-3xl bg-bg-elevated p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-extrabold text-ink">{moveConfirm.occupied ? "Juntar comandas" : "Transferir comanda"}</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {moveConfirm.occupied
+                ? <>A {moveConfirm.area === "balcao" ? "Balcão" : "Mesa"} {moveConfirm.number} já tem comanda aberta. <b className="text-ink">Juntar as duas numa só</b> (itens, couvert e pagamentos somam)? A {drawer.table.area === "balcao" ? "Balcão" : "Mesa"} {drawer.table.number} volta pra Livre.</>
+                : <>Mover a comanda da {drawer.table.area === "balcao" ? "Balcão" : "Mesa"} {drawer.table.number} para a <b className="text-ink">{moveConfirm.area === "balcao" ? "Balcão" : "Mesa"} {moveConfirm.number}</b>. A mesa de origem volta pra Livre.</>}
+            </p>
+            {err && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => setMoveConfirm(null)} className="flex-1 rounded-xl border border-line py-3 text-sm font-bold text-ink">Voltar</button>
+              <button onClick={() => doTransfer(moveConfirm.number, moveConfirm.occupied)} disabled={busy} className="flex-1 rounded-xl brand-gradient py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "..." : (moveConfirm.occupied ? "Juntar" : "Transferir")}</button>
             </div>
           </div>
         </div>
