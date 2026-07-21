@@ -43,8 +43,8 @@ export async function weightSoldSince(sinceISO: string, storeId?: string, balcao
 
   // MESA
   const d = db();
-  const { data: tabOrders } = await d.from("tab_orders").select("id").eq("store_id", sid).gte("created_at", sinceISO);
-  const ids = (tabOrders ?? []).map((t) => (t as { id: number }).id);
+  const { data: tabOrders } = await d.from("tab_orders").select("id, tabs(cancelled)").eq("store_id", sid).gte("created_at", sinceISO);
+  const ids = (tabOrders ?? []).filter((t) => !(t as { tabs?: { cancelled?: boolean } | null }).tabs?.cancelled).map((t) => (t as { id: number }).id); // comanda cancelada não conta kg
   if (ids.length) {
     const { data: items } = await d.from("tab_order_items").select("name, qty, consumes").in("tab_order_id", ids);
     for (const it of (items ?? []) as { name: string; qty: number; consumes: unknown }[]) {

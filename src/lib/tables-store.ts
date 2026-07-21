@@ -7,7 +7,7 @@ import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { applyConsumes, listStock, unitCostCents, moveStock } from "@/lib/stock-store";
 import { todayBR } from "@/lib/date-br";
-import { awardPoints, getByPhone, normPhone } from "@/lib/customers-store";
+import { awardPoints, getByPhone, normPhone, reversePoints } from "@/lib/customers-store";
 import { pointsForSale } from "@/lib/loyalty";
 import { WEIGHT_BASE_STOCK_ID } from "@/lib/menu";
 import { getLoyalty } from "@/lib/loyalty-store";
@@ -729,9 +729,56 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
     if (pointsAwarded > 0) {
       const ref = full.tab.table_id ? `Mesa (comanda #${tabId})` : `Comanda #${tabId}`;
       await awardPoints(phone, name || "Cliente", pointsAwarded, ref, new Date().toISOString());
+      // persiste os pontos dados → o cancelamento da venda sabe quanto estornar (mt-32)
+      await d.from("tabs").update({ points_awarded: pointsAwarded }).eq("id", tabId).eq("store_id", sid);
     }
   }
   return { pointsAwarded };
+}
+
+/** Cancela uma VENDA DE MESA (comanda FECHADA) — estorno espelhado no balcão: devolve o estoque,
+ *  estorna os pontos e marca a comanda como cancelada (NÃO apaga — auditável). A partir daí ela
+ *  sai do caixa/faturamento/CMV/comissão pelos filtros de `cancelled`. Só comanda fechada e ainda
+ *  não cancelada. Anti-IDOR: getTabFull trava a loja. Estornos são NÃO-FATAIS (retorna avisos). */
+export async function cancelMesaSale(
+  tabId: number,
+  opts: { reason: string; by?: string },
+): Promise<{ warnings: string[] }> {
+  const d = db();
+  const sid = await resolveStoreId();
+  const reason = (opts.reason ?? "").trim().slice(0, 200);
+  if (!reason) throw new Error("Diga o motivo do cancelamento.");
+
+  const full = await getTabFull(tabId, sid); // valida a loja + traz itens/pagamentos
+  const tab = full.tab as Tab & { cancelled?: boolean; points_awarded?: number };
+  if (tab.status !== "fechada") throw new Error("Só venda de mesa FECHADA se cancela aqui (comanda aberta: cancele o item).");
+  if (tab.cancelled) throw new Error("Essa venda já foi cancelada.");
+
+  const today = todayBR();
+  const warnings: string[] = [];
+
+  // 1) devolve o estoque de TODOS os itens (consumes é POR-UNIDADE → × qty) — não-fatal
+  const consumes = full.orders.flatMap((o) => o.items).flatMap((i) => (i.consumes ?? []).map((c) => ({ stockId: c.stockId, qty: num(c.qty) * num(i.qty) })));
+  for (const c of consumes) {
+    if (!c.stockId || !(c.qty > 0)) continue;
+    try { await moveStock(c.stockId, "entrada", c.qty, "Estorno venda de mesa", today, sid); }
+    catch { warnings.push(`estoque de ${c.stockId} não voltou`); }
+  }
+
+  // 2) estorna os pontos creditados no fechamento — não-fatal
+  const pts = num(tab.points_awarded);
+  if (pts > 0 && tab.customer_phone) {
+    try { await reversePoints(tab.customer_phone, tab.customer_name ?? "Cliente", pts, `Estorno mesa (comanda #${tabId})`, new Date().toISOString()); }
+    catch { warnings.push("pontos do cliente não estornaram"); }
+  }
+
+  // 3) marca como CANCELADA (não apaga — auditável). Sai de caixa/faturamento/CMV/comissão pelos filtros.
+  const { error } = await d.from("tabs").update({
+    cancelled: true, cancelled_at: new Date().toISOString(), cancel_reason: reason, cancelled_by: opts.by ?? null,
+  }).eq("id", tabId).eq("store_id", sid);
+  if (error) throw error;
+
+  return { warnings };
 }
 
 // ── Chamados de mesa ─────────────────────────────────────────────────────────
@@ -792,13 +839,13 @@ export async function listMesaPayments(): Promise<MesaVenda[]> {
   const sid = await resolveStoreId();
   const { data, error } = await db()
     .from("tab_payments")
-    .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, tables(number))")
+    .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, cancelled, tables(number))")
     .eq("store_id", sid);
   if (error) throw new Error("Erro ao ler pagamentos de mesa: " + error.message);
-  return (data ?? []).map((p) => {
+  return (data ?? []).filter((p) => !(p as { tabs?: { cancelled?: boolean } | null }).tabs?.cancelled).map((p) => {
     const row = p as {
       tab_id: string | number; amount_cents: number; method: string; fee_percent: number | null; paid_at: string;
-      tabs?: { customer_name?: string | null; label?: string | null; tables?: { number?: number } | null } | null;
+      tabs?: { customer_name?: string | null; label?: string | null; cancelled?: boolean; tables?: { number?: number } | null } | null;
     };
     const num = row.tabs?.tables?.number;
     return {
@@ -811,4 +858,49 @@ export async function listMesaPayments(): Promise<MesaVenda[]> {
       customerName: row.tabs?.customer_name ?? null,
     };
   });
+}
+
+export type MesaSale = { tabId: number; display: string; closedAt: string; totalCents: number; method: string | null; itens: number };
+
+/** Vendas de MESA (comandas fechadas, não canceladas) com pagamento desde `sinceISO` — a lista
+ *  que o Caixa mostra pra escolher qual venda de mesa cancelar. totalCents = soma dos pagamentos
+ *  (o que entrou no caixa); method = único método, "misto" se vários (split). */
+export async function listMesaSales(sinceISO: string, storeId?: string): Promise<MesaSale[]> {
+  const d = db();
+  const sid = storeId ?? (await resolveStoreId());
+  const { data: pays } = await d
+    .from("tab_payments")
+    .select("tab_id, amount_cents, method, paid_at, tabs!inner(status, cancelled, closed_at, label, tables(number))")
+    .eq("store_id", sid)
+    .gte("paid_at", sinceISO);
+
+  const byTab = new Map<number, MesaSale & { _methods: Set<string> }>();
+  for (const p of (pays ?? []) as Array<{ tab_id: number; amount_cents: number; method: string; tabs?: { status?: string; cancelled?: boolean; closed_at?: string; label?: string | null; tables?: { number?: number } | null } | null }>) {
+    const t = p.tabs;
+    if (!t || t.cancelled || t.status !== "fechada") continue; // só venda fechada e não cancelada
+    const tabId = num(p.tab_id);
+    const cur = byTab.get(tabId) ?? { tabId, display: t.tables?.number ? `Mesa ${t.tables.number}` : (t.label ?? "Comanda"), closedAt: t.closed_at ?? "", totalCents: 0, method: null, itens: 0, _methods: new Set<string>() };
+    cur.totalCents += num(p.amount_cents);
+    cur._methods.add(p.method);
+    byTab.set(tabId, cur);
+  }
+
+  // conta os itens de cada comanda
+  const tabIds = [...byTab.keys()];
+  if (tabIds.length) {
+    const { data: orders } = await d.from("tab_orders").select("id, tab_id").in("tab_id", tabIds).eq("store_id", sid);
+    const orderToTab = new Map<number, number>();
+    const orderIds: number[] = [];
+    for (const o of (orders ?? []) as Array<{ id: number; tab_id: number }>) { orderToTab.set(num(o.id), num(o.tab_id)); orderIds.push(num(o.id)); }
+    if (orderIds.length) {
+      const { data: items } = await d.from("tab_order_items").select("tab_order_id, qty").in("tab_order_id", orderIds);
+      for (const i of (items ?? []) as Array<{ tab_order_id: number; qty: number }>) {
+        const tid = orderToTab.get(num(i.tab_order_id));
+        const s = tid != null ? byTab.get(tid) : undefined;
+        if (s) s.itens += num(i.qty);
+      }
+    }
+  }
+
+  return [...byTab.values()].map((s) => ({ tabId: s.tabId, display: s.display, closedAt: s.closedAt, totalCents: s.totalCents, method: s._methods.size === 1 ? [...s._methods][0] : (s._methods.size > 1 ? "misto" : null), itens: s.itens }));
 }

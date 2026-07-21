@@ -6,7 +6,7 @@ import { listOrders, getOrder, cancelOrder } from "@/lib/orders-store";
 import { listServiceOrders } from "@/lib/service-orders-store";
 import { moveStock } from "@/lib/stock-store";
 import { reversePoints } from "@/lib/customers-store";
-import { listMesaPayments } from "@/lib/tables-store";
+import { listMesaPayments, listMesaSales, cancelMesaSale } from "@/lib/tables-store";
 import { weightSoldSince } from "@/lib/weight-report";
 import { dateBR } from "@/lib/date-br";
 
@@ -61,14 +61,18 @@ async function resumo(session: CashSession) {
   return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas, osTotalCents, osCashCents, nOS, acai };
 }
 
-// vendas de balcão da sessão aberta que ainda podem ser canceladas (não canceladas)
+// vendas da sessão que ainda podem ser canceladas: balcão (orders) + MESA (comandas fechadas).
+// `kind` diferencia o estorno no POST (cancelar-venda × cancelar-mesa). Mais recente primeiro.
 async function vendasSessao(session: CashSession) {
-  return (await listOrders())
+  const balcao = (await listOrders())
     .filter((o) => o.mode === "balcao" && !o.cancelled && o.createdAt >= session.openedAt)
     .map((o) => ({
-      id: o.id, display: o.display, createdAt: o.createdAt, totalCents: o.totalCents,
+      kind: "balcao" as const, id: o.id, display: o.display, createdAt: o.createdAt, totalCents: o.totalCents,
       paymentMethod: o.paymentMethod ?? null, itens: o.items.reduce((s, it) => s + it.qty, 0),
     }));
+  const mesa = (await listMesaSales(session.openedAt))
+    .map((m) => ({ kind: "mesa" as const, id: m.tabId, display: m.display, createdAt: m.closedAt, totalCents: m.totalCents, paymentMethod: m.method, itens: m.itens }));
+  return [...balcao, ...mesa].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function GET() {
@@ -78,7 +82,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let b: { action?: string; floatCents?: number; amountCents?: number; reason?: string; countedCents?: number; cardCountedCents?: number; pixCountedCents?: number; operator?: string; pin?: string; orderId?: number };
+  let b: { action?: string; floatCents?: number; amountCents?: number; reason?: string; countedCents?: number; cardCountedCents?: number; pixCountedCents?: number; operator?: string; pin?: string; orderId?: number; tabId?: number };
   try {
     b = await req.json();
   } catch {
@@ -173,6 +177,29 @@ export async function POST(req: Request) {
       ok: true, session: s, resumo: s ? await resumo(s) : null, vendas: s ? await vendasSessao(s) : [],
       warning: warnings.length ? `Venda cancelada, mas: ${warnings.join("; ")}.` : undefined,
     });
+  }
+
+  // cancelar VENDA DE MESA (comanda fechada) — mesmo gate/PIN do cancelar-venda de balcão
+  if (b.action === "cancelar-mesa") {
+    const open = await getOpenSession();
+    if (!open) return NextResponse.json({ error: "Nenhum caixa aberto" }, { status: 409 });
+    const tabId = Number(b.tabId);
+    if (!tabId) return NextResponse.json({ error: "Venda inválida" }, { status: 400 });
+    const reason = (b.reason || "").trim();
+    if (!reason) return NextResponse.json({ error: "Informe o motivo do cancelamento" }, { status: 400 });
+    const pin = await getCashPin();
+    if (pin && (b.pin || "").trim() !== pin) return NextResponse.json({ error: "PIN incorreto" }, { status: 403 });
+    try {
+      const who = (await getCurrentUser())?.email ?? undefined;
+      const { warnings } = await cancelMesaSale(tabId, { reason, by: who });
+      const s = await getOpenSession();
+      return NextResponse.json({
+        ok: true, session: s, resumo: s ? await resumo(s) : null, vendas: s ? await vendasSessao(s) : [],
+        warning: warnings.length ? `Venda cancelada, mas: ${warnings.join("; ")}.` : undefined,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 });

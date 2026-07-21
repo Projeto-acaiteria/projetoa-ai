@@ -225,9 +225,9 @@ function PainelCaixa({ session, resumo, store, cupomRodape, cashPinSet, onChange
 
 /* ---------------- Cancelar / estornar venda ---------------- */
 function CancelarVendaModal({ cashPinSet, onClose, onDone }: { cashPinSet: boolean; onClose: () => void; onDone: (d?: { session: CashSession | null; resumo: Resumo | null }) => void }) {
-  type V = { id: number; display: string; createdAt: string; totalCents: number; paymentMethod: string | null; itens: number };
+  type V = { kind: "balcao" | "mesa"; id: number; display: string; createdAt: string; totalCents: number; paymentMethod: string | null; itens: number };
   const [vendas, setVendas] = useState<V[] | null>(null);
-  const [sel, setSel] = useState<number | null>(null);
+  const [sel, setSel] = useState<V | null>(null);
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -244,9 +244,13 @@ function CancelarVendaModal({ cashPinSet, onClose, onDone }: { cashPinSet: boole
     if (!reason.trim()) { setErr("Diga o motivo do cancelamento."); return; }
     if (cashPinSet && pin.trim().length < 4) { setErr("Digite o PIN do caixa."); return; }
     setSaving(true); setErr("");
+    // mesa (comanda fechada) e balcão (venda) têm estornos diferentes no servidor — roteia por kind
+    const body = sel.kind === "mesa"
+      ? { action: "cancelar-mesa", tabId: sel.id, reason: reason.trim(), pin: cashPinSet ? pin.trim() : undefined }
+      : { action: "cancelar-venda", orderId: sel.id, reason: reason.trim(), pin: cashPinSet ? pin.trim() : undefined };
     const r = await fetch("/api/caixa", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "cancelar-venda", orderId: sel, reason: reason.trim(), pin: cashPinSet ? pin.trim() : undefined }),
+      body: JSON.stringify(body),
     });
     const d = await r.json().catch(() => null);
     if (d && d.ok) { onDone(d); return; } // resumo autoritativo do POST (venda já fora do caixa)
@@ -260,13 +264,14 @@ function CancelarVendaModal({ cashPinSet, onClose, onDone }: { cashPinSet: boole
       {vendas === null ? (
         <p className="py-6 text-center text-sm text-[var(--text-faded)]">Carregando vendas...</p>
       ) : vendas.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[var(--text-faded)]">Nenhuma venda de balcão nesta sessão pra cancelar.</p>
+        <p className="py-6 text-center text-sm text-[var(--text-faded)]">Nenhuma venda desta sessão pra cancelar.</p>
       ) : (
         <div className="max-h-52 space-y-1.5 overflow-y-auto">
           {vendas.map((v) => (
-            <button key={v.id} onClick={() => setSel(v.id)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${sel === v.id ? "border-brand-600 bg-[color-mix(in_srgb,var(--brand-600)_8%,transparent)]" : "border-line hover:border-brand-400"}`}>
+            <button key={`${v.kind}:${v.id}`} onClick={() => setSel(v)} className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${sel === v ? "border-brand-600 bg-[color-mix(in_srgb,var(--brand-600)_8%,transparent)]" : "border-line hover:border-brand-400"}`}>
               <span>
                 <span className="text-sm font-bold text-ink">{v.display}</span>
+                {v.kind === "mesa" && <span className="ml-1.5 rounded bg-bg-surface-2 px-1 text-[9px] font-bold uppercase text-[var(--text-muted)]">mesa</span>}
                 <span className="ml-2 text-xs text-[var(--text-muted)]">{hhmm(v.createdAt)} · {v.itens} item{v.itens === 1 ? "" : "s"}{v.paymentMethod ? ` · ${PM[v.paymentMethod] ?? v.paymentMethod}` : ""}</span>
               </span>
               <span className="shrink-0 text-sm font-extrabold text-ink tabular-nums">{brl(v.totalCents)}</span>

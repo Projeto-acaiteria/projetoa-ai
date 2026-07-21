@@ -50,12 +50,13 @@ export async function cmvReport(fromISO?: string, toISO?: string, storeId?: stri
   };
 
   // pedidos do período
-  let q = d.from("tab_orders").select("id, created_at").eq("store_id", sid);
+  let q = d.from("tab_orders").select("id, created_at, tabs(cancelled)").eq("store_id", sid);
   if (fromISO) q = q.gte("created_at", fromISO);
   if (toISO) q = q.lte("created_at", toISO);
   const { data: orders, error } = await q;
   if (error) throw new Error("Erro ao ler pedidos (CMV): " + error.message);
-  const orderIds = (orders ?? []).map((o) => num((o as { id: number }).id));
+  // exclui pedidos de comanda CANCELADA (estornada não entra no CMV nem na receita)
+  const orderIds = (orders ?? []).filter((o) => !(o as { tabs?: { cancelled?: boolean } | null }).tabs?.cancelled).map((o) => num((o as { id: number }).id));
 
   const byName = new Map<string, CmvLine>();
   let revenueCents = 0;

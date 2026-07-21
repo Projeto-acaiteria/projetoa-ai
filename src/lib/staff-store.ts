@@ -84,7 +84,7 @@ export async function staffReport(fromISO?: string, toISO?: string, storeId?: st
   const { data: mem } = await d.from("store_members").select("staff_id").eq("store_id", sid).in("role", loginRoles).eq("active", true).not("staff_id", "is", null);
   const withLogin = new Set(((mem ?? []) as { staff_id: string }[]).map((m) => String(m.staff_id)));
 
-  let q = d.from("tabs").select("id, waiter_id, service_fee_cents, closed_at").eq("store_id", sid).eq("status", "fechada").not("waiter_id", "is", null);
+  let q = d.from("tabs").select("id, waiter_id, service_fee_cents, closed_at").eq("store_id", sid).eq("status", "fechada").eq("cancelled", false).not("waiter_id", "is", null);
   if (fromISO) q = q.gte("closed_at", fromISO);
   if (toISO) q = q.lte("closed_at", toISO);
   const { data: tabs } = await q;
