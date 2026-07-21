@@ -537,7 +537,7 @@ export async function getTabFull(tabId: number, storeId?: string): Promise<TabFu
 export async function cancelTabItem(
   itemId: number,
   opts: { units?: number; reason: string; by?: string },
-): Promise<{ cancelledQty: number; itemName: string; tabId: number }> {
+): Promise<{ cancelledQty: number; itemName: string; tabId: number; tabFreed: boolean }> {
   const d = db();
   const sid = await resolveStoreId();
   const reason = (opts.reason ?? "").trim().slice(0, 200);
@@ -552,7 +552,7 @@ export async function cancelTabItem(
     .from("tab_orders").select("id, tab_id").eq("id", it.tab_order_id).eq("store_id", sid).maybeSingle();
   if (!order) throw new Error("Pedido não encontrado.");
   const tabId = num((order as { tab_id: number }).tab_id);
-  const { data: tab } = await d.from("tabs").select("id, status").eq("id", tabId).eq("store_id", sid).maybeSingle();
+  const { data: tab } = await d.from("tabs").select("id, status, cover_cents").eq("id", tabId).eq("store_id", sid).maybeSingle();
   if (!tab) throw new Error("Comanda não encontrada.");
   if ((tab as { status: string }).status !== "aberta") throw new Error("Comanda já fechada — estorne pelo Caixa.");
 
@@ -576,15 +576,32 @@ export async function cancelTabItem(
   });
 
   // 4) tira da comanda: decrementa; se zerou, apaga a linha; se o pedido esvaziou, apaga o pedido (sai do KDS)
+  let tabFreed = false;
   if (units >= have) {
     await d.from("tab_order_items").delete().eq("id", itemId).eq("store_id", sid);
-    const { count } = await d.from("tab_order_items").select("id", { count: "exact", head: true }).eq("tab_order_id", it.tab_order_id).eq("store_id", sid);
-    if (!count) await d.from("tab_orders").delete().eq("id", it.tab_order_id).eq("store_id", sid);
+    const { count: itemsInOrder } = await d.from("tab_order_items").select("id", { count: "exact", head: true }).eq("tab_order_id", it.tab_order_id).eq("store_id", sid);
+    if (!itemsInOrder) await d.from("tab_orders").delete().eq("id", it.tab_order_id).eq("store_id", sid);
+
+    // comanda esvaziou DE VEZ? (0 itens em qualquer pedido, 0 pago, sem couvert) → libera a mesa.
+    // NÃO vira venda R$0: apaga a comanda vazia (mesmo padrão do rollback do lançar). Trava: se
+    // sobrou couvert (mesa aberta pro show) ou pagamento parcial, quem decide é o caixa (não libera).
+    const { data: orders } = await d.from("tab_orders").select("id").eq("tab_id", tabId).eq("store_id", sid);
+    const orderIds = (orders ?? []).map((o) => num((o as { id: number }).id));
+    const { count: itemsLeft } = orderIds.length
+      ? await d.from("tab_order_items").select("id", { count: "exact", head: true }).in("tab_order_id", orderIds).eq("store_id", sid)
+      : { count: 0 };
+    const { count: paysLeft } = await d.from("tab_payments").select("id", { count: "exact", head: true }).eq("tab_id", tabId).eq("store_id", sid);
+    const coverLeft = num((tab as { cover_cents?: number }).cover_cents);
+    if (!itemsLeft && !paysLeft && !coverLeft) {
+      await d.from("tab_orders").delete().eq("tab_id", tabId).eq("store_id", sid); // pedidos órfãos (defensivo)
+      await d.from("tabs").delete().eq("id", tabId).eq("store_id", sid);           // mt-31: log de cancelamento sobrevive (sem cascade)
+      tabFreed = true;
+    }
   } else {
     await d.from("tab_order_items").update({ qty: have - units }).eq("id", itemId).eq("store_id", sid);
   }
 
-  return { cancelledQty: units, itemName: it.name, tabId };
+  return { cancelledQty: units, itemName: it.name, tabId, tabFreed };
 }
 
 /** Registra um pagamento na comanda. */

@@ -273,14 +273,19 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     try {
       const post = (itemId: number, units?: number) =>
         fetch("/api/mesas/cancelar-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, units, reason }) })
-          .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || "Não consegui cancelar."); });
+          .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Não consegui cancelar."); return d as { tabFreed?: boolean }; });
+      let freed = false;
       if (cancelFor.mode === "one") {
-        await post(cancelFor.parts[cancelFor.parts.length - 1].id, 1); // tira 1 da linha-fonte mais recente
+        const d = await post(cancelFor.parts[cancelFor.parts.length - 1].id, 1); // tira 1 da linha-fonte mais recente
+        freed = !!d.tabFreed;
       } else {
-        for (const p of cancelFor.parts) await post(p.id); // units ausente = linha-fonte inteira
+        for (const p of cancelFor.parts) { const d = await post(p.id); freed = freed || !!d.tabFreed; } // units ausente = linha-fonte inteira
       }
       setCancelFor(null); setCancelReason("");
-      if (drawer?.tabId) await loadComanda(drawer.tabId);
+      // comanda esvaziou de vez → a mesa foi liberada no servidor: fecha o drawer (NÃO recarrega a
+      // comanda deletada, senão dá 500). Senão, recarrega a comanda fresca (λ.prova-na-fonte).
+      if (freed) closeDrawer();
+      else if (drawer?.tabId) await loadComanda(drawer.tabId);
       loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao cancelar."); }
     finally { setBusy(false); }
