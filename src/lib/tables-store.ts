@@ -860,6 +860,56 @@ export async function listMesaPayments(): Promise<MesaVenda[]> {
   });
 }
 
+export type ItemCancellation = {
+  id: number; tabId: number; display: string; itemName: string; qty: number;
+  unitPriceCents: number; totalCents: number; reason: string; cancelledBy: string | null; at: string;
+};
+
+/** Cancelamentos de item pro relatório do Financeiro (o "deixa registrado" que a casa pediu).
+ *  A mesa é resolvida em SEPARADO (a mt-31 tirou a FK pro tab: o log sobrevive à comanda ser
+ *  apagada/liberada, então o PostgREST não consegue embutir a relação). Comanda já apagada → usa
+ *  o rótulo genérico, mas o registro do cancelamento NUNCA se perde. */
+export async function listItemCancellations(limit = 500): Promise<ItemCancellation[]> {
+  const d = db();
+  const sid = await resolveStoreId();
+  const { data } = await d
+    .from("tab_item_cancellations")
+    .select("id, tab_id, item_name, size_label, qty, unit_price_cents, reason, cancelled_by, created_at")
+    .eq("store_id", sid)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = (data ?? []) as Array<{ id: number; tab_id: number; item_name: string; size_label: string | null; qty: number; unit_price_cents: number; reason: string; cancelled_by: string | null; created_at: string }>;
+  if (!rows.length) return [];
+
+  // resolve o número da mesa: tab -> table (2 buscas, sem FK)
+  const tabIds = [...new Set(rows.map((r) => num(r.tab_id)))];
+  const { data: tabs } = await d.from("tabs").select("id, label, table_id").in("id", tabIds).eq("store_id", sid);
+  const tabRows = (tabs ?? []) as Array<{ id: number; label: string | null; table_id: number | null }>;
+  const tableIds = [...new Set(tabRows.map((t) => num(t.table_id)).filter((x) => x > 0))];
+  const { data: tables } = tableIds.length
+    ? await d.from("tables").select("id, number").in("id", tableIds).eq("store_id", sid)
+    : { data: [] as Array<{ id: number; number: number }> };
+  const numByTable = new Map((tables ?? []).map((t) => [num((t as { id: number }).id), num((t as { number: number }).number)]));
+  const displayByTab = new Map<number, string>();
+  for (const t of tabRows) {
+    const n = t.table_id != null ? numByTable.get(num(t.table_id)) : undefined;
+    displayByTab.set(num(t.id), n ? `Mesa ${n}` : (t.label ?? "Comanda"));
+  }
+
+  return rows.map((r) => ({
+    id: num(r.id),
+    tabId: num(r.tab_id),
+    display: displayByTab.get(num(r.tab_id)) ?? "Comanda encerrada",
+    itemName: r.item_name + (r.size_label ? ` · ${r.size_label}` : ""),
+    qty: num(r.qty),
+    unitPriceCents: num(r.unit_price_cents),
+    totalCents: num(r.qty) * num(r.unit_price_cents),
+    reason: r.reason,
+    cancelledBy: r.cancelled_by,
+    at: r.created_at,
+  }));
+}
+
 export type MesaSale = { tabId: number; display: string; closedAt: string; totalCents: number; method: string | null; itens: number };
 
 /** Vendas de MESA (comandas fechadas, não canceladas) com pagamento desde `sinceISO` — a lista

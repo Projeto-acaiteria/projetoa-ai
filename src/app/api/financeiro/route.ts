@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
-import { listMesaPayments } from "@/lib/tables-store";
+import { listMesaPayments, listItemCancellations } from "@/lib/tables-store";
 import { listServiceOrders } from "@/lib/service-orders-store";
 import { listCommissionPayments } from "@/lib/commission-payments-store";
 
@@ -71,5 +71,7 @@ export async function GET() {
     return rows;
   });
 
-  return NextResponse.json({ vendas, despesas, comissoes });
+  // cancelamentos de item (relatorio de auditoria do Financeiro) — a casa pediu registro consultavel
+  const cancelamentos = await listItemCancellations();
+  return NextResponse.json({ vendas, despesas, comissoes, cancelamentos });
 }

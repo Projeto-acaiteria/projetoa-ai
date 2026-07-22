@@ -7,6 +7,7 @@ import { dateBR, todayBR } from "@/lib/date-br";
 import { IconWallet, IconChart, IconReceipt, IconPlus, IconTrash } from "@/components/Icons";
 import FluxoCaixaTabela from "@/components/admin/FluxoCaixaTabela";
 
+type Cancelamento = { id: number; display: string; itemName: string; qty: number; totalCents: number; reason: string; cancelledBy: string | null; at: string };
 type Venda = { display: string; date: string; mode: string; paymentMethod: string | null; grossCents: number; cardFeeCents: number; netCents: number; customerName: string };
 type Despesa = { id: string; description: string; category: string; amountCents: number; date: string; createdAt: string };
 type Fixed = { id: string; description: string; category: string; amountCents: number };
@@ -38,7 +39,8 @@ export default function FinanceiroClient({ family }: { family?: string }) {
   const [comissoes, setComissoes] = useState<Despesa[]>([]); // saídas sintéticas (comissão/bônus pagos) — read-only
   const [loaded, setLoaded] = useState(false);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["k"]>("30d");
-  const [tab, setTab] = useState<"resumo" | "fluxo" | "despesas">("resumo");
+  const [tab, setTab] = useState<"resumo" | "fluxo" | "despesas" | "cancelamentos">("resumo");
+  const [cancelamentos, setCancelamentos] = useState<Cancelamento[]>([]);
   const [modal, setModal] = useState(false);
   const [fixed, setFixed] = useState<Fixed[]>([]);
   const [fixedModal, setFixedModal] = useState(false);
@@ -49,6 +51,7 @@ export default function FinanceiroClient({ family }: { family?: string }) {
       setVendas(d.vendas ?? []);
       setDespesas(d.despesas ?? []);
       setComissoes(d.comissoes ?? []);
+      setCancelamentos(d.cancelamentos ?? []);
       const fx = await fetch("/api/despesas-fixas", { cache: "no-store" }).then((r) => r.json());
       setFixed(fx.fixed ?? []);
     } finally {
@@ -128,7 +131,7 @@ export default function FinanceiroClient({ family }: { family?: string }) {
       {/* período + abas */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-xl border border-line bg-bg-elevated p-1">
-          {(["resumo", "fluxo", "despesas"] as const).map((t) => (
+          {(["resumo", "fluxo", "despesas", "cancelamentos"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`rounded-lg px-3.5 py-2 text-sm font-bold capitalize transition ${tab === t ? "brand-gradient text-white" : "text-ink-2"}`}>
               {t === "fluxo" ? "Fluxo de caixa" : t}
             </button>
@@ -201,6 +204,58 @@ export default function FinanceiroClient({ family }: { family?: string }) {
 
       {/* FLUXO DE CAIXA — tabela multi-período com drill-down (comissão paga entra como despesa) */}
       {tab === "fluxo" && <FluxoCaixaTabela vendas={vendas} despesas={allDespesas} />}
+
+      {/* CANCELAMENTOS — trilha de auditoria: o que foi tirado da comanda, por quem e por quê.
+          Cancelar é permitido (inclusive em comanda já paga, a pedido da casa); aqui fica o registro. */}
+      {tab === "cancelamentos" && (() => {
+        const lista = cancelamentos.filter((c) => dateBR(c.at) >= cutoff);
+        const total = lista.reduce((s, c) => s + c.totalCents, 0);
+        return (
+          <Card className="p-4 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Itens cancelados</h2>
+                <div className="text-xs text-[var(--text-muted)]">
+                  {lista.length} cancelamento{lista.length === 1 ? "" : "s"} no período · total <b className="text-ink">{brl(total)}</b>
+                </div>
+              </div>
+              <Badge tone="muted">auditoria</Badge>
+            </div>
+            {lista.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">Nenhum item cancelado no período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--line)] text-left text-xs uppercase text-[var(--text-muted)]">
+                      <th className="py-2 pr-3 font-bold">Quando</th>
+                      <th className="py-2 pr-3 font-bold">Mesa</th>
+                      <th className="py-2 pr-3 font-bold">Item</th>
+                      <th className="py-2 pr-3 text-right font-bold">Valor</th>
+                      <th className="py-2 pr-3 font-bold">Motivo</th>
+                      <th className="py-2 font-bold">Quem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--line)]">
+                    {lista.map((c) => (
+                      <tr key={c.id}>
+                        <td className="whitespace-nowrap py-2.5 pr-3 text-[var(--text-muted)]">
+                          {new Date(c.at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        </td>
+                        <td className="whitespace-nowrap py-2.5 pr-3 font-semibold text-ink">{c.display}</td>
+                        <td className="py-2.5 pr-3 text-ink"><b className="tabular-nums">{c.qty}×</b> {c.itemName}</td>
+                        <td className="whitespace-nowrap py-2.5 pr-3 text-right font-bold tabular-nums text-[var(--red-no)]">− {brl(c.totalCents)}</td>
+                        <td className="py-2.5 pr-3 text-[var(--text-muted)]">{c.reason}</td>
+                        <td className="whitespace-nowrap py-2.5 text-xs text-[var(--text-faded)]">{c.cancelledBy ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        );
+      })()}
 
       {/* DESPESAS */}
       {tab === "despesas" && (

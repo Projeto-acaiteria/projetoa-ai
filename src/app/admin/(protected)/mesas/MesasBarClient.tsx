@@ -70,7 +70,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [addN, setAddN] = useState("");
   // cancelar item da comanda (só caixa/admin): 'one' tira 1 unidade, 'all' tira a linha toda. parts =
   // linhas reais do banco que compõem a linha visual consolidada. Pede motivo (registro auditável).
-  const [cancelFor, setCancelFor] = useState<{ parts: { id: number; qty: number }[]; label: string; mode: "one" | "all" } | null>(null);
+  const [cancelFor, setCancelFor] = useState<{ parts: { id: number; qty: number }[]; label: string; mode: "one" | "all"; unitCents: number; qtyTotal: number } | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   // trocar de mesa (só caixa/admin): abre o seletor de mesas; se a destino estiver ocupada, confirma a junção
   const [moveOpen, setMoveOpen] = useState(false);
@@ -527,8 +527,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                             {/* cancelar (só caixa/admin): − tira 1 unidade (some se qty=1), 🗑 tira a linha toda */}
                             {canClose && (
                               <>
-                                {it.qty > 1 && <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "one" }); setCancelReason(""); setErr(""); }} title="Cancelar 1 unidade" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconMinus width={13} height={13} /></button>}
-                                <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "all" }); setCancelReason(""); setErr(""); }} title="Cancelar item" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconTrash width={13} height={13} /></button>
+                                {it.qty > 1 && <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "one", unitCents: it.unitPriceCents, qtyTotal: it.qty }); setCancelReason(""); setErr(""); }} title="Cancelar 1 unidade" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconMinus width={13} height={13} /></button>}
+                                <button onClick={() => { setCancelFor({ parts: it.parts, label: `${it.qty}× ${it.name}`, mode: "all", unitCents: it.unitPriceCents, qtyTotal: it.qty }); setCancelReason(""); setErr(""); }} title="Cancelar item" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconTrash width={13} height={13} /></button>
                               </>
                             )}
                           </span>
@@ -657,6 +657,21 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           <div className="relative w-full max-w-sm rounded-t-3xl bg-bg-elevated p-5 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-extrabold text-ink">Cancelar {cancelFor.mode === "one" ? "1 unidade" : "item"}</h3>
             <p className="mt-1 text-sm text-[var(--text-muted)]"><b className="text-ink">{cancelFor.label}</b> — volta pro estoque e fica registrado com o motivo (não some sem rastro).</p>
+            {/* comanda JÁ PAGA: a casa pediu pra deixar cancelar mesmo assim (erro de operação).
+                Não bloqueia — só avisa o quanto sobra pro cliente receber de volta, senão o dinheiro
+                fica no caixa sem explicação (foi o que aconteceu na Mesa 13 em 20/07). */}
+            {paid > 0 && (() => {
+              const valor = cancelFor.mode === "one" ? cancelFor.unitCents : cancelFor.unitCents * cancelFor.qtyTotal;
+              const novoConsumo = Math.max(0, consumo - valor);
+              const novoGrand = novoConsumo + coverCharged + (fee ? Math.round(novoConsumo * 0.1) : 0);
+              const aDevolver = Math.max(0, paid - novoGrand);
+              return aDevolver > 0 ? (
+                <div className="mt-2.5 rounded-lg border border-amber-400 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-900">Esta comanda já tem <b>{brl(paid)}</b> pago.</p>
+                  <p className="mt-0.5 text-sm font-extrabold text-amber-900">Sobra {brl(aDevolver)} pra devolver ao cliente.</p>
+                </div>
+              ) : null;
+            })()}
             <input autoFocus value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Motivo (ex: bateu errado, cliente desistiu)" className="mt-3 w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600" />
             {err && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-600">{err}</p>}
             <div className="mt-3 flex gap-2">
