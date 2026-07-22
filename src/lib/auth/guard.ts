@@ -1,7 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { getCurrentRole } from "@/lib/auth/store";
+import { getCurrentRole, getCurrentMembership } from "@/lib/auth/store";
 import { canSeeNav } from "@/lib/auth/roles";
+import { checkInStaff } from "@/lib/staff-store";
 
 // Guard SERVER-SIDE por página. Espelha a matriz de nav (canSeeNav) — fonte única: se o papel
 // não enxerga a rota no menu, também não acessa digitando a URL. Sem isso, o filtro de nav é só
@@ -13,5 +14,11 @@ export async function requireNavAccess(href: string): Promise<void> {
   if (!canSeeNav(role, href)) {
     // técnico → área dele; garçom → mesas (não vê o dashboard); recepção/owner → início
     redirect(role === "technician" ? "/admin/minha-area" : role === "waiter" ? "/admin/mesas" : "/admin");
+  }
+  // CHECK-IN da diária (mt-33): garçom que entra no sistema bate ponto na noite operacional.
+  // Idempotente (1 por noite) e nunca lança — presença não pode derrubar a navegação dele.
+  if (role === "waiter") {
+    const staffId = (await getCurrentMembership())?.staffId;
+    if (staffId) await checkInStaff(staffId);
   }
 }

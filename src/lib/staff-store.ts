@@ -3,6 +3,7 @@
 // Server-side, por loja. NÃO promete conformidade trabalhista de folha (13º/FGTS = contador).
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { noiteOperacionalBR } from "@/lib/events-store";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -121,4 +122,106 @@ export async function staffReport(fromISO?: string, toISO?: string, storeId?: st
     const comissao = s.pay_type === "comissao" ? Math.round((a.vendido * s.commission_percent) / 100) : 0;
     return { ...s, comandas: a.comandas, vendidoCents: a.vendido, comissaoCents: comissao, gorjetaCents: a.gorjeta, aPagarCents: comissao + a.gorjeta, hasLogin: withLogin.has(s.id) };
   }).filter((r) => r.active || r.comandas > 0);
+}
+
+// ── PRESENÇA / DIÁRIAS (mt-33) ───────────────────────────────────────────────
+// O Medellín paga por DIÁRIA. Como quem paga diária não vincula garçom na comanda, a presença é
+// registrada por conta própria: check-in no login + ajuste do Adm. Noite = NOITE OPERACIONAL (6h→6h).
+
+export type Shift = {
+  id: number; staffId: string; name: string; noite: string;
+  diariaCents: number; bonusCents: number; source: string; checkedInAt: string;
+};
+
+/** CHECK-IN do garçom na noite operacional atual. Idempotente: 1 linha por garçom por noite
+ *  (índice único). É chamado a cada acesso do garçom — grava só na primeira vez da noite.
+ *  Snapshota a diária cadastrada: reajuste futuro não reescreve noite já trabalhada.
+ *  NUNCA lança: presença não pode derrubar a navegação do garçom. */
+export async function checkInStaff(staffId: string, storeId?: string): Promise<void> {
+  try {
+    const sid = storeId ?? (await resolveStoreId());
+    const noite = noiteOperacionalBR();
+    const d = db();
+    const { data: ex } = await d.from("staff_shifts").select("id").eq("store_id", sid).eq("staff_id", staffId).eq("noite", noite).maybeSingle();
+    if (ex) return; // já bateu ponto nesta noite
+    const { data: st } = await d.from("staff").select("pay_value_cents").eq("id", staffId).eq("store_id", sid).maybeSingle();
+    const { error } = await d.from("staff_shifts").insert({
+      store_id: sid, staff_id: staffId, noite,
+      diaria_cents: num((st as { pay_value_cents?: number } | null)?.pay_value_cents), source: "login",
+    });
+    // 23505 = dois acessos simultâneos na virada; o índice único garantiu — não é erro
+    if (error && (error as { code?: string }).code !== "23505") console.error("checkInStaff:", error.message);
+  } catch (e) {
+    console.error("checkInStaff:", e);
+  }
+}
+
+/** Presenças de um intervalo de NOITES (YYYY-MM-DD, inclusivo), com o nome do garçom. */
+export async function listShifts(fromNoite: string, toNoite: string, storeId?: string): Promise<Shift[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const d = db();
+  const { data } = await d.from("staff_shifts").select("*").eq("store_id", sid)
+    .gte("noite", fromNoite).lte("noite", toNoite).order("noite", { ascending: false });
+  const rows = (data ?? []) as Array<{ id: number; staff_id: string; noite: string; diaria_cents: number; bonus_cents: number; source: string; checked_in_at: string }>;
+  if (!rows.length) return [];
+  const nomeById = new Map((await listStaff(sid)).map((s) => [s.id, s.name]));
+  return rows.map((r) => ({
+    id: num(r.id), staffId: String(r.staff_id), name: nomeById.get(String(r.staff_id)) ?? "—",
+    noite: String(r.noite).slice(0, 10), diariaCents: num(r.diaria_cents), bonusCents: num(r.bonus_cents),
+    source: r.source, checkedInAt: r.checked_in_at,
+  }));
+}
+
+/** Adm ajusta a diária/bônus daquela noite (o valor pago é o desta linha, não o do cadastro). */
+export async function updateShift(id: number, patch: { diariaCents?: number; bonusCents?: number }, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const up: Record<string, number> = {};
+  if (patch.diariaCents != null) up.diaria_cents = Math.max(0, Math.round(patch.diariaCents));
+  if (patch.bonusCents != null) up.bonus_cents = Math.max(0, Math.round(patch.bonusCents));
+  if (!Object.keys(up).length) return;
+  await db().from("staff_shifts").update(up).eq("id", id).eq("store_id", sid);
+}
+
+/** Adm lança presença na mão (garçom trabalhou mas não logou). Idempotente por noite. */
+export async function addShift(staffId: string, noite: string, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const d = db();
+  const { data: ex } = await d.from("staff_shifts").select("id").eq("store_id", sid).eq("staff_id", staffId).eq("noite", noite).maybeSingle();
+  if (ex) return;
+  const { data: st } = await d.from("staff").select("pay_value_cents").eq("id", staffId).eq("store_id", sid).maybeSingle();
+  const { error } = await d.from("staff_shifts").insert({
+    store_id: sid, staff_id: staffId, noite,
+    diaria_cents: num((st as { pay_value_cents?: number } | null)?.pay_value_cents), source: "manual",
+  });
+  if (error && (error as { code?: string }).code !== "23505") throw error;
+}
+
+export async function removeShift(id: number, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  await db().from("staff_shifts").delete().eq("id", id).eq("store_id", sid);
+}
+
+/** Quanto a casa RECEBEU de taxa de serviço (10%) por noite. A gorjeta fica no financeiro do bar
+ *  (decisão interna do Medellín); esta visão existe pra saberem quanto entrou antes de decidir
+ *  quanto repassar. Só comanda FECHADA e não cancelada. */
+export async function taxaServicoPorNoite(fromNoite: string, toNoite: string, storeId?: string): Promise<{ totalCents: number; porNoite: { noite: string; cents: number }[] }> {
+  const sid = storeId ?? (await resolveStoreId());
+  // janela em timestamp: 6h da 1ª noite até 6h do dia seguinte ao fim
+  const ini = new Date(`${fromNoite}T06:00:00-03:00`).toISOString();
+  const fim = new Date(new Date(`${toNoite}T06:00:00-03:00`).getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await db().from("tabs").select("service_fee_cents, closed_at")
+    .eq("store_id", sid).eq("status", "fechada").eq("cancelled", false)
+    .gte("closed_at", ini).lt("closed_at", fim);
+  const map = new Map<string, number>();
+  let totalCents = 0;
+  for (const t of (data ?? []) as Array<{ service_fee_cents: number; closed_at: string }>) {
+    const cents = num(t.service_fee_cents);
+    if (!cents) continue;
+    // noite operacional do fechamento = data de (closed_at − 6h) no fuso BR
+    const noite = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(new Date(new Date(t.closed_at).getTime() - 6 * 60 * 60 * 1000));
+    map.set(noite, (map.get(noite) ?? 0) + cents);
+    totalCents += cents;
+  }
+  return { totalCents, porNoite: [...map.entries()].map(([noite, cents]) => ({ noite, cents })).sort((a, b) => b.noite.localeCompare(a.noite)) };
 }

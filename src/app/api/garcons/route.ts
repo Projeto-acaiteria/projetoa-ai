@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess } from "@/lib/staff-store";
+import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess, listShifts, updateShift, addShift, removeShift, taxaServicoPorNoite } from "@/lib/staff-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Garçons + acerto (comissão/gorjeta). GET = acerto por garçom. POST {action,payload} = CRUD.
-export async function GET() {
+const ymdBR = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+
+// GET ?from=YYYY-MM-DD&to=YYYY-MM-DD (NOITES operacionais). Acerto + presenças (diárias) + 10% recebido.
+export async function GET(req: Request) {
   const storeId = await resolveStoreId();
-  const acerto = await staffReport(undefined, undefined, storeId);
-  return NextResponse.json({ acerto });
+  const { searchParams } = new URL(req.url);
+  const to = searchParams.get("to") || ymdBR(new Date());
+  const from = searchParams.get("from") || ymdBR(new Date(Date.now() - 29 * 864e5));
+  const [acerto, shifts, taxa] = await Promise.all([
+    staffReport(undefined, undefined, storeId),
+    listShifts(from, to, storeId),
+    taxaServicoPorNoite(from, to, storeId),
+  ]);
+  return NextResponse.json({ acerto, shifts, taxa, from, to });
 }
 
 export async function POST(req: Request) {
@@ -32,6 +42,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "delete":
         await deleteStaff(String(p.id), storeId);
+        return NextResponse.json({ ok: true });
+      // DIÁRIAS (mt-33): o Adm ajusta o valor/bônus da noite, lança presença na mão ou remove.
+      case "shiftUpdate":
+        await updateShift(Number(p.id), { diariaCents: p.diariaCents as number | undefined, bonusCents: p.bonusCents as number | undefined }, storeId);
+        return NextResponse.json({ ok: true });
+      case "shiftAdd":
+        await addShift(String(p.staffId), String(p.noite), storeId);
+        return NextResponse.json({ ok: true });
+      case "shiftRemove":
+        await removeShift(Number(p.id), storeId);
         return NextResponse.json({ ok: true });
       case "createAccess": {
         const email = String(p.email ?? "").trim();
