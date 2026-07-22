@@ -9,14 +9,26 @@ import { reversePoints } from "@/lib/customers-store";
 import { listMesaPayments, listMesaSales, cancelMesaSale } from "@/lib/tables-store";
 import { weightSoldSince } from "@/lib/weight-report";
 import { dateBR } from "@/lib/date-br";
+import { inicioNoiteOperacionalISO } from "@/lib/events-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// resumo do caixa aberto: vendas de balcão + pagamentos de mesa desde a abertura
+// JANELA DO CAIXA = NOITE OPERACIONAL (6h→6h), não "desde que a sessão abriu".
+// O bar abre 18h e fecha até 06h: a venda das 02h é da noite anterior. Se ninguém fechou o caixa e a
+// sessão é de uma noite passada, a tela mostra SÓ a noite de agora — não mistura as datas (e zera
+// sozinha às 6h). Sessão aberta nesta noite: janela = a abertura dela (comportamento de sempre).
+// Tudo comparado por TIMESTAMP (não string): paid_at vem "+00:00" e openedAt vem "Z".
+function janela(session: CashSession) {
+  return Math.max(new Date(session.openedAt).getTime(), new Date(inicioNoiteOperacionalISO()).getTime());
+}
+
+// resumo do caixa: vendas de balcão + pagamentos de mesa da noite operacional corrente
 async function resumo(session: CashSession) {
-  const orders = (await listOrders()).filter((o) => o.mode === "balcao" && !o.cancelled && o.createdAt >= session.openedAt);
-  const mesas = (await listMesaPayments()).filter((m) => m.date >= session.openedAt);
+  const winMs = janela(session);
+  const winISO = new Date(winMs).toISOString();
+  const orders = (await listOrders()).filter((o) => o.mode === "balcao" && !o.cancelled && new Date(o.createdAt).getTime() >= winMs);
+  const mesas = (await listMesaPayments()).filter((m) => new Date(m.date).getTime() >= winMs);
   const mesaCashCents = mesas.filter((m) => m.method === "dinheiro").reduce((s, m) => s + m.grossCents, 0);
   const mesaTotalCents = mesas.reduce((s, m) => s + m.grossCents, 0);
   const salesTotalCents = orders.reduce((s, o) => s + o.totalCents, 0) + mesaTotalCents;
@@ -43,34 +55,36 @@ async function resumo(session: CashSession) {
   // da OS entra no saldo físico; pix/cartão de OS aparecem no total mas não incham a gaveta (igual
   // às vendas de balcão). Food não tem OS → lista vazia → tudo zero (no-op, food intacto).
   // Compara paidAt >= openedAt por timestamp (não string): paid_at pode vir com "+00:00" e openedAt com "Z".
-  const sessOpenMs = new Date(session.openedAt).getTime();
   const os = (await listServiceOrders()).filter(
-    (o) => o.paymentStatus === "quitada" && o.status !== "cancelado" && o.paidAt != null && new Date(o.paidAt).getTime() >= sessOpenMs,
+    (o) => o.paymentStatus === "quitada" && o.status !== "cancelado" && o.paidAt != null && new Date(o.paidAt).getTime() >= winMs,
   );
   const osTotalCents = os.reduce((s, o) => s + o.totalCents, 0);
   const osCashCents = os.filter((o) => o.paymentMethod === "dinheiro").reduce((s, o) => s + o.totalCents, 0);
   const nOS = os.length;
-  const suprimentoCents = session.movements.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);
-  const sangriaCents = session.movements.filter((m) => m.type === "sangria").reduce((s, m) => s + m.amountCents, 0);
+  // sangria/suprimento também entram na janela da noite (senão movimento de ontem some no saldo de hoje)
+  const movs = session.movements.filter((m) => new Date(m.at).getTime() >= winMs);
+  const suprimentoCents = movs.filter((m) => m.type === "suprimento").reduce((s, m) => s + m.amountCents, 0);
+  const sangriaCents = movs.filter((m) => m.type === "sangria").reduce((s, m) => s + m.amountCents, 0);
   const saldoCaixaCents = session.openingFloatCents + salesCashCents + osCashCents + suprimentoCents - sangriaCents;
   // nVendas: balcão (1 order = 1 venda) + comandas DISTINTAS (split em N parciais NÃO conta N vezes)
   const nMesas = new Set(mesas.map((m) => m.tabId)).size;
   // "quantos kg de açaí vendi hoje" (Vidal): polpa consumida nas vendas da sessão (copo + peso).
   // Reusa `orders` (balcão) já carregado acima; a função busca só os itens de mesa.
-  const acai = await weightSoldSince(session.openedAt, undefined, orders);
+  const acai = await weightSoldSince(winISO, undefined, orders);
   return { salesCashCents, salesTotalCents, salesCardCents, salesPixCents, cardFeeCents, cardNetCents, suprimentoCents, sangriaCents, saldoCaixaCents, nVendas: orders.length + nMesas, osTotalCents, osCashCents, nOS, acai };
 }
 
 // vendas da sessão que ainda podem ser canceladas: balcão (orders) + MESA (comandas fechadas).
 // `kind` diferencia o estorno no POST (cancelar-venda × cancelar-mesa). Mais recente primeiro.
 async function vendasSessao(session: CashSession) {
+  const winMs = janela(session);
   const balcao = (await listOrders())
-    .filter((o) => o.mode === "balcao" && !o.cancelled && o.createdAt >= session.openedAt)
+    .filter((o) => o.mode === "balcao" && !o.cancelled && new Date(o.createdAt).getTime() >= winMs)
     .map((o) => ({
       kind: "balcao" as const, id: o.id, display: o.display, createdAt: o.createdAt, totalCents: o.totalCents,
       paymentMethod: o.paymentMethod ?? null, itens: o.items.reduce((s, it) => s + it.qty, 0),
     }));
-  const mesa = (await listMesaSales(session.openedAt))
+  const mesa = (await listMesaSales(new Date(winMs).toISOString()))
     .map((m) => ({ kind: "mesa" as const, id: m.tabId, display: m.display, createdAt: m.closedAt, totalCents: m.totalCents, paymentMethod: m.method, itens: m.itens }));
   return [...balcao, ...mesa].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }

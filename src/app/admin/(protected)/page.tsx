@@ -19,6 +19,7 @@ import { listStaff } from "@/lib/staff-store";
 import NovaOSButton from "./os/NovaOSButton";
 import { IconWallet, IconMoto, IconBag, IconClock, IconBowl } from "@/components/Icons";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { inicioNoiteOperacionalISO } from "@/lib/events-store";
 import { familyOf } from "@/config/segments";
 import { listServiceOrders } from "@/lib/service-orders-store";
 import { listStock } from "@/lib/stock-store";
@@ -48,11 +49,12 @@ export default async function AdminHome() {
   const semCaixa = !session;
 
   const today = todayBR(); // hoje no fuso do Brasil (não UTC) — senão venda da noite some
-  // BAR atravessa a meia-noite: enquanto o CAIXA está aberto, "hoje" = desde a abertura do caixa
-  // (senão às 00h o faturado zera no dashboard, mas a venda da noite continua no caixa — divergência).
-  // Sem caixa aberto, cai no dia-calendário normal.
-  const sessStart = session?.openedAt ? new Date(session.openedAt).getTime() : null;
-  const isToday = (iso: string) => (sessStart !== null ? new Date(iso).getTime() >= sessStart : dateBR(iso) === today);
+  // "HOJE" = NOITE OPERACIONAL (6h→6h), a mesma âncora do Caixa e do couvert. O bar abre 18h e vai
+  // até 06h: a venda das 02h pertence à noite anterior e não pode pular pro dia civil seguinte.
+  // Antes isso era ancorado na abertura da SESSÃO de caixa — frágil: reabrir o caixa no meio da
+  // noite fazia sumir do dashboard tudo que já tinha vendido. Loja diurna não muda (6h→6h cobre o dia).
+  const noiteIniMs = new Date(inicioNoiteOperacionalISO()).getTime();
+  const isToday = (iso: string) => new Date(iso).getTime() >= noiteIniMs;
   const orders = await listOrders();
   const expenses = await listExpenses();
   const [settings, cur, mesaPagosAll, acai] = await Promise.all([getStore(), getCurrentStore(), listMesaPayments(), weightSoldPeriods()]);

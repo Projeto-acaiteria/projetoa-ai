@@ -17,6 +17,14 @@ export function noiteOperacionalBR(): string {
  *  do show às 6h do dia seguinte. Casa com getActiveEvent — pega a madrugada pós-meia-noite. */
 const noiteInicio = (ymd: string): string => `${ymd}T${String(CUTOFF_NOITE_HORA).padStart(2, "0")}:00:00-03:00`;
 
+/** Início (ISO) da noite operacional ATUAL — o "zero do dia" do bar (6h). É a âncora do Caixa e do
+ *  dashboard: o bar abre 18h e fecha até 06h, então a venda das 02h ainda é da noite anterior e NÃO
+ *  pode cair no dia civil seguinte. Independe da sessão de caixa (que pode ser reaberta no meio da
+ *  noite). Loja diurna (açaí) não é afetada: a janela 6h→6h cobre o dia comercial inteiro dela. */
+export function inicioNoiteOperacionalISO(): string {
+  return noiteInicio(noiteOperacionalBR());
+}
+
 export type EventRow = {
   id: string;
   artist: string;
