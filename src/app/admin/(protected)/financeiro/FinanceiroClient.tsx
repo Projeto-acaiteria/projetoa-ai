@@ -18,7 +18,7 @@ const CATS_SERVICE = ["pecas", "aluguel", "salarios", "utilidades", "marketing",
 // comissao/bonus NÃO entram no dropdown (são sintéticas do pagamento de comissão) — só têm rótulo p/ exibir.
 const CAT_LABEL: Record<string, string> = {
   insumos: "Insumos", aluguel: "Aluguel", salarios: "Salários", utilidades: "Energia / Água",
-  embalagens: "Embalagens", marketing: "Marketing", manutencao: "Manutenção", impostos: "Impostos", outros: "Outros",
+  diaria: "Diária", embalagens: "Embalagens", marketing: "Marketing", manutencao: "Manutenção", impostos: "Impostos", outros: "Outros",
   pecas: "Peças / fornecedores", frete: "Frete / envio", comissao: "Comissão (técnico)", bonus: "Bônus (técnico)",
 };
 const PAY_LABEL: Record<string, string> = { dinheiro: "Dinheiro", pix: "Pix", debito: "Débito", credito: "Crédito" };

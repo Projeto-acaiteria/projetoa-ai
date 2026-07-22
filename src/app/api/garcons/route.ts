@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
-import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess, listShifts, updateShift, addShift, removeShift, taxaServicoPorNoite } from "@/lib/staff-store";
+import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess, listShifts, updateShift, addShift, removeShift, taxaServicoPorNoite, payShifts, listStaffPayments, reverseStaffPayment } from "@/lib/staff-store";
+import { getCurrentUser } from "@/lib/auth/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,12 +15,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const to = searchParams.get("to") || ymdBR(new Date());
   const from = searchParams.get("from") || ymdBR(new Date(Date.now() - 29 * 864e5));
-  const [acerto, shifts, taxa] = await Promise.all([
+  const [acerto, shifts, taxa, pagamentos] = await Promise.all([
     staffReport(undefined, undefined, storeId),
     listShifts(from, to, storeId),
     taxaServicoPorNoite(from, to, storeId),
+    listStaffPayments(storeId),
   ]);
-  return NextResponse.json({ acerto, shifts, taxa, from, to });
+  return NextResponse.json({ acerto, shifts, taxa, pagamentos, from, to });
 }
 
 export async function POST(req: Request) {
@@ -52,6 +54,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       case "shiftRemove":
         await removeShift(Number(p.id), storeId);
+        return NextResponse.json({ ok: true });
+      // PAGAMENTO das diárias (mt-34): total recalculado no servidor + carimbo anti-2x
+      case "payShifts": {
+        const paidBy = (await getCurrentUser())?.email ?? undefined;
+        const pay = await payShifts(String(p.staffId), { shiftIds: p.shiftIds as number[] | undefined, notes: p.notes as string | undefined, paidBy }, storeId);
+        return NextResponse.json({ ok: true, pay });
+      }
+      case "reversePayment":
+        await reverseStaffPayment(Number(p.id), storeId);
         return NextResponse.json({ ok: true });
       case "createAccess": {
         const email = String(p.email ?? "").trim();

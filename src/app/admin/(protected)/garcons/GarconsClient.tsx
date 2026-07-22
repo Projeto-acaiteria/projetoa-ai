@@ -10,8 +10,9 @@ const inputCls = "rounded-xl border border-line bg-bg-elevated px-3.5 py-2.5 tex
 const PAY_LABEL: Record<PayType, string> = { comissao: "Comissão", diaria: "Diária", salario: "Salário" };
 const reaisToCents = (s: string) => Math.round((parseFloat(s.replace(",", ".")) || 0) * 100);
 // PRESENÇA/DIÁRIA (mt-33): o garçom bate ponto ao logar; o Adm ajusta valor e bônus da noite.
-type Shift = { id: number; staffId: string; name: string; noite: string; diariaCents: number; bonusCents: number; source: string; checkedInAt: string };
+type Shift = { id: number; staffId: string; name: string; noite: string; diariaCents: number; bonusCents: number; source: string; checkedInAt: string; paymentId?: number | null };
 type Taxa = { totalCents: number; porNoite: { noite: string; cents: number }[] };
+type Pagamento = { id: number; staffId: string; name: string; totalCents: number; noites: number; periodStart: string | null; periodEnd: string | null; paidBy: string | null; paidAt: string };
 const ddmm = (ymd: string) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`;
 const hojeBR = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
@@ -32,6 +33,7 @@ export default function GarconsClient() {
   const [openDias, setOpenDias] = useState<string | null>(null); // garçom com as noites abertas
   const [verTaxa, setVerTaxa] = useState(false);
   const [novaNoite, setNovaNoite] = useState(hojeBR());
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/garcons", { cache: "no-store" });
@@ -39,6 +41,7 @@ export default function GarconsClient() {
     setAcerto(d.acerto ?? []);
     setShifts(d.shifts ?? []);
     setTaxa(d.taxa ?? { totalCents: 0, porNoite: [] });
+    setPagamentos(d.pagamentos ?? []);
     setLoading(false);
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -154,17 +157,28 @@ export default function GarconsClient() {
           {/* DIÁRIAS — dias trabalhados (check-in no login do garçom) × diária + bônus */}
           {g.pay_type === "diaria" && (() => {
             const meus = shifts.filter((s) => s.staffId === g.id);
-            const totDiaria = meus.reduce((s, x) => s + x.diariaCents, 0);
-            const totBonus = meus.reduce((s, x) => s + x.bonusCents, 0);
+            const emAberto = meus.filter((s) => !s.paymentId);
+            const aPagar = emAberto.reduce((s, x) => s + x.diariaCents + x.bonusCents, 0);
+            const recibos = pagamentos.filter((p) => p.staffId === g.id);
+            const jaPago = recibos.reduce((s, p) => s + p.totalCents, 0);
             const aberto = openDias === g.id;
             return (
               <div className="mt-3 rounded-xl border border-line bg-bg-surface-2 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm">
-                    <b className="text-ink">{meus.length}</b> <span className="text-[var(--text-muted)]">dia{meus.length === 1 ? "" : "s"} trabalhado{meus.length === 1 ? "" : "s"} · diárias <b className="text-ink">{brl(totDiaria)}</b>{totBonus > 0 && <> · bônus <b className="text-ink">{brl(totBonus)}</b></>}</span>
+                    <b className="text-ink">{meus.length}</b> <span className="text-[var(--text-muted)]">dia{meus.length === 1 ? "" : "s"} trabalhado{meus.length === 1 ? "" : "s"}{jaPago > 0 && <> · já pago <b className="text-ink">{brl(jaPago)}</b></>}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-extrabold text-[var(--green-ok)]">{brl(totDiaria + totBonus)}</span>
+                    <span className="text-xs text-[var(--text-muted)]">a pagar</span>
+                    <span className="text-sm font-extrabold text-[var(--green-ok)]">{brl(aPagar)}</span>
+                    {aPagar > 0 && (
+                      <button
+                        onClick={() => confirm(`Registrar pagamento de ${brl(aPagar)} para ${g.name} (${emAberto.length} noite${emAberto.length === 1 ? "" : "s"})?`) && api("payShifts", { staffId: g.id })}
+                        disabled={saving}
+                        className="rounded-lg brand-gradient px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                        Pagar
+                      </button>
+                    )}
                     <button onClick={() => setOpenDias(aberto ? null : g.id)} className="text-xs font-bold text-brand-600">{aberto ? "ocultar" : "ver noites"}</button>
                   </div>
                 </div>
@@ -172,25 +186,53 @@ export default function GarconsClient() {
                 {aberto && (
                   <div className="mt-3 border-t border-line pt-2">
                     {meus.length === 0 && <p className="py-2 text-xs text-[var(--text-muted)]">Nenhuma presença ainda. O garçom bate ponto sozinho ao entrar no sistema — ou lance na mão abaixo.</p>}
-                    {meus.map((s) => (
-                      <div key={s.id} className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] py-2 last:border-0">
-                        <span className="w-16 text-sm font-bold text-ink">{ddmm(s.noite)}</span>
-                        <span className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold text-[var(--text-faded)]">{s.source === "login" ? "check-in" : "manual"}</span>
-                        <label className="flex items-center gap-1 text-xs text-[var(--text-muted)]">diária R$
-                          <input defaultValue={(s.diariaCents / 100).toFixed(2)} inputMode="decimal" onBlur={(e) => api("shiftUpdate", { id: s.id, diariaCents: reaisToCents(e.target.value) })}
-                            className="w-20 rounded-lg border border-line bg-bg-elevated px-2 py-1 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
-                        </label>
-                        <label className="flex items-center gap-1 text-xs text-[var(--text-muted)]">bônus R$
-                          <input defaultValue={(s.bonusCents / 100).toFixed(2)} inputMode="decimal" onBlur={(e) => api("shiftUpdate", { id: s.id, bonusCents: reaisToCents(e.target.value) })}
-                            className="w-20 rounded-lg border border-line bg-bg-elevated px-2 py-1 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
-                        </label>
-                        <button onClick={() => api("shiftRemove", { id: s.id })} disabled={saving} className="ml-auto text-xs font-bold text-red-500">remover</button>
-                      </div>
-                    ))}
+                    {meus.map((s) => {
+                      const pago = !!s.paymentId; // noite paga: congela (não edita nem remove)
+                      return (
+                        <div key={s.id} className={`flex flex-wrap items-center gap-2 border-b border-[var(--line)] py-2 last:border-0 ${pago ? "opacity-60" : ""}`}>
+                          <span className="w-16 text-sm font-bold text-ink">{ddmm(s.noite)}</span>
+                          <span className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold text-[var(--text-faded)]">{s.source === "login" ? "check-in" : "manual"}</span>
+                          {pago ? (
+                            <>
+                              <span className="text-sm font-bold text-ink">{brl(s.diariaCents + s.bonusCents)}</span>
+                              <span className="rounded-full bg-[var(--green-ok)] px-2 py-0.5 text-[10px] font-bold text-white">pago</span>
+                            </>
+                          ) : (
+                            <>
+                              <label className="flex items-center gap-1 text-xs text-[var(--text-muted)]">diária R$
+                                <input defaultValue={(s.diariaCents / 100).toFixed(2)} inputMode="decimal" onBlur={(e) => api("shiftUpdate", { id: s.id, diariaCents: reaisToCents(e.target.value) })}
+                                  className="w-20 rounded-lg border border-line bg-bg-elevated px-2 py-1 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
+                              </label>
+                              <label className="flex items-center gap-1 text-xs text-[var(--text-muted)]">bônus R$
+                                <input defaultValue={(s.bonusCents / 100).toFixed(2)} inputMode="decimal" onBlur={(e) => api("shiftUpdate", { id: s.id, bonusCents: reaisToCents(e.target.value) })}
+                                  className="w-20 rounded-lg border border-line bg-bg-elevated px-2 py-1 text-right text-sm font-bold text-ink outline-none focus:border-brand-600" />
+                              </label>
+                              <button onClick={() => api("shiftRemove", { id: s.id })} disabled={saving} className="ml-auto text-xs font-bold text-red-500">remover</button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <input type="date" value={novaNoite} onChange={(e) => setNovaNoite(e.target.value)} className="rounded-lg border border-line bg-bg-elevated px-2 py-1.5 text-sm text-ink outline-none" />
                       <button onClick={() => api("shiftAdd", { staffId: g.id, noite: novaNoite })} disabled={saving} className="rounded-lg border border-brand-400 px-3 py-1.5 text-xs font-bold text-brand-600 disabled:opacity-50">Lançar presença</button>
                     </div>
+
+                    {/* recibos: histórico do que já foi pago (entra como despesa no Financeiro) */}
+                    {recibos.length > 0 && (
+                      <div className="mt-3 border-t border-line pt-2">
+                        <p className="mb-1 text-[11px] font-bold uppercase text-[var(--text-muted)]">Pagamentos feitos</p>
+                        {recibos.map((r) => (
+                          <div key={r.id} className="flex flex-wrap items-center gap-2 py-1 text-xs">
+                            <span className="font-bold text-ink">{brl(r.totalCents)}</span>
+                            <span className="text-[var(--text-muted)]">
+                              {r.noites} noite{r.noites === 1 ? "" : "s"}{r.periodStart ? ` · ${ddmm(r.periodStart)}${r.periodEnd && r.periodEnd !== r.periodStart ? `–${ddmm(r.periodEnd)}` : ""}` : ""} · pago em {new Date(r.paidAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                            </span>
+                            <button onClick={() => confirm(`Estornar o pagamento de ${brl(r.totalCents)}? As noites voltam para "a pagar".`) && api("reversePayment", { id: r.id })} disabled={saving} className="ml-auto font-bold text-red-500">estornar</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

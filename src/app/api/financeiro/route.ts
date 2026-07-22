@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listOrders } from "@/lib/orders-store";
 import { listExpenses } from "@/lib/expense-store";
 import { listMesaPayments, listItemCancellations } from "@/lib/tables-store";
+import { listStaffPayments } from "@/lib/staff-store";
 import { listServiceOrders } from "@/lib/service-orders-store";
 import { listCommissionPayments } from "@/lib/commission-payments-store";
 
@@ -70,6 +71,17 @@ export async function GET() {
     if (p.bonusCents > 0) rows.push({ id: "bon_" + p.id, description: "Bônus" + (p.bonusReason ? ` · ${p.bonusReason}` : ""), category: "bonus", amountCents: p.bonusCents, date });
     return rows;
   });
+  // DIÁRIAS PAGAS (mt-34) — custo de pessoal do bar entra no resultado, igual as comissões.
+  // Sintéticas também: o recibo é a fonte da verdade, não editável na aba Despesas.
+  for (const dp of await listStaffPayments()) {
+    comissoes.push({
+      id: "dia_" + dp.id,
+      description: `Diárias · ${dp.name} (${dp.noites} noite${dp.noites === 1 ? "" : "s"})`,
+      category: "diaria",
+      amountCents: dp.totalCents,
+      date: (dp.paidAt || "").slice(0, 10),
+    });
+  }
 
   // cancelamentos de item (relatorio de auditoria do Financeiro) — a casa pediu registro consultavel
   const cancelamentos = await listItemCancellations();

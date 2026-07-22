@@ -131,6 +131,7 @@ export async function staffReport(fromISO?: string, toISO?: string, storeId?: st
 export type Shift = {
   id: number; staffId: string; name: string; noite: string;
   diariaCents: number; bonusCents: number; source: string; checkedInAt: string;
+  paymentId?: number | null; // carimbo do pagamento (mt-34): noite paga não entra em novo recibo
 };
 
 /** CHECK-IN do garçom na noite operacional atual. Idempotente: 1 linha por garçom por noite
@@ -162,13 +163,13 @@ export async function listShifts(fromNoite: string, toNoite: string, storeId?: s
   const d = db();
   const { data } = await d.from("staff_shifts").select("*").eq("store_id", sid)
     .gte("noite", fromNoite).lte("noite", toNoite).order("noite", { ascending: false });
-  const rows = (data ?? []) as Array<{ id: number; staff_id: string; noite: string; diaria_cents: number; bonus_cents: number; source: string; checked_in_at: string }>;
+  const rows = (data ?? []) as Array<{ id: number; staff_id: string; noite: string; diaria_cents: number; bonus_cents: number; source: string; checked_in_at: string; payment_id: number | null }>;
   if (!rows.length) return [];
   const nomeById = new Map((await listStaff(sid)).map((s) => [s.id, s.name]));
   return rows.map((r) => ({
     id: num(r.id), staffId: String(r.staff_id), name: nomeById.get(String(r.staff_id)) ?? "—",
     noite: String(r.noite).slice(0, 10), diariaCents: num(r.diaria_cents), bonusCents: num(r.bonus_cents),
-    source: r.source, checkedInAt: r.checked_in_at,
+    source: r.source, checkedInAt: r.checked_in_at, paymentId: r.payment_id ?? null,
   }));
 }
 
@@ -224,4 +225,93 @@ export async function taxaServicoPorNoite(fromNoite: string, toNoite: string, st
     totalCents += cents;
   }
   return { totalCents, porNoite: [...map.entries()].map(([noite, cents]) => ({ noite, cents })).sort((a, b) => b.noite.localeCompare(a.noite)) };
+}
+
+// ── PAGAMENTO das diárias (mt-34) ────────────────────────────────────────────
+
+export type StaffPayment = {
+  id: number; staffId: string; name: string; totalCents: number; noites: number;
+  periodStart: string | null; periodEnd: string | null; notes: string | null;
+  paidBy: string | null; paidAt: string;
+};
+
+/** Noites AINDA NÃO PAGAS de um garçom (o que entra no próximo pagamento). */
+export async function shiftsAPagar(staffId: string, storeId?: string): Promise<Shift[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data } = await db().from("staff_shifts").select("*")
+    .eq("store_id", sid).eq("staff_id", staffId).is("payment_id", null).order("noite");
+  const rows = (data ?? []) as Array<{ id: number; staff_id: string; noite: string; diaria_cents: number; bonus_cents: number; source: string; checked_in_at: string }>;
+  const nome = (await listStaff(sid)).find((s) => s.id === staffId)?.name ?? "—";
+  return rows.map((r) => ({
+    id: num(r.id), staffId: String(r.staff_id), name: nome, noite: String(r.noite).slice(0, 10),
+    diariaCents: num(r.diaria_cents), bonusCents: num(r.bonus_cents), source: r.source, checkedInAt: r.checked_in_at,
+  }));
+}
+
+/** Registra o PAGAMENTO das noites em aberto: gera o recibo e carimba as noites (anti-2x).
+ *  Recalcula o total NO SERVIDOR (a tela é só preview). Se o carimbo falhar, apaga o recibo
+ *  — não deixa pagamento órfão. `shiftIds` vazio = paga todas as noites em aberto. */
+export async function payShifts(
+  staffId: string,
+  opts: { shiftIds?: number[]; notes?: string; paidBy?: string } = {},
+  storeId?: string,
+): Promise<StaffPayment> {
+  const sid = storeId ?? (await resolveStoreId());
+  const d = db();
+  const abertas = await shiftsAPagar(staffId, sid);
+  const alvo = opts.shiftIds?.length ? abertas.filter((s) => opts.shiftIds!.includes(s.id)) : abertas;
+  if (!alvo.length) throw new Error("Nenhuma noite em aberto pra pagar.");
+
+  const totalCents = alvo.reduce((s, x) => s + x.diariaCents + x.bonusCents, 0);
+  if (totalCents <= 0) throw new Error("O total a pagar está zerado — confira a diária das noites.");
+  const noites = alvo.map((s) => s.noite).sort();
+
+  const { data: pay, error } = await d.from("staff_payments").insert({
+    store_id: sid, staff_id: staffId, total_cents: totalCents, noites: alvo.length,
+    period_start: noites[0], period_end: noites[noites.length - 1],
+    notes: opts.notes?.trim() || null, paid_by: opts.paidBy ?? null,
+  }).select("*").single();
+  if (error || !pay) throw new Error("Falha ao registrar o pagamento: " + (error?.message ?? ""));
+  const payId = num((pay as { id: number }).id);
+
+  // carimba SÓ as que ainda estão em aberto (.is null) — se outra sessão pagou em paralelo,
+  // o número não bate e o recibo é desfeito (mesmo padrão anti-corrida da comissão de OS).
+  const { data: carimbadas, error: upErr } = await d.from("staff_shifts")
+    .update({ payment_id: payId }).eq("store_id", sid).in("id", alvo.map((s) => s.id)).is("payment_id", null).select("id");
+  if (upErr || (carimbadas ?? []).length !== alvo.length) {
+    await d.from("staff_shifts").update({ payment_id: null }).eq("store_id", sid).eq("payment_id", payId);
+    await d.from("staff_payments").delete().eq("id", payId).eq("store_id", sid);
+    throw new Error("Uma das noites foi paga em paralelo — pagamento cancelado, tente de novo.");
+  }
+
+  return {
+    id: payId, staffId, name: alvo[0].name, totalCents, noites: alvo.length,
+    periodStart: noites[0], periodEnd: noites[noites.length - 1],
+    notes: opts.notes?.trim() || null, paidBy: opts.paidBy ?? null,
+    paidAt: String((pay as { paid_at: string }).paid_at),
+  };
+}
+
+/** Histórico de pagamentos (recibos) — vira despesa sintética no Financeiro. */
+export async function listStaffPayments(storeId?: string): Promise<StaffPayment[]> {
+  const sid = storeId ?? (await resolveStoreId());
+  const { data } = await db().from("staff_payments").select("*").eq("store_id", sid).order("paid_at", { ascending: false });
+  const rows = (data ?? []) as Array<{ id: number; staff_id: string; total_cents: number; noites: number; period_start: string | null; period_end: string | null; notes: string | null; paid_by: string | null; paid_at: string }>;
+  if (!rows.length) return [];
+  const nomeById = new Map((await listStaff(sid)).map((s) => [s.id, s.name]));
+  return rows.map((r) => ({
+    id: num(r.id), staffId: String(r.staff_id), name: nomeById.get(String(r.staff_id)) ?? "—",
+    totalCents: num(r.total_cents), noites: num(r.noites),
+    periodStart: r.period_start ? String(r.period_start).slice(0, 10) : null,
+    periodEnd: r.period_end ? String(r.period_end).slice(0, 10) : null,
+    notes: r.notes, paidBy: r.paid_by, paidAt: r.paid_at,
+  }));
+}
+
+/** Estorna o recibo: devolve as noites pra "a pagar" e apaga o pagamento. */
+export async function reverseStaffPayment(paymentId: number, storeId?: string): Promise<void> {
+  const sid = storeId ?? (await resolveStoreId());
+  const d = db();
+  await d.from("staff_shifts").update({ payment_id: null }).eq("store_id", sid).eq("payment_id", paymentId);
+  await d.from("staff_payments").delete().eq("id", paymentId).eq("store_id", sid);
 }
