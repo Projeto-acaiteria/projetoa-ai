@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Falha na configuração da loja." }, { status: 500 });
   }
 
-  // 4. subscription em trial (7 dias — o cron expira; o gate manda pra /bloqueado depois)
+  // 4. subscription em trial (BILLING.trialDias — o cron expira; o gate manda pra /bloqueado depois)
   const { error: subErr } = await db().from("subscriptions").insert({ store_id: storeId, status: "trial" });
   if (subErr) {
     await rollbackStore();
