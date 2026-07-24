@@ -9,6 +9,8 @@ import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag, IconMinus, IconTrash } from "@/components/Icons";
+import { submitOrQueue, pendingCount, QUEUE_EVENT } from "@/lib/offline-queue";
+import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
@@ -24,9 +26,11 @@ let _seq = 0;
 const uid = () => `t${++_seq}`;
 
 const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], ["credito", "Crédito"]] as const;
+// opId estável por lançamento (offline Fatia 1/2): guardado no corpo enfileirado → reusado no replay
+const genOpId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true, selfWaiterId = null }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true, selfWaiterId = null, offlineEnabled = false }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -39,6 +43,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   onSaleClosed?: () => void; // ressincroniza o saldo do Caixa quando a grade está embutida no hub PDV
   canClose?: boolean; // GARÇOM (false): abre e lança, mas NÃO fecha/recebe — quem fecha é o caixa
   selfWaiterId?: string | null; // garçom logado: pedido nasce no nome dele (sem escolher no seletor)
+  offlineEnabled?: boolean; // Fatia 2: lançar em comanda aberta aguenta queda de rede (flag por loja)
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -75,6 +80,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // trocar de mesa (só caixa/admin): abre o seletor de mesas; se a destino estiver ocupada, confirma a junção
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveConfirm, setMoveConfirm] = useState<{ number: number; area: string; occupied: boolean } | null>(null);
+  // Fatia 2: itens lançados OFFLINE numa comanda aberta, mostrados otimistas até a fila subir.
+  const [pendingLines, setPendingLines] = useState<{ tabId: number; label: string; qty: number; unitPriceCents: number }[]>([]);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -82,6 +89,19 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, []);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
   useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
+  // Fatia 2: quando a fila offline drena (pendentes → 0), reconcilia a tela com o servidor fresco
+  // (o flush em si é do OfflineIndicator, ao reconectar). Tira os "pendente" e recarrega a comanda.
+  useEffect(() => {
+    if (!offlineEnabled) return;
+    const onChange = async () => {
+      if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
+      setPendingLines((p) => (p.length ? [] : p));
+      if (drawer?.tabId) await loadComanda(drawer.tabId);
+      loadTables();
+    };
+    window.addEventListener(QUEUE_EVENT, onChange);
+    return () => window.removeEventListener(QUEUE_EVENT, onChange);
+  }, [offlineEnabled, drawer, loadTables]);
 
   async function loadComanda(tabId: number) {
     const r = await fetch(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
@@ -132,6 +152,31 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     setBusy(true); setErr("");
     try {
       const items = temp.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds, grams: l.grams, note: l.note }));
+
+      // FATIA 2 — comanda JÁ aberta + flag: aguenta queda. Enfileira com opId (a Fatia 1 impede
+      // duplicar no replay). Rascunho (abrir mesa nova) precisa de id temporário → segue online-only.
+      if (offlineEnabled && drawer.tabId) {
+        const opId = genOpId();
+        const tid = drawer.tabId;
+        const pend = temp.map((l) => ({ tabId: tid, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
+        const res = await submitOrQueue("/api/mesas/lancar", { tabId: drawer.tabId, items, opId }, `Mesa ${drawer.table.number} · ${tempCount} item(ns)`);
+        setTemp([]);
+        if ("queued" in res) {
+          // offline: mostra otimista, marcado como pendente; sobe sozinho ao reconectar
+          setPendingLines((p) => [...p, ...pend]);
+          setView("comanda");
+        } else {
+          setView("comanda"); await loadComanda(drawer.tabId); loadTables();
+        }
+        return;
+      }
+
+      // rascunho offline (mesa nova): não dá pra abrir sem net ainda (Fatia 3) — avisa em vez de travar feio
+      if (offlineEnabled && !drawer.tabId && typeof navigator !== "undefined" && !navigator.onLine) {
+        setErr("Sem conexão: abrir mesa nova volta quando a net voltar. Dá pra seguir lançando nas mesas já abertas.");
+        return;
+      }
+
       const body = drawer.tabId
         ? { tabId: drawer.tabId, items }
         : { tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items };
@@ -347,9 +392,14 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, [tables]);
 
   const cats = categories.filter((c) => c.products.length);
+  const myPending = pendingLines.filter((p) => drawer?.tabId != null && p.tabId === drawer.tabId); // itens offline desta comanda
 
   return (
     <>
+      {/* Fatia 2: barra de status offline (sem conexão / pendentes) — só quando o flag da loja liga.
+          Ela drena a fila ao reconectar; o efeito acima reconcilia a comanda quando zera. */}
+      {offlineEnabled && <OfflineIndicator />}
+
       {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez).
           Garçom (canClose=false) não vê QZ (não imprime — quem imprime é o caixa) nem gerencia mesas. */}
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -535,6 +585,21 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {/* Fatia 2: itens lançados OFFLINE — otimistas, com selo "aguardando sincronizar".
+                      λ.prova-na-fonte: o operador vê que ainda não subiu; some sozinho quando a fila drena. */}
+                  {myPending.length > 0 && (
+                    <div className="border-t border-dashed border-[var(--gold)]/60">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase text-[var(--gold)]">⏳ aguardando sincronizar</div>
+                      <ul className="divide-y divide-line/50">
+                        {myPending.map((p, i) => (
+                          <li key={`pend-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm opacity-70">
+                            <span className="min-w-0 text-ink"><b className="tabular-nums">{p.qty}×</b> {p.label}</span>
+                            <span className="tabular-nums text-[var(--text-muted)]">{brl(p.qty * p.unitPriceCents)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
 

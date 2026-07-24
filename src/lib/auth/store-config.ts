@@ -18,6 +18,7 @@ export type StoreConfig = {
   loyalty_enabled: boolean;
   has_estoque: boolean; // controle de estoque/ficha técnica (baixa por insumo) — ligável por loja
   kitchen_screen: boolean; // cozinha COM tela (bump: iniciar→pronto). false = só ticket → Preparo vira leitura
+  offline_enabled?: boolean; // resiliência a quedas (Fatia 2 offline-first) — default false; liga por loja provada
 };
 
 export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig | null> => {
@@ -26,7 +27,7 @@ export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig
 });
 
 // Flags que o DONO pode ligar/desligar no painel (as outras vêm do segmento e não mudam pela UI).
-const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose", "has_estoque", "kitchen_screen"];
+const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose", "has_estoque", "kitchen_screen", "offline_enabled"];
 
 export async function setStoreConfig(patch: Partial<StoreConfig>, storeId: string): Promise<void> {
   const clean: Record<string, boolean> = {};
