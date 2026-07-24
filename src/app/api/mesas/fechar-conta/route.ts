@@ -4,6 +4,7 @@ import { getOpenSession } from "@/lib/cash-store";
 import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
+import { withIdempotency, httpError } from "@/lib/idempotency";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
@@ -15,47 +16,53 @@ export const dynamic = "force-dynamic";
 const PAYS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
 
 export async function POST(req: Request) {
-  let b: { tabId?: number; applyFee?: boolean; applyCover?: boolean; method?: string; machineId?: string; parcelas?: number; customerPhone?: string; customerName?: string };
+  let b: { tabId?: number; applyFee?: boolean; applyCover?: boolean; method?: string; machineId?: string; parcelas?: number; customerPhone?: string; customerName?: string; opId?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
   if (typeof b.tabId !== "number" || !Number.isFinite(b.tabId)) {
     return NextResponse.json({ error: "tabId é obrigatório" }, { status: 400 });
   }
   const method: PaymentMethod = PAYS.includes(b.method as PaymentMethod) ? (b.method as PaymentMethod) : "dinheiro";
 
+  const tabId = b.tabId;
   try {
     const sid = await resolveStoreId();
-    // FRESCO do banco — nunca o total da tela (pode ter entrado pedido no meio)
-    const full = await getTabFull(b.tabId, sid);
-    if (full.tab.status === "fechada") return NextResponse.json({ ok: true, alreadyClosed: true });
+    // idempotência (offline Fatia 1): sem opId roda igual a hoje; com opId, replay devolve o mesmo
+    // fechamento (não fecha de novo nem cobra 2×). closeTab já é idempotente por status; o op_id
+    // garante a MESMA resposta e barra um 2º pagamento se o replay chegar antes do status atualizar.
+    const { result } = await withIdempotency(b.opId, sid, "fechar", async () => {
+      // FRESCO do banco — nunca o total da tela (pode ter entrado pedido no meio)
+      const full = await getTabFull(tabId, sid);
+      if (full.tab.status === "fechada") return { ok: true, alreadyClosed: true };
 
-    const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0; // taxa só sobre consumo
-    // COUVERT: cobrado por padrão; se o cliente recusar (applyCover === false) zera E persiste 0.
-    // Se o snapshot ainda é 0 (comanda antiga/QR aberta sem pax) mas há show ativo, calcula cover/pessoa
-    // × pessoas — assim o couvert do checkbox marcado sempre cobra, mesmo sem ter passado pelo ajuste.
-    let coverCents = 0;
-    if (b.applyCover !== false) {
-      coverCents = full.coverCents;
-      if (coverCents === 0) {
-        const ev = await getActiveEvent(sid);
-        if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1);
+      const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0; // taxa só sobre consumo
+      // COUVERT: cobrado por padrão; se o cliente recusar (applyCover === false) zera E persiste 0.
+      // Se o snapshot ainda é 0 (comanda antiga/QR aberta sem pax) mas há show ativo, calcula cover/pessoa
+      // × pessoas — assim o couvert do checkbox marcado sempre cobra, mesmo sem ter passado pelo ajuste.
+      let coverCents = 0;
+      if (b.applyCover !== false) {
+        coverCents = full.coverCents;
+        if (coverCents === 0) {
+          const ev = await getActiveEvent(sid);
+          if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1);
+        }
       }
-    }
-    const grand = full.consumoCents + coverCents + serviceFeeCents;
-    const falta = Math.max(0, grand - full.paidCents);
+      const grand = full.consumoCents + coverCents + serviceFeeCents;
+      const falta = Math.max(0, grand - full.paidCents);
 
-    if (falta > 0) {
-      // #2-caixa: recebe o que falta SÓ com caixa aberto (uniforme com balcao-venda). Comanda já
-      // quitada (falta=0) fecha normal sem exigir caixa — só o recebimento de dinheiro exige.
-      if (!(await getOpenSession())) {
-        return NextResponse.json({ error: "Abra o caixa antes de receber pagamento" }, { status: 409 });
+      if (falta > 0) {
+        // #2-caixa: recebe o que falta SÓ com caixa aberto (uniforme com balcao-venda). Comanda já
+        // quitada (falta=0) fecha normal sem exigir caixa — só o recebimento de dinheiro exige.
+        if (!(await getOpenSession())) throw httpError(409, "Abra o caixa antes de receber pagamento");
+        const card = await resolveCardFee(method, falta, sid, { machineId: b.machineId, parcelas: b.parcelas });
+        await addPayment(tabId, method, falta, card.feePercent); // valida dono + grava taxa da máquina escolhida
       }
-      const card = await resolveCardFee(method, falta, sid, { machineId: b.machineId, parcelas: b.parcelas });
-      await addPayment(b.tabId, method, falta, card.feePercent); // valida dono + grava taxa da máquina escolhida
-    }
-    const r = await closeTab(b.tabId, { serviceFeeCents, coverCents, customerPhone: b.customerPhone, customerName: b.customerName });
-    await markTabCallsAttended(b.tabId); // ao fechar, quita o "pediu a conta" (some o âmbar do tile)
-    return NextResponse.json({ ok: true, totalCents: grand, paidNowCents: falta, pointsAwarded: r.pointsAwarded });
+      const r = await closeTab(tabId, { serviceFeeCents, coverCents, customerPhone: b.customerPhone, customerName: b.customerName });
+      await markTabCallsAttended(tabId); // ao fechar, quita o "pediu a conta" (some o âmbar do tile)
+      return { ok: true, totalCents: grand, paidNowCents: falta, pointsAwarded: r.pointsAwarded };
+    });
+    return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    const status = (e as { inflight?: boolean }).inflight ? 409 : ((e as { httpStatus?: number }).httpStatus ?? 500);
+    return NextResponse.json({ error: (e as Error).message }, { status });
   }
 }

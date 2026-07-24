@@ -4,6 +4,7 @@ import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getOpenSession } from "@/lib/cash-store";
+import { withIdempotency, httpError } from "@/lib/idempotency";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/mesas/pagamento — registra um pagamento PARCIAL (split) na comanda
 export async function POST(req: Request) {
-  let b: { tabId?: number; method?: string; amountCents?: number; machineId?: string; parcelas?: number; applyFee?: boolean; applyCover?: boolean };
+  let b: { tabId?: number; method?: string; amountCents?: number; machineId?: string; parcelas?: number; applyFee?: boolean; applyCover?: boolean; opId?: string };
   try {
     b = await req.json();
   } catch {
@@ -29,32 +30,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "amountCents é obrigatório" }, { status: 400 });
   }
 
+  const tabId = b.tabId;
+  const amountCents = b.amountCents;
   try {
     const sid = await resolveStoreId();
-    // TROCO NÃO É RECEITA: limita o valor GRAVADO ao que ainda falta (grand − pago). O excedente
-    // que o cliente deu em dinheiro é troco e volta pra ele — não pode inflar caixa/faturamento.
-    const full = await getTabFull(b.tabId, sid);
-    const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0;
-    let coverCents = 0;
-    if (b.applyCover !== false) {
-      coverCents = full.coverCents;
-      if (coverCents === 0) { const ev = await getActiveEvent(sid); if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1); }
-    }
-    const grand = full.consumoCents + coverCents + serviceFeeCents;
-    const falta = Math.max(0, grand - full.paidCents);
-    const recorded = Math.min(b.amountCents, falta);
-    const trocoCents = Math.max(0, b.amountCents - falta);
-    if (recorded <= 0) return NextResponse.json({ ok: true, recordedCents: 0, trocoCents }); // já quitado; resto é troco
-    // #2-caixa: dinheiro recebido SÓ com caixa aberto (uniforme com balcao-venda/vendas). Sem isso,
-    // pagamento de mesa com caixa fechado some da conferência da gaveta (λ.reconciliação de caixa).
-    if (!(await getOpenSession())) {
-      return NextResponse.json({ error: "Abra o caixa antes de receber pagamento" }, { status: 409 });
-    }
-    // taxa do cartão: máquina escolhida (snapshot) ou flat por método — server-authoritative
-    const card = await resolveCardFee(method as PaymentMethod, recorded, sid, { machineId: b.machineId, parcelas: b.parcelas });
-    await addPayment(b.tabId, method, recorded, card.feePercent);
-    return NextResponse.json({ ok: true, recordedCents: recorded, trocoCents });
+    // idempotência (offline Fatia 1): sem opId roda igual a hoje; com opId, replay NÃO grava 2º pagamento
+    const { result } = await withIdempotency(b.opId, sid, "pagamento", async () => {
+      // TROCO NÃO É RECEITA: limita o valor GRAVADO ao que ainda falta (grand − pago). O excedente
+      // que o cliente deu em dinheiro é troco e volta pra ele — não pode inflar caixa/faturamento.
+      const full = await getTabFull(tabId, sid);
+      const serviceFeeCents = b.applyFee ? Math.round(full.consumoCents * 0.1) : 0;
+      let coverCents = 0;
+      if (b.applyCover !== false) {
+        coverCents = full.coverCents;
+        if (coverCents === 0) { const ev = await getActiveEvent(sid); if (ev) coverCents = ev.cover_cents * Math.max(1, full.tab.people_count || 1); }
+      }
+      const grand = full.consumoCents + coverCents + serviceFeeCents;
+      const falta = Math.max(0, grand - full.paidCents);
+      const recorded = Math.min(amountCents, falta);
+      const trocoCents = Math.max(0, amountCents - falta);
+      if (recorded <= 0) return { ok: true, recordedCents: 0, trocoCents }; // já quitado; resto é troco
+      // #2-caixa: dinheiro recebido SÓ com caixa aberto (uniforme com balcao-venda/vendas). Sem isso,
+      // pagamento de mesa com caixa fechado some da conferência da gaveta (λ.reconciliação de caixa).
+      if (!(await getOpenSession())) throw httpError(409, "Abra o caixa antes de receber pagamento");
+      // taxa do cartão: máquina escolhida (snapshot) ou flat por método — server-authoritative
+      const card = await resolveCardFee(method as PaymentMethod, recorded, sid, { machineId: b.machineId, parcelas: b.parcelas });
+      await addPayment(tabId, method, recorded, card.feePercent);
+      return { ok: true, recordedCents: recorded, trocoCents };
+    });
+    return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    const status = (e as { inflight?: boolean }).inflight ? 409 : ((e as { httpStatus?: number }).httpStatus ?? 500);
+    return NextResponse.json({ error: (e as Error).message }, { status });
   }
 }
