@@ -217,7 +217,10 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     return [...map.values()];
   }, [comanda]);
 
-  const consumo = comanda?.consumoCents ?? 0;
+  // itens lançados OFFLINE desta comanda (ainda na fila) — entram no total OTIMISTA pra a tela mostrar
+  // o cálculo mesmo sem net (some quando sincroniza e o servidor devolve o consumo real).
+  const myPendingCents = pendingLines.filter((p) => drawer?.tabId != null && p.tabId === drawer.tabId).reduce((s, p) => s + p.qty * p.unitPriceCents, 0);
+  const consumo = (comanda?.consumoCents ?? 0) + myPendingCents;
   const cover = comanda?.coverCents ?? 0;
   const people = comanda?.tab.people_count ?? 1;
 
