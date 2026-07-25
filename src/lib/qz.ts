@@ -61,12 +61,19 @@ async function getQz(): Promise<QZ> {
   // modo ASSINADO — com o override.crt na máquina, o QZ não pede "Allow"
   qz.security.setCertificatePromise((resolve: any) => resolve(QZ_CERT));
   if (qz.security.setSignatureAlgorithm) qz.security.setSignatureAlgorithm("SHA512");
-  // assina no SERVIDOR (online); se falhar (offline), assina LOCAL com a chave cacheada
+  // assina no SERVIDOR (online); offline → assinatura LOCAL. navigator.onLine === false → vai direto
+  // no local (nem tenta o servidor). Online com timeout curto: se o /api/qz-sign não responde (queda
+  // de net que o navegador ainda não marcou), NÃO pendura — cai no local. Antes pendurava e o QZ
+  // nunca recebia a assinatura → não imprimia offline.
   qz.security.setSignaturePromise((toSign: string) => (resolve: any, reject: any) => {
-    fetch(`/api/qz-sign?request=${encodeURIComponent(toSign)}`)
-      .then((r) => { if (!r.ok) throw new Error("qz-sign " + r.status); return r.text(); })
+    const local = () => signLocal(toSign).then(resolve).catch(reject);
+    if (typeof navigator !== "undefined" && !navigator.onLine) { local(); return; }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    fetch(`/api/qz-sign?request=${encodeURIComponent(toSign)}`, { signal: ctrl.signal })
+      .then((r) => { clearTimeout(t); if (!r.ok) throw new Error("qz-sign " + r.status); return r.text(); })
       .then((sig) => { if (!sig) throw new Error("assinatura vazia"); resolve(sig); })
-      .catch(() => signLocal(toSign).then(resolve).catch(reject)); // offline → assinatura local
+      .catch(() => { clearTimeout(t); local(); }); // timeout/rede/erro → assina local
   });
   qzMod = qz;
   return qzMod;
