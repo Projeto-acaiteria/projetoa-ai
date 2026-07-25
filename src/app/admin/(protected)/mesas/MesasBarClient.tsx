@@ -15,7 +15,7 @@ import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
-import { ticketHtml } from "@/lib/ticket";
+import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
 type TableCard = { number: number; area: string; tabId: number | null; openTotalCents: number; openedAt: string | null; contaCalled: boolean };
@@ -177,6 +177,26 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const tempCount = temp.reduce((s, l) => s + l.qty, 0);
   const tempTotal = temp.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
 
+  // imprime o ticket de ESTAÇÃO no lançar (cozinha na cozinha, bar no bar) — LOCAL via QZ, roteando
+  // por estação (herdada da categoria). É o que faz a impressão sair OFFLINE (o QZ é local; não depende
+  // da tela Preparo ler do servidor). Só quando offlineOn (loja com o modo ligado) pra não duplicar
+  // com o autoprint do Preparo nas lojas que ainda usam aquele fluxo.
+  function printStationTickets(lines: TempLine[]) {
+    if (!drawer) return;
+    const stationOf = (pid: string) => categories.find((c) => c.products.some((p) => p.id === pid))?.station ?? "cozinha";
+    const byStation = new Map<string, TempLine[]>();
+    for (const l of lines) { const st = stationOf(l.product.id); const arr = byStation.get(st) ?? []; arr.push(l); byStation.set(st, arr); }
+    const d = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
+    const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
+    for (const [station, ls] of byStation) {
+      const html = stationTicketHtml({
+        loja: storeName, station, tableLabel: dest, dateLabel: `${p2(d.getHours())}:${p2(d.getMinutes())}`, orderId: 0,
+        items: ls.map((l) => ({ qty: l.qty, name: l.label, note: l.note ?? null })),
+      });
+      void printTicket(html, station); // QZ roteia pra impressora da estação (nunca lança — QZ→iframe)
+    }
+  }
+
   // lança o temp — UM request transacional (/api/mesas/lancar): se for rascunho, abre a comanda
   // e lança junto no servidor; se o lançamento falhar, o servidor faz rollback (sem mesa-fantasma).
   async function confirmAdd() {
@@ -197,6 +217,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           : { tableNumber: num, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items, opId };
         const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
         const res = await submitOrQueue("/api/mesas/lancar", body, `Mesa ${num} · ${tempCount} item(ns)`);
+        printStationTickets(temp); // lançamento aceito (fila ou servidor) → sai na impressora da estação, online+offline
         setTemp([]);
         if ("queued" in res) {
           setPendingLines((p) => [...p, ...pend]); // otimista: card + drawer somam (fonte única por número)
