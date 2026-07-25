@@ -82,7 +82,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveConfirm, setMoveConfirm] = useState<{ number: number; area: string; occupied: boolean } | null>(null);
   // Fatia 2: itens lançados OFFLINE numa comanda aberta, mostrados otimistas até a fila subir.
-  const [pendingLines, setPendingLines] = useState<{ tabId: number; label: string; qty: number; unitPriceCents: number }[]>([]);
+  // itens lançados OFFLINE, chaveados por NÚMERO da mesa (fonte única — o card e o drawer leem daqui).
+  // Some quando a fila sincroniza e o servidor devolve o consumo real.
+  const [pendingLines, setPendingLines] = useState<{ tableNumber: number; label: string; qty: number; unitPriceCents: number }[]>([]);
   // flag offline: inicia com o prop (pode vir velho do cache do PWA) e AUTOCORRIGE pela /api/mesas fresca
   const [offlineOn, setOfflineOn] = useState(offlineEnabled);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -176,8 +178,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       // duplicar no replay). Rascunho (abrir mesa nova) precisa de id temporário → segue online-only.
       if (offlineOn && drawer.tabId) {
         const opId = genOpId();
-        const tid = drawer.tabId;
-        const pend = temp.map((l) => ({ tabId: tid, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
+        const num = drawer.table.number;
+        const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
         const res = await submitOrQueue("/api/mesas/lancar", { tabId: drawer.tabId, items, opId }, `Mesa ${drawer.table.number} · ${tempCount} item(ns)`);
         setTemp([]);
         if ("queued" in res) {
@@ -231,7 +233,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   // itens lançados OFFLINE desta comanda (ainda na fila) — entram no total OTIMISTA pra a tela mostrar
   // o cálculo mesmo sem net (some quando sincroniza e o servidor devolve o consumo real).
-  const myPendingCents = pendingLines.filter((p) => drawer?.tabId != null && p.tabId === drawer.tabId).reduce((s, p) => s + p.qty * p.unitPriceCents, 0);
+  // soma pendente de UMA mesa (por número) — usado no card (grid) e no total do drawer, mesma fonte
+  const pendingForTable = (n?: number) => (n == null ? 0 : pendingLines.filter((p) => p.tableNumber === n).reduce((s, p) => s + p.qty * p.unitPriceCents, 0));
+  const myPendingCents = pendingForTable(drawer?.table.number);
   const consumo = (comanda?.consumoCents ?? 0) + myPendingCents;
   const cover = comanda?.coverCents ?? 0;
   const people = comanda?.tab.people_count ?? 1;
@@ -406,7 +410,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }
 
   // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
-  const rank = (t: TableCard) => (t.contaCalled ? 0 : t.tabId ? 1 : 2);
+  const rank = (t: TableCard) => (t.contaCalled ? 0 : (t.tabId || pendingForTable(t.number) > 0) ? 1 : 2);
   const areas = useMemo(() => {
     const g: Record<string, TableCard[]> = {};
     for (const t of tables) (g[t.area || "salao"] ??= []).push(t);
@@ -416,7 +420,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, [tables]);
 
   const cats = categories.filter((c) => c.products.length);
-  const myPending = pendingLines.filter((p) => drawer?.tabId != null && p.tabId === drawer.tabId); // itens offline desta comanda
+  const myPending = pendingLines.filter((p) => drawer != null && p.tableNumber === drawer.table.number); // itens offline desta mesa
 
   return (
     <>
@@ -449,7 +453,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             <h2 className="mb-2 text-sm font-extrabold capitalize text-ink">{area === "balcao" ? "Balcão" : area}</h2>
             <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
               {list.map((t) => {
-                const oc = !!t.tabId;
+                const pendCents = pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
+                const oc = !!t.tabId || pendCents > 0;       // pendente já deixa a mesa "ocupada" no card
+                const shownTotal = t.openTotalCents + pendCents; // card mostra servidor + pendente (fonte única)
                 const conta = t.contaCalled; // pediu a conta → âmbar pulsando, no topo
                 const topColor = conta ? "#D97706" : oc ? "var(--brand-600)" : "#16A34A";
                 return (
@@ -460,8 +466,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     <span className={`text-3xl font-extrabold ${conta ? "text-amber-600" : oc ? "text-ink" : "text-lime"}`}>{t.number}</span>
                     {oc ? (
                       <>
-                        <span className={`mt-0.5 text-[11px] font-bold tabular-nums ${conta ? "text-amber-600" : "text-brand-600"}`}>{brl(t.openTotalCents)}</span>
-                        <span className="text-[9px] text-[var(--text-faded)]">{agoMin(t.openedAt, now)}</span>
+                        <span className={`mt-0.5 text-[11px] font-bold tabular-nums ${conta ? "text-amber-600" : "text-brand-600"}`}>{brl(shownTotal)}</span>
+                        <span className="text-[9px] text-[var(--text-faded)]">{pendCents > 0 && !t.tabId ? "offline" : agoMin(t.openedAt, now)}</span>
                       </>
                     ) : <span className="mt-1 text-[10px] font-semibold text-lime">Livre</span>}
                   </button>
