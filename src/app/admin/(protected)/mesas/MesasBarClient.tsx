@@ -93,14 +93,17 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) { // OFFLINE: cache instantâneo (não pendura no fetch)
+      const cch = await cacheGet<TableCard[]>("tables"); if (cch) setTables(cch); return;
+    }
     try {
-      const r = await fetchTimeout("/api/mesas", { cache: "no-store" });
+      const r = await fetchTimeout("/api/mesas", { cache: "no-store" }, 3000);
       const d = await r.json();
       setTables(d.tables ?? []);
       if (typeof d.offlineEnabled === "boolean") setOfflineOn(d.offlineEnabled);
       cacheSet("tables", d.tables ?? []); // Peça 1: espelho pra ver as mesas offline
     } catch {
-      const cch = await cacheGet<TableCard[]>("tables"); // offline: último estado bom das mesas
+      const cch = await cacheGet<TableCard[]>("tables"); // net caiu no meio → último estado bom
       if (cch) setTables(cch);
     }
   }, []);
@@ -132,20 +135,24 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, [offlineOn, drawer, loadTables]);
 
   async function loadComanda(tabId: number) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) { // OFFLINE: cache instantâneo (não espera o servidor ~1min)
+      setComanda(await cacheGet<Comanda>("comanda:" + tabId)); return;
+    }
     try {
-      const r = await fetchTimeout(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
+      const r = await fetchTimeout(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" }, 3000);
       if (!r.ok) throw new Error("comanda indisponível");
       const d = await r.json();
       setComanda(d);
       cacheSet("comanda:" + tabId, d); // Peça 1: guarda pra abrir a comanda offline com os itens reais
     } catch {
-      setComanda(await cacheGet<Comanda>("comanda:" + tabId)); // offline: serve do cache (null = nunca vista online)
+      setComanda(await cacheGet<Comanda>("comanda:" + tabId)); // net caiu no meio → cache (null = nunca vista online)
     }
   }
 
   function clickTable(t: TableCard) {
     setErr(""); setTemp([]); setPax(1); setWaiter(selfWaiterId ?? "");
     if (t.tabId) { setDrawer({ table: t, tabId: t.tabId }); setView("comanda"); void loadComanda(t.tabId); }
+    else if (pendingLines.some((p) => p.tableNumber === t.number)) { setDrawer({ table: t, tabId: null }); setView("comanda"); setComanda(null); } // mesa aberta OFFLINE (só na fila) → já vê a comanda com os pendentes + Fechar conta
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
   function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setSplitTroco(0); setSentToCaixa(false); }
