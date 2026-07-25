@@ -110,8 +110,16 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     const onChange = async () => {
       if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
       setPendingLines((p) => (p.length ? [] : p));
-      if (drawer?.tabId) await loadComanda(drawer.tabId);
-      loadTables();
+      await loadTables();
+      if (!drawer) return;
+      if (drawer.tabId) { await loadComanda(drawer.tabId); return; }
+      // mesa NOVA aberta offline que acabou de subir: acha o tabId real pelo número e re-vincula o drawer
+      try {
+        const r = await fetchTimeout("/api/mesas", { cache: "no-store" });
+        const d = await r.json();
+        const t = (d.tables ?? []).find((x: TableCard) => x.number === drawer.table.number && x.tabId);
+        if (t?.tabId) { setDrawer({ table: t, tabId: t.tabId }); await loadComanda(t.tabId); }
+      } catch { /* offline de novo — mantém */ }
     };
     window.addEventListener(QUEUE_EVENT, onChange);
     return () => window.removeEventListener(QUEUE_EVENT, onChange);
@@ -174,36 +182,36 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     try {
       const items = temp.map((l) => ({ productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds, grams: l.grams, note: l.note }));
 
-      // FATIA 2 — comanda JÁ aberta + flag: aguenta queda. Enfileira com opId (a Fatia 1 impede
-      // duplicar no replay). Rascunho (abrir mesa nova) precisa de id temporário → segue online-only.
-      if (offlineOn && drawer.tabId) {
+      // FATIA 2/3 offline (flag on): comanda JÁ aberta OU mesa NOVA. Enfileira com opId (a Fatia 1
+      // impede duplicar no replay). Mesa nova vai por NÚMERO — no sync o servidor procura-ou-cria o
+      // tab (getOrCreateOpenTab), então vários lançamentos offline na mesma mesa nova caem no MESMO
+      // tab. Sem id-temporário frágil. submitOrQueue tenta online (com timeout) e enfileira se cair.
+      if (offlineOn) {
         const opId = genOpId();
         const num = drawer.table.number;
+        const body = drawer.tabId
+          ? { tabId: drawer.tabId, items, opId }
+          : { tableNumber: num, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items, opId };
         const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
-        const res = await submitOrQueue("/api/mesas/lancar", { tabId: drawer.tabId, items, opId }, `Mesa ${drawer.table.number} · ${tempCount} item(ns)`);
+        const res = await submitOrQueue("/api/mesas/lancar", body, `Mesa ${num} · ${tempCount} item(ns)`);
         setTemp([]);
         if ("queued" in res) {
-          // offline: mostra otimista, marcado como pendente; sobe sozinho ao reconectar
-          setPendingLines((p) => [...p, ...pend]);
-          setView("comanda");
+          setPendingLines((p) => [...p, ...pend]); // otimista: card + drawer somam (fonte única por número)
+          setView("comanda"); loadTables();        // grid já mostra a mesa ocupada
         } else {
-          setView("comanda"); await loadComanda(drawer.tabId); loadTables();
+          // subiu online: pega o tabId real (mesa nova retorna o novo) e recarrega fresco
+          const tabId = drawer.tabId ?? Number((res.data as { tabId?: number })?.tabId);
+          if (Number.isFinite(tabId) && tabId > 0) { setDrawer({ table: drawer.table, tabId }); await loadComanda(tabId); }
+          loadTables(); setView("comanda");
         }
         return;
       }
 
-      // rascunho (abrir mesa nova) ou flag off → fetch DIRETO, mas com TIMEOUT (navigator.onLine
-      // mente; sem timeout o botão travava pendurado). Se estourar num rascunho offline, avisa claro
-      // que abrir mesa nova é Fatia 3 (ainda online-only).
+      // flag OFF → fetch direto (comportamento ORIGINAL, sem offline — Medellín/Cantinho intactos)
       const body = drawer.tabId
         ? { tabId: drawer.tabId, items }
         : { tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items };
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 5000);
-      let r: Response;
-      try { r = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal }); }
-      catch { if (!drawer.tabId) { setErr("Sem conexão: abrir mesa nova ainda precisa de net. Dá pra seguir lançando nas mesas JÁ abertas."); return; } throw new Error("Sem conexão — tente de novo."); }
-      finally { clearTimeout(to); }
+      const r = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui lançar.");
       const tabId = Number(d.tabId);
@@ -597,7 +605,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                 {/* COMANDA consolidada */}
                 <div className="rounded-xl border border-line">
                   <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-xs font-bold uppercase text-[var(--text-muted)]"><IconReceipt width={14} height={14} /> Na comanda</div>
-                  {consolid.length === 0 ? <p className="px-3 py-4 text-sm text-[var(--text-faded)]">Comanda vazia.</p> : (
+                  {consolid.length === 0 && myPending.length === 0 ? <p className="px-3 py-4 text-sm text-[var(--text-faded)]">Comanda vazia.</p> : consolid.length === 0 ? null : (
                     <ul className="divide-y divide-line">
                       {consolid.map((it, i) => (
                         <li key={i} className="flex items-start justify-between gap-2 px-3 py-2 text-sm">
