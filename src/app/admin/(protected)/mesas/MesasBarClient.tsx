@@ -108,6 +108,25 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     }
   }, []);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
+  // OFFLINE: pré-aquece o cache de TODAS as comandas abertas enquanto tem net, pra qualquer mesa abrir
+  // com os itens offline (não só a que já foi aberta online). Roda na entrada e ao reconectar.
+  const warmComandas = useCallback(async () => {
+    if (!offlineOn || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+    try {
+      const r = await fetchTimeout("/api/mesas", { cache: "no-store" }, 3000);
+      const tbls: TableCard[] = (await r.json()).tables ?? [];
+      for (const t of tbls) {
+        if (!t.tabId) continue;
+        try { const rc = await fetchTimeout(`/api/mesas/comanda?tabId=${t.tabId}`, { cache: "no-store" }, 3000); if (rc.ok) await cacheSet("comanda:" + t.tabId, await rc.json()); } catch { /* pula essa */ }
+      }
+    } catch { /* offline — mantém o que tem */ }
+  }, [offlineOn]);
+  useEffect(() => {
+    void warmComandas();
+    const onOnline = () => void warmComandas();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [warmComandas]);
   useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
   // offline: aquece a chave de assinatura do QZ enquanto tem net (pra imprimir estação na queda)
   useEffect(() => { if (offlineOn) void warmQzSignKey(); }, [offlineOn]);
