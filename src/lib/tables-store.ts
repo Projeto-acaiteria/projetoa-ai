@@ -273,7 +273,7 @@ export async function getOrCreateTableByNumber(tableNumber: number, storeId?: st
  *  cada um com seus tab_order_items. Itens de cozinha+bar viram 2 tab_orders → cada um vai pra
  *  sua impressora/KDS, mas a comanda (tab) soma tudo. Açaí (sem station) = 1 tab_order 'cozinha'.
  *  Baixa estoque por ficha técnica. Retorna os tab_orders criados (um por estação). */
-export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: string, note?: string): Promise<TabOrder[]> {
+export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: string, note?: string, prePrinted = false): Promise<TabOrder[]> {
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
   // a comanda tem que ser DESTA loja (anti-IDOR: não injetar item em comanda alheia)
@@ -369,7 +369,7 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   for (const [station, group] of byStation) {
     const { data: order, error } = await d
       .from("tab_orders")
-      .insert({ store_id: sid, tab_id: tabId, status: "pendente", station, note: note ?? null })
+      .insert({ store_id: sid, tab_id: tabId, status: "pendente", station, note: note ?? null, pre_printed: prePrinted })
       .select()
       .single();
     if (error) throw error;
@@ -410,6 +410,7 @@ export type KdsOrder = {
   table_label: string;
   note: string | null;
   items: KdsItem[];
+  pre_printed?: boolean; // já impresso no lançar offline → o vigia headless pula (não duplica)
 };
 
 export const KDS_STATUSES = ["pendente", "preparando", "pronto"] as const;
@@ -426,12 +427,12 @@ export async function getStationOrders(stations: string[]): Promise<KdsOrder[]> 
   const sid = await resolveStoreId();
   const { data: orders } = await d
     .from("tab_orders")
-    .select("id, tab_id, station, status, note, created_at")
+    .select("id, tab_id, station, status, note, created_at, pre_printed")
     .eq("store_id", sid)
     .in("station", stations)
     .in("status", KDS_STATUSES as unknown as string[])
     .order("created_at");
-  const list = (orders ?? []) as Array<{ id: number; tab_id: number; station: string; status: string; note: string | null; created_at: string }>;
+  const list = (orders ?? []) as Array<{ id: number; tab_id: number; station: string; status: string; note: string | null; created_at: string; pre_printed: boolean | null }>;
   if (!list.length) return [];
 
   const orderIds = list.map((o) => o.id);
@@ -456,6 +457,7 @@ export async function getStationOrders(stations: string[]): Promise<KdsOrder[]> 
     table_label: labelByTab.get(o.tab_id) ?? "Balcão",
     note: o.note,
     items: byOrder.get(o.id) ?? [],
+    pre_printed: !!o.pre_printed,
   }));
 }
 

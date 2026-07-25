@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // abre-ou-pega a comanda só depois, e se o lançamento falhar numa comanda RECÉM-criada, faz rollback
 // (apaga a comanda) — não deixa nascer mesa-fantasma vazia.
 export async function POST(req: Request) {
-  let b: { tabId?: number; tableNumber?: number; pax?: number; waiterId?: string; items?: { productId: string; qty: number; modifierIds?: string[]; grams?: number }[]; note?: string; opId?: string };
+  let b: { tabId?: number; tableNumber?: number; pax?: number; waiterId?: string; items?: { productId: string; qty: number; modifierIds?: string[]; grams?: number }[]; note?: string; opId?: string; prePrinted?: boolean };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
   const sel = Array.isArray(b.items) ? b.items : [];
   if (!sel.length) return NextResponse.json({ error: "Nenhum item." }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
       // 2) comanda já existe (adicionar item) → lança direto, sem rollback
       if (b.tabId != null) {
-        const orders = await addTabItems(b.tabId, lines, storeId, note);
+        const orders = await addTabItems(b.tabId, lines, storeId, note, !!b.prePrinted);
         return { ok: true, tabId: b.tabId, stations: [...new Set(orders.map((o) => o.station))] };
       }
 
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
       // 4) lança; se falhar e a comanda acabou de nascer, ROLLBACK (apaga) — sem mesa-fantasma
       try {
-        const orders = await addTabItems(Number(tab.id), lines, storeId, note);
+        const orders = await addTabItems(Number(tab.id), lines, storeId, note, !!b.prePrinted);
         return { ok: true, tabId: Number(tab.id), stations: [...new Set(orders.map((o) => o.station))] };
       } catch (e) {
         if (createdNow) { try { await d.from("tabs").delete().eq("id", tab.id).eq("store_id", storeId); } catch {} }

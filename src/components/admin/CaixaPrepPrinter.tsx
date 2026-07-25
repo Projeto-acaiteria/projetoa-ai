@@ -12,7 +12,7 @@ import { getStationPrinter } from "@/lib/qz";
 // estação — SÓ se essa estação tem impressora configurada nesta máquina (senão pula, sem popup do
 // navegador). Ligado por padrão; desliga ("0") em setup distribuído com telas Preparo próprias. — ComandaPRO 3.9
 type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null };
-type KdsOrder = { id: number; station: string; status: string; created_at: string; table_label: string; note: string | null; items: KdsItem[] };
+type KdsOrder = { id: number; station: string; status: string; created_at: string; table_label: string; note: string | null; items: KdsItem[]; pre_printed?: boolean };
 
 export const CAIXA_PREP_KEY = "autoprint:caixa-preparo";
 
@@ -44,6 +44,7 @@ export default function CaixaPrepPrinter({ stations, loja }: { stations: string[
       for (const o of list) {
         if (o.status !== "pendente" || printedRef.current.has(o.id)) continue;
         printedRef.current.add(o.id); // marca já (mesmo se pular a impressão, não re-tenta em loop)
+        if (o.pre_printed) continue; // JÁ saiu no lançar offline (mt-37) → não reimprime no sync (dobro)
         if (!getStationPrinter(o.station)) continue; // sem impressora dessa estação AQUI → pula (sem iframe)
         void printTicket(
           stationTicketHtml({

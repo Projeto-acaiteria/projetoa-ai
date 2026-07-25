@@ -216,7 +216,10 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           ? { tabId: drawer.tabId, items, opId }
           : { tableNumber: num, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items, opId };
         const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
-        const res = await submitOrQueue("/api/mesas/lancar", body, `Mesa ${num} · ${tempCount} item(ns)`);
+        // queuedExtra prePrinted: só o corpo ENFILEIRADO leva — no sync o servidor marca o pedido
+        // como já impresso (imprimi local abaixo) e o vigia headless NÃO reimprime. Online não leva
+        // (post imediato) → quem imprime é o vigia, sem duplicar.
+        const res = await submitOrQueue("/api/mesas/lancar", body, `Mesa ${num} · ${tempCount} item(ns)`, { prePrinted: true });
         const pendTemp = temp; // captura antes de limpar (o print de estação usa)
         setTemp([]);
         if ("queued" in res) {

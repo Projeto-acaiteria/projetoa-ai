@@ -51,7 +51,10 @@ export async function fetchTimeout(url: string, init: RequestInit, ms = 5000): P
   finally { clearTimeout(t); }
 }
 
-export async function submitOrQueue(url: string, body: unknown, label: string): Promise<{ ok: true; data: unknown } | { queued: true }> {
+// queuedExtra: campos mesclados SÓ no corpo ENFILEIRADO (não no post online). Ex.: prePrinted=true —
+// o replay avisa o servidor que a estação já foi impressa localmente no lançar offline, pra o vigia
+// headless não reimprimir no sync. Online (post imediato) não leva isso: quem imprime é o vigia.
+export async function submitOrQueue(url: string, body: unknown, label: string, queuedExtra?: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { queued: true }> {
   const payload = JSON.stringify(body);
   // navigator.onLine === false é confiável (sem interface); === true NÃO garante internet → tenta com
   // timeout e cai pra fila se não responder. Assim não trava esperando um fetch que nunca volta.
@@ -66,7 +69,8 @@ export async function submitOrQueue(url: string, body: unknown, label: string): 
       if ((e as { server?: boolean }).server) throw e;
     }
   }
-  await enqueue({ id: newId(), url, method: "POST", body: payload, label, createdAt: Date.now() });
+  const queuedBody = queuedExtra ? JSON.stringify({ ...(body as Record<string, unknown>), ...queuedExtra }) : payload;
+  await enqueue({ id: newId(), url, method: "POST", body: queuedBody, label, createdAt: Date.now() });
   notifyChange();
   return { queued: true };
 }
