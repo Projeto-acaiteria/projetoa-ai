@@ -82,17 +82,24 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [moveConfirm, setMoveConfirm] = useState<{ number: number; area: string; occupied: boolean } | null>(null);
   // Fatia 2: itens lançados OFFLINE numa comanda aberta, mostrados otimistas até a fila subir.
   const [pendingLines, setPendingLines] = useState<{ tabId: number; label: string; qty: number; unitPriceCents: number }[]>([]);
+  // flag offline: inicia com o prop (pode vir velho do cache do PWA) e AUTOCORRIGE pela /api/mesas fresca
+  const [offlineOn, setOfflineOn] = useState(offlineEnabled);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
-    try { const r = await fetch("/api/mesas", { cache: "no-store" }); setTables((await r.json()).tables ?? []); } catch { /* mantém */ }
+    try {
+      const r = await fetch("/api/mesas", { cache: "no-store" });
+      const d = await r.json();
+      setTables(d.tables ?? []);
+      if (typeof d.offlineEnabled === "boolean") setOfflineOn(d.offlineEnabled);
+    } catch { /* mantém */ }
   }, []);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
   useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
   // Fatia 2: quando a fila offline drena (pendentes → 0), reconcilia a tela com o servidor fresco
   // (o flush em si é do OfflineIndicator, ao reconectar). Tira os "pendente" e recarrega a comanda.
   useEffect(() => {
-    if (!offlineEnabled) return;
+    if (!offlineOn) return;
     const onChange = async () => {
       if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
       setPendingLines((p) => (p.length ? [] : p));
@@ -101,7 +108,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     };
     window.addEventListener(QUEUE_EVENT, onChange);
     return () => window.removeEventListener(QUEUE_EVENT, onChange);
-  }, [offlineEnabled, drawer, loadTables]);
+  }, [offlineOn, drawer, loadTables]);
 
   async function loadComanda(tabId: number) {
     const r = await fetch(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
@@ -155,7 +162,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
       // FATIA 2 — comanda JÁ aberta + flag: aguenta queda. Enfileira com opId (a Fatia 1 impede
       // duplicar no replay). Rascunho (abrir mesa nova) precisa de id temporário → segue online-only.
-      if (offlineEnabled && drawer.tabId) {
+      if (offlineOn && drawer.tabId) {
         const opId = genOpId();
         const tid = drawer.tabId;
         const pend = temp.map((l) => ({ tabId: tid, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
@@ -400,7 +407,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     <>
       {/* Fatia 2: barra de status offline (sem conexão / pendentes) — só quando o flag da loja liga.
           Ela drena a fila ao reconectar; o efeito acima reconcilia a comanda quando zera. */}
-      {offlineEnabled && <OfflineIndicator />}
+      {offlineOn && <OfflineIndicator />}
 
       {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez).
           Garçom (canClose=false) não vê QZ (não imprime — quem imprime é o caixa) nem gerencia mesas. */}
