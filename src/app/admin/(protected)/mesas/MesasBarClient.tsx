@@ -171,16 +171,18 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         return;
       }
 
-      // rascunho offline (mesa nova): não dá pra abrir sem net ainda (Fatia 3) — avisa em vez de travar feio
-      if (offlineEnabled && !drawer.tabId && typeof navigator !== "undefined" && !navigator.onLine) {
-        setErr("Sem conexão: abrir mesa nova volta quando a net voltar. Dá pra seguir lançando nas mesas já abertas.");
-        return;
-      }
-
+      // rascunho (abrir mesa nova) ou flag off → fetch DIRETO, mas com TIMEOUT (navigator.onLine
+      // mente; sem timeout o botão travava pendurado). Se estourar num rascunho offline, avisa claro
+      // que abrir mesa nova é Fatia 3 (ainda online-only).
       const body = drawer.tabId
         ? { tabId: drawer.tabId, items }
         : { tableNumber: drawer.table.number, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items };
-      const r = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 5000);
+      let r: Response;
+      try { r = await fetch("/api/mesas/lancar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal }); }
+      catch { if (!drawer.tabId) { setErr("Sem conexão: abrir mesa nova ainda precisa de net. Dá pra seguir lançando nas mesas JÁ abertas."); return; } throw new Error("Sem conexão — tente de novo."); }
+      finally { clearTimeout(to); }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui lançar.");
       const tabId = Number(d.tabId);

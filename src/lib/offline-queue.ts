@@ -42,15 +42,27 @@ function notifyChange() { if (typeof window !== "undefined") window.dispatchEven
 
 /** Envia agora (se online) ou enfileira (se offline / a net cair no meio).
  *  Retorna {ok:true,data} quando o servidor confirmou, ou {queued:true} quando ficou pendente. */
+// fetch com TIMEOUT — navigator.onLine é falso-positivo (interface up, sem internet real): sem isso
+// o fetch fica pendurado e a UI trava (botão "apagado"). Se estourar/abortar, vira falha de rede.
+async function fetchTimeout(url: string, init: RequestInit, ms = 5000): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...init, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 export async function submitOrQueue(url: string, body: unknown, label: string): Promise<{ ok: true; data: unknown } | { queued: true }> {
   const payload = JSON.stringify(body);
-  if (typeof navigator !== "undefined" && navigator.onLine) {
+  // navigator.onLine === false é confiável (sem interface); === true NÃO garante internet → tenta com
+  // timeout e cai pra fila se não responder. Assim não trava esperando um fetch que nunca volta.
+  const maybeOnline = typeof navigator === "undefined" || navigator.onLine;
+  if (maybeOnline) {
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      const r = await fetchTimeout(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw Object.assign(new Error(d.error || "falha"), { server: true }); }
       return { ok: true, data: await r.json().catch(() => ({})) };
     } catch (e) {
-      // erro do SERVIDOR (validação etc.) NÃO enfileira — repropaga; só falha de REDE enfileira
+      // erro do SERVIDOR (validação etc.) NÃO enfileira — repropaga; timeout/rede/abort enfileira
       if ((e as { server?: boolean }).server) throw e;
     }
   }
@@ -66,7 +78,7 @@ export async function flushQueue(): Promise<number> {
   let sent = 0;
   for (const w of await getPending()) {
     try {
-      const r = await fetch(w.url, { method: w.method, headers: { "Content-Type": "application/json" }, body: w.body });
+      const r = await fetchTimeout(w.url, { method: w.method, headers: { "Content-Type": "application/json" }, body: w.body });
       if (r.ok) { await removePending(w.id); sent++; }
       else if (r.status >= 400 && r.status < 500) { await removePending(w.id); } // request inválido: não retorna
       // 5xx: mantém na fila pra próxima
