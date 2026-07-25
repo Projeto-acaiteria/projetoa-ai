@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { getOpenSession } from "@/lib/cash-store";
-import { getTabFull, addPayment, closeTab, markTabCallsAttended } from "@/lib/tables-store";
+import { getTabFull, addPayment, closeTab, markTabCallsAttended, getOrCreateTableByNumber } from "@/lib/tables-store";
+import { db } from "@/lib/supabase";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import { withIdempotency, httpError } from "@/lib/idempotency";
@@ -16,20 +17,30 @@ export const dynamic = "force-dynamic";
 const PAYS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
 
 export async function POST(req: Request) {
-  let b: { tabId?: number; applyFee?: boolean; applyCover?: boolean; method?: string; machineId?: string; parcelas?: number; customerPhone?: string; customerName?: string; opId?: string };
+  let b: { tabId?: number; tableNumber?: number; applyFee?: boolean; applyCover?: boolean; method?: string; machineId?: string; parcelas?: number; customerPhone?: string; customerName?: string; opId?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
-  if (typeof b.tabId !== "number" || !Number.isFinite(b.tabId)) {
-    return NextResponse.json({ error: "tabId é obrigatório" }, { status: 400 });
+  const hasTab = typeof b.tabId === "number" && Number.isFinite(b.tabId);
+  const hasNum = typeof b.tableNumber === "number" && Number.isFinite(b.tableNumber);
+  if (!hasTab && !hasNum) {
+    return NextResponse.json({ error: "tabId ou tableNumber é obrigatório" }, { status: 400 });
   }
   const method: PaymentMethod = PAYS.includes(b.method as PaymentMethod) ? (b.method as PaymentMethod) : "dinheiro";
 
-  const tabId = b.tabId;
   try {
     const sid = await resolveStoreId();
     // idempotência (offline Fatia 1): sem opId roda igual a hoje; com opId, replay devolve o mesmo
     // fechamento (não fecha de novo nem cobra 2×). closeTab já é idempotente por status; o op_id
     // garante a MESMA resposta e barra um 2º pagamento se o replay chegar antes do status atualizar.
     const { result } = await withIdempotency(b.opId, sid, "fechar", async () => {
+      // resolve o tabId: por número quando a mesa nasceu OFFLINE (só vira tabId real no sync, e o
+      // fechar sincroniza DEPOIS dos lançamentos — por isso a comanda já existe aqui, achável por número)
+      let tabId = hasTab ? (b.tabId as number) : 0;
+      if (!hasTab) {
+        const tableId = await getOrCreateTableByNumber(b.tableNumber as number, sid);
+        const { data } = await db().from("tabs").select("id").eq("store_id", sid).eq("table_id", tableId).eq("status", "aberta").maybeSingle();
+        if (!data) return { ok: true, alreadyClosed: true }; // nada aberto pra fechar (já fechou/sync anterior)
+        tabId = Number((data as { id: number }).id);
+      }
       // FRESCO do banco — nunca o total da tela (pode ter entrado pedido no meio)
       const full = await getTabFull(tabId, sid);
       if (full.tab.status === "fechada") return { ok: true, alreadyClosed: true };

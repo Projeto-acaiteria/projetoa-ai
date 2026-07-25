@@ -87,6 +87,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [pendingLines, setPendingLines] = useState<{ tableNumber: number; label: string; qty: number; unitPriceCents: number }[]>([]);
   // flag offline: inicia com o prop (pode vir velho do cache do PWA) e AUTOCORRIGE pela /api/mesas fresca
   const [offlineOn, setOfflineOn] = useState(offlineEnabled);
+  // Peça 3: mesas FECHADAS offline (por número) — somem da tela como provisórias até a fila subir
+  const [offlineClosed, setOfflineClosed] = useState<number[]>([]);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -110,6 +112,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     const onChange = async () => {
       if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
       setPendingLines((p) => (p.length ? [] : p));
+      setOfflineClosed((c) => (c.length ? [] : c)); // fechamentos subiram → some o "provisório", vale o servidor
       await loadTables();
       if (!drawer) return;
       if (drawer.tabId) { await loadComanda(drawer.tabId); return; }
@@ -311,13 +314,32 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }
 
   async function fechar() {
-    if (!drawer?.tabId || busy) return;
+    if (!drawer || busy) return; // tabId OU número (mesa aberta offline fecha por número)
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, applyFee: fee, applyCover: coverOn, method, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
-      // cupom de fechamento: itens (mods no nome + totalCents que JÁ inclui os mods) + total fresco do servidor
+      const numMesa = drawer.table.number;
+      const body = {
+        ...(drawer.tabId ? { tabId: drawer.tabId } : { tableNumber: numMesa }),
+        applyFee: fee, applyCover: coverOn, method,
+        machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined,
+        parcelas: method === "credito" ? parcelas : 1,
+      };
+      // FATIA 3 offline: enfileira o fechamento (opId idempotente; resolve por número no sync). Sem net,
+      // a venda é PROVISÓRIA até subir — o cupom sai local (QZ) e a mesa some da tela; a fila mostra pendente.
+      let closedTotal = grand; // cupom: offline usa o total local; online usa o total fresco do servidor
+      let queued = false;
+      if (offlineOn) {
+        const res = await submitOrQueue("/api/mesas/fechar-conta", { ...body, opId: genOpId() }, `Fechar Mesa ${numMesa}`);
+        if ("queued" in res) queued = true;
+        else closedTotal = Number((res.data as { totalCents?: number })?.totalCents ?? grand);
+      } else {
+        const r = await fetch("/api/mesas/fechar-conta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Não consegui fechar.");
+        closedTotal = d.totalCents ?? grand;
+      }
+      // cupom de fechamento: itens do servidor (consolid) + os lançados OFFLINE (myPending) — senão o
+      // cupom offline sairia sem os itens novos. total = fresco do servidor (online) ou local (offline).
       const nowD = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
       const dest = drawer.table.area === "balcao" ? `Balcão ${drawer.table.number}` : `Mesa ${drawer.table.number}`;
       // recebido/troco em dinheiro → sai no cupom. Dois casos: fluxo simples (campo Recebido) OU split que
@@ -331,16 +353,25 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         dateLabel: `${p2(nowD.getDate())}/${p2(nowD.getMonth() + 1)} ${p2(nowD.getHours())}:${p2(nowD.getMinutes())}`,
         modeLabel: dest, paymentLabel: (PAYS.find(([id]) => id === method) ?? [])[1],
         ...(cupomReceived > 0 ? { receivedCents: cupomReceived, changeCents: cupomTroco } : {}),
-        items: consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
-        subtotalCents: consumo, // produtos, sem couvert/taxa
+        items: [
+          ...consolid.map((it) => ({ qty: it.qty, name: it.name + (it.mods?.length ? ` (${it.mods.map((m) => m.name).join(", ")})` : "") + (it.note ? ` [${it.note}]` : ""), totalCents: it.qty * it.unitPriceCents })),
+          ...myPending.map((p) => ({ qty: p.qty, name: p.label, totalCents: p.qty * p.unitPriceCents })), // itens lançados offline
+        ],
+        subtotalCents: consumo, // produtos (JÁ inclui os offline), sem couvert/taxa
         extras: [
           ...(coverCharged > 0 ? [{ label: "Couvert", cents: coverCharged }] : []),
           ...(serviceFee > 0 ? [{ label: "Taxa de serviço 10%", cents: serviceFee }] : []),
         ],
-        totalCents: d.totalCents ?? grand,
+        totalCents: closedTotal,
       }));
       // abre a gaveta na venda em dinheiro (se a máquina tem gaveta ligada) — igual ao balcão
       if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
+      if (queued) {
+        // fechamento PROVISÓRIO: some da tela local (número entra em offlineClosed) e limpa o pendente
+        // dessa mesa; a fila mostra a escrita pendente. Vira definitivo quando sincroniza.
+        setOfflineClosed((c) => [...c, numMesa]);
+        setPendingLines((p) => p.filter((x) => x.tableNumber !== numMesa));
+      }
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
     finally { setBusy(false); }
@@ -418,7 +449,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }
 
   // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
-  const rank = (t: TableCard) => (t.contaCalled ? 0 : (t.tabId || pendingForTable(t.number) > 0) ? 1 : 2);
+  const rank = (t: TableCard) => (offlineClosed.includes(t.number) ? 2 : t.contaCalled ? 0 : (t.tabId || pendingForTable(t.number) > 0) ? 1 : 2);
   const areas = useMemo(() => {
     const g: Record<string, TableCard[]> = {};
     for (const t of tables) (g[t.area || "salao"] ??= []).push(t);
@@ -461,8 +492,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             <h2 className="mb-2 text-sm font-extrabold capitalize text-ink">{area === "balcao" ? "Balcão" : area}</h2>
             <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
               {list.map((t) => {
-                const pendCents = pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
-                const oc = !!t.tabId || pendCents > 0;       // pendente já deixa a mesa "ocupada" no card
+                const closedOff = offlineClosed.includes(t.number); // fechada offline → livre (provisório até sync)
+                const pendCents = closedOff ? 0 : pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
+                const oc = !closedOff && (!!t.tabId || pendCents > 0);       // pendente deixa a mesa "ocupada" no card
                 const shownTotal = t.openTotalCents + pendCents; // card mostra servidor + pendente (fonte única)
                 const conta = t.contaCalled; // pediu a conta → âmbar pulsando, no topo
                 const topColor = conta ? "#D97706" : oc ? "var(--brand-600)" : "#16A34A";
