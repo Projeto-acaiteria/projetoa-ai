@@ -44,7 +44,7 @@ function notifyChange() { if (typeof window !== "undefined") window.dispatchEven
  *  Retorna {ok:true,data} quando o servidor confirmou, ou {queued:true} quando ficou pendente. */
 // fetch com TIMEOUT — navigator.onLine é falso-positivo (interface up, sem internet real): sem isso
 // o fetch fica pendurado e a UI trava (botão "apagado"). Se estourar/abortar, vira falha de rede.
-async function fetchTimeout(url: string, init: RequestInit, ms = 5000): Promise<Response> {
+export async function fetchTimeout(url: string, init: RequestInit, ms = 5000): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(url, { ...init, signal: ctrl.signal }); }

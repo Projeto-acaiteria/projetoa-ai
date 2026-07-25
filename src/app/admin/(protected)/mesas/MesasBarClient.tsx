@@ -9,7 +9,8 @@ import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag, IconMinus, IconTrash } from "@/components/Icons";
-import { submitOrQueue, pendingCount, QUEUE_EVENT } from "@/lib/offline-queue";
+import { submitOrQueue, pendingCount, QUEUE_EVENT, fetchTimeout } from "@/lib/offline-queue";
+import { cacheSet, cacheGet } from "@/lib/offline-cache";
 import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
@@ -88,11 +89,15 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   const loadTables = useCallback(async () => {
     try {
-      const r = await fetch("/api/mesas", { cache: "no-store" });
+      const r = await fetchTimeout("/api/mesas", { cache: "no-store" });
       const d = await r.json();
       setTables(d.tables ?? []);
       if (typeof d.offlineEnabled === "boolean") setOfflineOn(d.offlineEnabled);
-    } catch { /* mantém */ }
+      cacheSet("tables", d.tables ?? []); // Peça 1: espelho pra ver as mesas offline
+    } catch {
+      const cch = await cacheGet<TableCard[]>("tables"); // offline: último estado bom das mesas
+      if (cch) setTables(cch);
+    }
   }, []);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
   useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
@@ -111,8 +116,15 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, [offlineOn, drawer, loadTables]);
 
   async function loadComanda(tabId: number) {
-    const r = await fetch(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
-    setComanda(await r.json());
+    try {
+      const r = await fetchTimeout(`/api/mesas/comanda?tabId=${tabId}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("comanda indisponível");
+      const d = await r.json();
+      setComanda(d);
+      cacheSet("comanda:" + tabId, d); // Peça 1: guarda pra abrir a comanda offline com os itens reais
+    } catch {
+      setComanda(await cacheGet<Comanda>("comanda:" + tabId)); // offline: serve do cache (null = nunca vista online)
+    }
   }
 
   function clickTable(t: TableCard) {
