@@ -217,9 +217,12 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           : { tableNumber: num, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items, opId };
         const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
         const res = await submitOrQueue("/api/mesas/lancar", body, `Mesa ${num} · ${tempCount} item(ns)`);
-        printStationTickets(temp); // lançamento aceito (fila ou servidor) → sai na impressora da estação, online+offline
+        const pendTemp = temp; // captura antes de limpar (o print de estação usa)
         setTemp([]);
         if ("queued" in res) {
+          // OFFLINE: o Preparo não tem como ver o pedido (só na fila local) → imprime a estação AQUI.
+          // Online quem imprime é o Preparo (autoprint) — não imprimir aqui evita ticket DUPLICADO.
+          printStationTickets(pendTemp);
           setPendingLines((p) => [...p, ...pend]); // otimista: card + drawer somam (fonte única por número)
           setView("comanda"); loadTables();        // grid já mostra a mesa ocupada
         } else {
