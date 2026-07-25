@@ -15,6 +15,7 @@ import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
+import { warmQzSignKey } from "@/lib/qz";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
@@ -105,6 +106,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, []);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
   useEffect(() => { tick.current = setInterval(() => setNow(Date.now()), 30000); return () => { if (tick.current) clearInterval(tick.current); }; }, []);
+  // offline: aquece a chave de assinatura do QZ enquanto tem net (pra imprimir estação na queda)
+  useEffect(() => { if (offlineOn) void warmQzSignKey(); }, [offlineOn]);
   // Fatia 2: quando a fila offline drena (pendentes → 0), reconcilia a tela com o servidor fresco
   // (o flush em si é do OfflineIndicator, ao reconectar). Tira os "pendente" e recarrega a comanda.
   useEffect(() => {

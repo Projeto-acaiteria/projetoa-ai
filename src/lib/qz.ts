@@ -8,9 +8,51 @@
 import { QZ_CERT } from "./qz-cert";
 import { parseScaleWeight } from "./scale";
 import { getPrintWidthMm } from "./print-config";
+import { cacheGet, cacheSet } from "./offline-cache";
 
 type QZ = any;
 let qzMod: QZ = null;
+
+// ── Assinatura OFFLINE (opção 1) ─────────────────────────────────────────────
+// O QZ assina cada print no servidor (/api/qz-sign). Sem net isso falha e a impressão de estação
+// não sai. Solução: cachear a chave (PKCS#8) uma vez ONLINE e assinar no navegador (Web Crypto,
+// RSASSA-PKCS1-v1_5 + SHA-512 → base64, IGUAL ao servidor, determinístico → o QZ aceita).
+const QZ_KEY_CACHE = "qz-key-pkcs8";
+let signKeyPromise: Promise<CryptoKey | null> | null = null;
+
+async function importPkcs8(pem: string): Promise<CryptoKey> {
+  const b64 = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey("pkcs8", der.buffer, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" }, false, ["sign"]);
+}
+
+/** Garante a chave local de assinatura: memória → IndexedDB → busca online (/api/qz-key) e cacheia. */
+async function ensureSignKey(): Promise<CryptoKey | null> {
+  if (!signKeyPromise) {
+    signKeyPromise = (async () => {
+      try {
+        let pem = await cacheGet<string>(QZ_KEY_CACHE); // persistido (sobrevive reload/offline)
+        if (!pem) {
+          const r = await fetch("/api/qz-key", { cache: "no-store" }); // só dá certo ONLINE (warm)
+          if (!r.ok) return null;
+          pem = await r.text();
+          if (pem) await cacheSet(QZ_KEY_CACHE, pem);
+        }
+        return pem ? await importPkcs8(pem) : null;
+      } catch { return null; }
+    })();
+  }
+  return signKeyPromise;
+}
+
+async function signLocal(toSign: string): Promise<string> {
+  const key = await ensureSignKey();
+  if (!key) throw new Error("sem chave local de assinatura");
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(toSign));
+  let bin = ""; const bytes = new Uint8Array(sig);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin); // base64 — mesmo formato do /api/qz-sign
+}
 
 async function getQz(): Promise<QZ> {
   if (qzMod) return qzMod;
@@ -19,15 +61,20 @@ async function getQz(): Promise<QZ> {
   // modo ASSINADO — com o override.crt na máquina, o QZ não pede "Allow"
   qz.security.setCertificatePromise((resolve: any) => resolve(QZ_CERT));
   if (qz.security.setSignatureAlgorithm) qz.security.setSignatureAlgorithm("SHA512");
+  // assina no SERVIDOR (online); se falhar (offline), assina LOCAL com a chave cacheada
   qz.security.setSignaturePromise((toSign: string) => (resolve: any, reject: any) => {
     fetch(`/api/qz-sign?request=${encodeURIComponent(toSign)}`)
-      .then((r) => r.text())
-      .then(resolve)
-      .catch(reject);
+      .then((r) => { if (!r.ok) throw new Error("qz-sign " + r.status); return r.text(); })
+      .then((sig) => { if (!sig) throw new Error("assinatura vazia"); resolve(sig); })
+      .catch(() => signLocal(toSign).then(resolve).catch(reject)); // offline → assinatura local
   });
   qzMod = qz;
   return qzMod;
 }
+
+/** Aquece a chave de assinatura local ENQUANTO tem net — chamar só em loja com offline ligado, pra
+ *  não cachear a chave em todo device (limita a exposição). Sem isso, offline não há como assinar. */
+export const warmQzSignKey = () => ensureSignKey();
 
 export async function qzConnect(): Promise<QZ> {
   const qz = await getQz();
