@@ -89,7 +89,6 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // flag offline: inicia com o prop (pode vir velho do cache do PWA) e AUTOCORRIGE pela /api/mesas fresca
   const [offlineOn, setOfflineOn] = useState(offlineEnabled);
   // Peça 3: mesas FECHADAS offline (por número) — somem da tela como provisórias até a fila subir
-  const [offlineClosed, setOfflineClosed] = useState<number[]>([]);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -137,7 +136,6 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     const onChange = async () => {
       if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
       setPendingLines((p) => (p.length ? [] : p));
-      setOfflineClosed((c) => (c.length ? [] : c)); // fechamentos subiram → some o "provisório", vale o servidor
       await loadTables();
       if (!drawer) return;
       if (drawer.tabId) { await loadComanda(drawer.tabId); return; }
@@ -423,10 +421,15 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       // abre a gaveta na venda em dinheiro (se a máquina tem gaveta ligada) — igual ao balcão
       if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       if (queued) {
-        // fechamento PROVISÓRIO: some da tela local (número entra em offlineClosed) e limpa o pendente
-        // dessa mesa; a fila mostra a escrita pendente. Vira definitivo quando sincroniza.
-        setOfflineClosed((c) => [...c, numMesa]);
+        // fechamento PROVISÓRIO: marca a mesa LIVRE no ESTADO e no CACHE, limpa o pendente e a comanda
+        // ANTIGA do cache — senão reabrir mostrava os itens da comanda fechada (bug 25/07). Vira
+        // definitivo no sync; a fila mostra a escrita pendente. Ordem FIFO garante: fecha a antiga,
+        // depois os novos lançamentos por número criam a comanda nova.
         setPendingLines((p) => p.filter((x) => x.tableNumber !== numMesa));
+        const freeTile = (ts: TableCard[]) => ts.map((t) => (t.number === numMesa ? { ...t, tabId: null, openTotalCents: 0, openedAt: null, contaCalled: false } : t));
+        setTables(freeTile);
+        const cur = await cacheGet<TableCard[]>("tables"); if (cur) await cacheSet("tables", freeTile(cur));
+        if (drawer.tabId) await cacheSet("comanda:" + drawer.tabId, null); // some a comanda antiga do cache
       }
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
@@ -505,7 +508,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }
 
   // "pediu a conta" no topo (âmbar) → ocupada (Verbo #2) → livre, depois agrupa por área
-  const rank = (t: TableCard) => (offlineClosed.includes(t.number) ? 2 : t.contaCalled ? 0 : (t.tabId || pendingForTable(t.number) > 0) ? 1 : 2);
+  const rank = (t: TableCard) => (t.contaCalled ? 0 : (t.tabId || pendingForTable(t.number) > 0) ? 1 : 2);
   const areas = useMemo(() => {
     const g: Record<string, TableCard[]> = {};
     for (const t of tables) (g[t.area || "salao"] ??= []).push(t);
@@ -548,9 +551,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             <h2 className="mb-2 text-sm font-extrabold capitalize text-ink">{area === "balcao" ? "Balcão" : area}</h2>
             <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
               {list.map((t) => {
-                const closedOff = offlineClosed.includes(t.number); // fechada offline → livre (provisório até sync)
-                const pendCents = closedOff ? 0 : pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
-                const oc = !closedOff && (!!t.tabId || pendCents > 0);       // pendente deixa a mesa "ocupada" no card
+                const pendCents = pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
+                const oc = !!t.tabId || pendCents > 0;        // pendente deixa a mesa "ocupada" no card
                 const shownTotal = t.openTotalCents + pendCents; // card mostra servidor + pendente (fonte única)
                 const conta = t.contaCalled; // pediu a conta → âmbar pulsando, no topo
                 const topColor = conta ? "#D97706" : oc ? "var(--brand-600)" : "#16A34A";
