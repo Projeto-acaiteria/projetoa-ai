@@ -216,10 +216,15 @@ export default function TemplateGrid({
             Mesa {tableNumber}
           </span>
         )}
-        {tableNumber != null && !orderingEnabled && (
+        {!orderingEnabled && (
           <div className="relative z-10 mx-auto mt-4 inline-flex max-w-xs items-center gap-2.5 rounded-2xl border border-zinc-200 bg-white px-5 py-3.5 text-sm font-semibold text-zinc-700 shadow-sm">
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M18 20a6 6 0 0 0-12 0" /><circle cx="12" cy="10" r="4" /><circle cx="12" cy="12" r="10" /></svg>
-            <span className="text-left">Cardápio para consulta. <strong className="text-zinc-900">O pedido é feito com o garçom</strong> — é só chamar.</span>
+            <span className="text-left">
+              Cardápio para consulta.{" "}
+              {tableNumber != null
+                ? <><strong className="text-zinc-900">O pedido é feito com o garçom</strong> — é só chamar.</>
+                : <><strong className="text-zinc-900">O pedido é feito no balcão</strong> ou com o garçom.</>}
+            </span>
           </div>
         )}
         {coverNotice && (

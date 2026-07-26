@@ -305,10 +305,15 @@ export default function TemplateBar({
             {calledMsg && <p className="text-sm font-semibold" style={{ color: ACCENT_HI }}>{calledMsg}</p>}
           </div>
         )}
-        {tableNumber != null && !orderingEnabled && (
+        {!orderingEnabled && (
           <div className="relative z-10 mt-6 inline-flex max-w-xs items-center gap-2.5 rounded-2xl border border-white/15 bg-white/5 px-5 py-3.5 text-sm font-semibold backdrop-blur">
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={ACCENT_HI} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M18 20a6 6 0 0 0-12 0" /><circle cx="12" cy="10" r="4" /><circle cx="12" cy="12" r="10" /></svg>
-            <span className="text-left text-white/85">Cardápio para consulta. <strong className="text-white">O pedido é feito com o garçom</strong> — é só chamar.</span>
+            <span className="text-left text-white/85">
+              Cardápio para consulta.{" "}
+              {tableNumber != null
+                ? <><strong className="text-white">O pedido é feito com o garçom</strong> — é só chamar.</>
+                : <><strong className="text-white">O pedido é feito no balcão</strong> ou com o garçom.</>}
+            </span>
           </div>
         )}
         <div className="mt-7 h-px w-24" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }} />

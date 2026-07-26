@@ -12,12 +12,18 @@ export default function QrMesasClient({
   slug,
   accent,
   coverEnabled,
+  balcaoPede = true,
+  mesaPede = true,
   mesas,
 }: {
   storeName: string;
   slug: string;
   accent: string;
   coverEnabled: boolean;
+  /** loja recebe pedido pelo link (delivery/retirada)? false = o QR do balcão é cardápio de leitura */
+  balcaoPede?: boolean;
+  /** cliente pede pelo QR da mesa? false = o QR da mesa é cardápio de leitura, quem lança é o garçom */
+  mesaPede?: boolean;
   mesas: number[];
 }) {
   const [origin, setOrigin] = useState("");
@@ -64,8 +70,8 @@ export default function QrMesasClient({
           <QrCard
             storeName={storeName}
             url={base}
-            titulo="Peça no Balcão"
-            sub="Aponte a câmera, peça e retire aqui"
+            titulo={balcaoPede ? "Peça no Balcão" : "Cardápio"}
+            sub={balcaoPede ? "Aponte a câmera, peça e retire aqui" : "Aponte a câmera e veja o cardápio"}
             cor={cor}
             couvert={false}
           />
@@ -76,7 +82,7 @@ export default function QrMesasClient({
             storeName={storeName}
             url={`${base}/mesa/${n}`}
             titulo={`Mesa ${n}`}
-            sub="Aponte a câmera e peça pelo celular"
+            sub={mesaPede ? "Aponte a câmera e peça pelo celular" : "Aponte a câmera e veja o cardápio"}
             cor={cor}
             couvert={coverEnabled}
           />

@@ -71,6 +71,10 @@ export default async function LojaCardapio({ params }: { params: Promise<{ slug:
       coverNotice,
       branding: { logoUrl: lojaStore.logoUrl, bannerUrl: lojaStore.bannerUrl, primaryColor: lojaStore.primaryColor },
       hasDelivery: cfg.has_delivery !== false,
+      // Sem mesa e sem delivery, o "pedido" da vitrine não tinha pra onde ir: o cliente montava o
+      // carrinho e via "Pedido enviado! Já está sendo preparado" sem NADA ser gravado (comanda é da
+      // mesa; delivery está desligado). Cardápio de leitura é honesto — o pedido é no balcão/garçom.
+      orderingEnabled: cfg.has_delivery !== false,
       whatsapp: lojaStore.whatsapp,
       deliveryFeeCents: lojaStore.deliveryFeeCents,
       minOrderCents: lojaStore.minOrderCents,
