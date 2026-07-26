@@ -294,10 +294,18 @@ export function isOpenNow(hours: OpenHours[], now = new Date()): boolean {
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   const day = DOW[get("weekday")] ?? now.getDay();
   const hh = get("hour") === "24" ? "00" : get("hour").padStart(2, "0");
-  const h = hours[day];
-  if (!h || h.closed) return false;
   const cur = `${hh}:${get("minute").padStart(2, "0")}`;
-  return cur >= h.open && cur <= h.close;
+  if (!Array.isArray(hours) || hours.length < 7) return false;
+
+  // Bar fecha DEPOIS da meia-noite (18:00→04:00): a janela atravessa o dia, e comparar
+  // `cur >= open && cur <= close` dava SEMPRE fechado (23:00 não é <= 04:00). Quando a janela
+  // cruza, o dia de hoje cobre só até a meia-noite — a madrugada pertence à noite de ONTEM.
+  const cruza = (h: OpenHours) => h.close <= h.open;
+  const h = hours[day];
+  if (h && !h.closed && (cruza(h) ? cur >= h.open : cur >= h.open && cur <= h.close)) return true;
+
+  const ontem = hours[(day + 6) % 7];
+  return !!(ontem && !ontem.closed && cruza(ontem) && cur <= ontem.close);
 }
 
 export async function getFees(storeId?: string): Promise<PaymentFees> {
