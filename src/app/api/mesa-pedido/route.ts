@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
 import { getOrCreateTableByNumber, getOrCreateOpenTab, addTabItems } from "@/lib/tables-store";
+import { getStoreConfig, qrPedidoOn } from "@/lib/auth/store-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,12 @@ export async function POST(req: Request) {
   const { data: loja } = await db().from("stores").select("id").eq("slug", slug).eq("active", true).maybeSingle();
   if (!loja) return NextResponse.json({ error: "loja não encontrada" }, { status: 404 });
   const storeId = (loja as { id: string }).id;
+
+  // pedido pelo QR desligado pela loja (mt-30): não grava nada. O gate vive AQUI porque a tela da
+  // mesa é ISR (30s) — celular com a página já aberta continuaria mostrando o botão de enviar.
+  if (!qrPedidoOn(await getStoreConfig(storeId))) {
+    return NextResponse.json({ error: "O pedido pelo celular está desativado. Chame o garçom, ele anota pra você." }, { status: 403 });
+  }
 
   try {
     const items = await resolveOrderItems(storeId, sel);

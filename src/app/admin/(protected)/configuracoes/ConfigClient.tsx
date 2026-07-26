@@ -34,7 +34,7 @@ const FEE_ROWS: { k: keyof Fees; label: string; hint: string }[] = [
 
 const inp = "w-full rounded-lg border border-line bg-bg-base px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-600";
 
-type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; has_estoque: boolean; sells_by_weight: boolean; kitchen_screen: boolean } | null;
+type Config = { has_delivery: boolean; cover_enabled: boolean; loyalty_enabled: boolean; stock_dose: boolean; has_estoque: boolean; sells_by_weight: boolean; kitchen_screen: boolean; has_tables: boolean; qr_pedido_enabled: boolean } | null;
 
 export default function ConfigClient({ family }: { family?: string }) {
   const [fees, setFees] = useState<Fees | null>(null);
@@ -55,7 +55,7 @@ export default function ConfigClient({ family }: { family?: string }) {
   useEffect(() => {
     fetch("/api/configuracoes", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight, kitchen_screen: !!d.config.kitchen_screen } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); setFiscal(d.fiscal ?? null); });
+      .then((d) => { setFees(d.fees); setStore(d.store); setConfig(d.config ? { has_delivery: !!d.config.has_delivery, cover_enabled: !!d.config.cover_enabled, loyalty_enabled: !!d.config.loyalty_enabled, stock_dose: !!d.config.stock_dose, has_estoque: !!d.config.has_estoque, sells_by_weight: !!d.config.sells_by_weight, kitchen_screen: !!d.config.kitchen_screen, has_tables: !!d.config.has_tables, qr_pedido_enabled: d.config.qr_pedido_enabled !== false } : null); setMachines(Array.isArray(d.machines) ? d.machines : []); setHasPin(!!d.hasCashPin); setFiscal(d.fiscal ?? null); });
   }, []);
 
   function setS<K extends keyof Store>(k: K, v: Store[K]) {
@@ -418,6 +418,14 @@ export default function ConfigClient({ family }: { family?: string }) {
           <h2 className="mb-1 text-base font-extrabold text-ink">Recursos da loja</h2>
           <p className="mb-3 text-sm text-[var(--text-muted)]">Ligue só o que o seu negócio usa.</p>
           <div className="divide-y divide-line">
+            {config.has_tables && (
+              <FeatureToggle
+                label="Cliente pede pelo QR da mesa"
+                hint="Ligado: o cliente escaneia o QR e manda o pedido direto pra comanda. Desligado: o cardápio no celular vira só consulta (preço e foto) e quem lança o pedido é o garçom — evita o mesmo pedido entrar duas vezes."
+                on={config.qr_pedido_enabled}
+                onToggle={() => { setConfig((c) => c ? { ...c, qr_pedido_enabled: !c.qr_pedido_enabled } : c); setSaved(false); }}
+              />
+            )}
             <FeatureToggle label="Couvert / Shows" hint="Cobra couvert por pessoa quando tem atração ao vivo (bar)." on={config.cover_enabled} onToggle={() => { setConfig((c) => c ? { ...c, cover_enabled: !c.cover_enabled } : c); setSaved(false); }} />
             <FeatureToggle label="Fidelidade (pontos)" hint="Cliente junta pontos e troca por brinde." on={config.loyalty_enabled} onToggle={() => { setConfig((c) => c ? { ...c, loyalty_enabled: !c.loyalty_enabled } : c); setSaved(false); }} />
             <FeatureToggle label="Dose / garrafa" hint="Controle de destilado em doses (estoque do bar)." on={config.stock_dose} onToggle={() => { setConfig((c) => c ? { ...c, stock_dose: !c.stock_dose } : c); setSaved(false); }} />

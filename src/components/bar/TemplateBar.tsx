@@ -37,13 +37,14 @@ function ProductThumb({ p, station }: { p: BarProduct; station: string }) {
 }
 
 // Linha de produto (usada dentro do modal da categoria). Espelha a linha antiga inline.
-function ProductRow({ p, station, cart, onPlus, incKey, decKey }: {
+function ProductRow({ p, station, cart, onPlus, incKey, decKey, orderingEnabled = true }: {
   p: BarProduct;
   station: string;
   cart: Record<string, Line>;
   onPlus: (p: BarProduct, station: string) => void;
   incKey: (key: string) => void;
   decKey: (key: string) => void;
+  orderingEnabled?: boolean;
 }) {
   const hasGroups = !!(p.groups && p.groups.length > 0);
   const q = hasGroups ? 0 : cart[p.id]?.qty ?? 0;
@@ -62,7 +63,7 @@ function ProductRow({ p, station, cart, onPlus, incKey, decKey }: {
           {hasGroups && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,59,78,0.15)", color: ACCENT_HI }}>monta</span>}
         </div>
       </div>
-      {p.by_weight ? (
+      {!orderingEnabled ? null : p.by_weight ? (
         <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">pesado no balcão</span>
       ) : q > 0 ? (
         <div className="flex items-center gap-2.5">
@@ -84,6 +85,7 @@ export default function TemplateBar({
   categories,
   slug,
   tableNumber = null,
+  orderingEnabled = true,
   coverNotice = null,
   branding = null,
   hasDelivery = false,
@@ -99,6 +101,8 @@ export default function TemplateBar({
   categories: BarCategory[];
   slug: string;
   tableNumber?: number | null;
+  /** false = cardápio de LEITURA (mt-30): sem carrinho, sem enviar, sem chamar garçom. Quem lança é o garçom. */
+  orderingEnabled?: boolean;
   coverNotice?: { artist: string; coverCents: number } | null;
   branding?: { logoUrl?: string; bannerUrl?: string; primaryColor?: string } | null;
   hasDelivery?: boolean;
@@ -173,7 +177,7 @@ export default function TemplateBar({
   }
 
   async function send() {
-    if (sending || count === 0) return;
+    if (!orderingEnabled || sending || count === 0) return;
     setErrorMsg("");
 
     // cardápio com mesa → comanda (fluxo existente)
@@ -286,7 +290,7 @@ export default function TemplateBar({
             Couvert {brl(coverNotice.coverCents)}/pessoa · ao vivo: {coverNotice.artist}
           </div>
         )}
-        {tableNumber != null && (
+        {tableNumber != null && orderingEnabled && (
           <div className="relative z-10 mt-6 flex flex-col items-center gap-2">
             <div className="flex gap-2.5">
               <button onClick={() => chamar("atendente")} disabled={!!calling} className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-bold backdrop-blur transition active:scale-95 disabled:opacity-50">
@@ -299,6 +303,12 @@ export default function TemplateBar({
               </button>
             </div>
             {calledMsg && <p className="text-sm font-semibold" style={{ color: ACCENT_HI }}>{calledMsg}</p>}
+          </div>
+        )}
+        {tableNumber != null && !orderingEnabled && (
+          <div className="relative z-10 mt-6 inline-flex max-w-xs items-center gap-2.5 rounded-2xl border border-white/15 bg-white/5 px-5 py-3.5 text-sm font-semibold backdrop-blur">
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={ACCENT_HI} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M18 20a6 6 0 0 0-12 0" /><circle cx="12" cy="10" r="4" /><circle cx="12" cy="12" r="10" /></svg>
+            <span className="text-left text-white/85">Cardápio para consulta. <strong className="text-white">O pedido é feito com o garçom</strong> — é só chamar.</span>
           </div>
         )}
         <div className="mt-7 h-px w-24" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }} />
@@ -333,7 +343,7 @@ export default function TemplateBar({
         })}
       </div>
 
-      {count > 0 && !open && (
+      {orderingEnabled && count > 0 && !open && (
         <button onClick={() => setOpen(true)} className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})`, boxShadow: "0 16px 40px -12px rgba(255,59,78,0.6)" }}>
           <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/25 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
           <span className="tabular-nums">{brl(total)}</span>
@@ -358,10 +368,10 @@ export default function TemplateBar({
             </div>
             <ul className="flex-1 space-y-2 overflow-y-auto p-4">
               {openCat.products.map((p) => (
-                <ProductRow key={p.id} p={p} station={openCat.station} cart={cart} onPlus={onPlus} incKey={incKey} decKey={decKey} />
+                <ProductRow key={p.id} p={p} station={openCat.station} cart={cart} onPlus={onPlus} incKey={incKey} decKey={decKey} orderingEnabled={orderingEnabled} />
               ))}
             </ul>
-            {count > 0 && (
+            {orderingEnabled && count > 0 && (
               <div className="border-t border-white/10 p-3">
                 <button onClick={() => { setOpenCat(null); setOpen(true); }} className="flex w-full items-center justify-between rounded-2xl px-5 py-3.5 font-bold text-white active:scale-[0.99]" style={{ background: `linear-gradient(180deg, ${ACCENT_HI}, ${ACCENT})` }}>
                   <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/25 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>

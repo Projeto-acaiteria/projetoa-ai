@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
+import { getStoreConfig, qrPedidoOn } from "@/lib/auth/store-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
   const { data: loja } = await db().from("stores").select("id").eq("slug", slug).eq("active", true).maybeSingle();
   if (!loja) return NextResponse.json({ error: "loja não encontrada" }, { status: 404 });
   const storeId = (loja as { id: string }).id;
+
+  // interação do cliente pelo QR desligada (mt-30): chamar garçom / pedir a conta também saem.
+  if (!qrPedidoOn(await getStoreConfig(storeId))) {
+    return NextResponse.json({ error: "chamado pelo celular desativado" }, { status: 403 });
+  }
 
   // dedup: já tem chamado pendente do mesmo tipo nessa mesa? não duplica (cliente tocou 2×)
   const { data: existing } = await db()

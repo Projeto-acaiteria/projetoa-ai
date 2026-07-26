@@ -36,6 +36,7 @@ export default function TemplateGrid({
   categories,
   slug,
   tableNumber = null,
+  orderingEnabled = true,
   coverNotice = null,
   branding = null,
   hasDelivery = false,
@@ -51,6 +52,8 @@ export default function TemplateGrid({
   categories: BarCategory[];
   slug: string;
   tableNumber?: number | null;
+  /** false = cardápio de LEITURA (mt-30): sem carrinho, sem enviar. Quem lança o pedido é o garçom. */
+  orderingEnabled?: boolean;
   coverNotice?: { artist: string; coverCents: number } | null;
   branding?: { logoUrl?: string; bannerUrl?: string; primaryColor?: string } | null;
   hasDelivery?: boolean;
@@ -124,7 +127,7 @@ export default function TemplateGrid({
   }
 
   async function send() {
-    if (sending || count === 0) return;
+    if (!orderingEnabled || sending || count === 0) return;
     setErrorMsg("");
 
     // cardápio com mesa → comanda (fluxo existente)
@@ -213,6 +216,12 @@ export default function TemplateGrid({
             Mesa {tableNumber}
           </span>
         )}
+        {tableNumber != null && !orderingEnabled && (
+          <div className="relative z-10 mx-auto mt-4 inline-flex max-w-xs items-center gap-2.5 rounded-2xl border border-zinc-200 bg-white px-5 py-3.5 text-sm font-semibold text-zinc-700 shadow-sm">
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M18 20a6 6 0 0 0-12 0" /><circle cx="12" cy="10" r="4" /><circle cx="12" cy="12" r="10" /></svg>
+            <span className="text-left">Cardápio para consulta. <strong className="text-zinc-900">O pedido é feito com o garçom</strong> — é só chamar.</span>
+          </div>
+        )}
         {coverNotice && (
           <div className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: "#FED7AA", background: "#FFF7ED", color: "#C2410C" }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
@@ -250,7 +259,7 @@ export default function TemplateGrid({
                   <div key={p.id} className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
                     <div className="relative">
                       <Thumb p={p} />
-                      {p.by_weight ? (
+                      {!orderingEnabled ? null : p.by_weight ? (
                         // vendido por peso = pesado no balcão; não é pedível online (evita o beco-sem-saída no checkout)
                         <span className="absolute bottom-2 right-2 rounded-full bg-zinc-900/75 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">pesado no balcão</span>
                       ) : q > 0 ? (
@@ -282,7 +291,7 @@ export default function TemplateGrid({
         })}
       </div>
 
-      {count > 0 && !open && (
+      {orderingEnabled && count > 0 && !open && (
         <button onClick={() => setOpen(true)} className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-2xl px-5 py-4 font-bold text-white shadow-2xl active:scale-[0.99]" style={{ background: branding?.primaryColor || ACCENT, boxShadow: "0 16px 40px -12px rgba(0,0,0,0.4)" }}>
           <span className="flex items-center gap-2"><span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/20 px-1.5 text-sm tabular-nums">{count}</span> Ver pedido</span>
           <span className="tabular-nums">{brl(total)}</span>

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/supabase";
 import { readBarMenu } from "@/lib/menu-bar-store";
-import { getStoreConfig } from "@/lib/auth/store-config";
+import { getStoreConfig, qrPedidoOn } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
 import TemplateBar from "@/components/bar/TemplateBar";
@@ -44,6 +44,9 @@ export default async function MesaCardapio({ params }: { params: Promise<{ slug:
     categories,
     slug,
     tableNumber,
+    // desligado (mt-30): cardápio vira LEITURA — sem carrinho, sem enviar, sem chamar garçom.
+    // O cliente vê preço e foto; quem lança é o garçom.
+    orderingEnabled: qrPedidoOn(cfg),
     coverNotice,
     branding: { logoUrl: store.logoUrl, bannerUrl: store.bannerUrl, primaryColor: store.primaryColor },
   };

@@ -19,7 +19,14 @@ export type StoreConfig = {
   has_estoque: boolean; // controle de estoque/ficha técnica (baixa por insumo) — ligável por loja
   kitchen_screen: boolean; // cozinha COM tela (bump: iniciar→pronto). false = só ticket → Preparo vira leitura
   offline_enabled?: boolean; // resiliência a quedas (Fatia 2 offline-first) — default false; liga por loja provada
+  qr_pedido_enabled?: boolean; // cliente PEDE pelo QR da mesa. false = cardápio vira leitura, só o garçom lança (mt-30)
 };
+
+// Cliente pode pedir pelo QR da mesa? Coluna nova (mt-30): loja sem a coluna/sem config = LIGADO
+// (retrocompatível). Só o `false` explícito desliga.
+export function qrPedidoOn(cfg: StoreConfig | null): boolean {
+  return cfg?.qr_pedido_enabled !== false;
+}
 
 export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig | null> => {
   const { data } = await db().from("store_config").select("*").eq("store_id", storeId).maybeSingle();
@@ -27,7 +34,7 @@ export const getStoreConfig = cache(async (storeId: string): Promise<StoreConfig
 });
 
 // Flags que o DONO pode ligar/desligar no painel (as outras vêm do segmento e não mudam pela UI).
-const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose", "has_estoque", "kitchen_screen", "offline_enabled"];
+const TOGGLEABLE: (keyof StoreConfig)[] = ["has_delivery", "loyalty_enabled", "cover_enabled", "stock_dose", "has_estoque", "kitchen_screen", "offline_enabled", "qr_pedido_enabled"];
 
 export async function setStoreConfig(patch: Partial<StoreConfig>, storeId: string): Promise<void> {
   const clean: Record<string, boolean> = {};
