@@ -26,6 +26,9 @@ export type TicketData = {
   subtotalCents?: number; // soma dos PRODUTOS (sem couvert/taxa) — sai como "Subtotal" quando há extras/desconto
   extras?: { label: string; cents: number }[]; // linhas ENTRE subtotal e total: couvert, taxa de serviço 10%…
   discountCents?: number;
+  // pagamentos JÁ recebidos nessa conta (adiantamento / split): saem ABAIXO do total, abatendo.
+  // Sem isso a pré-conta de uma mesa que já pagou metade imprimia o valor cheio.
+  payments?: { label: string; cents: number }[];
   feeCents?: number;
   receivedCents?: number;
   changeCents?: number;
@@ -377,6 +380,7 @@ export function ticketHtml(d: TicketData): string {
     ${d.discountCents ? lead("Desconto", "- " + brl(d.discountCents)) : ""}
     ${((d.extras && d.extras.length) || d.discountCents) ? `<div class="dash"></div>` : ""}
     ${lead("TOTAL", brl(d.totalCents), "b total")}
+    ${(d.payments ?? []).map((p) => lead(esc(p.label), "- " + brl(p.cents))).join("")}
     ${d.collectCents != null ? `<div class="collect">RECEBER ${d.paymentLabel ? `EM ${esc(d.paymentLabel).toUpperCase()}` : "DO CLIENTE"}<br><span class="v">${brl(d.collectCents)}</span></div>` : (d.paymentLabel ? `<div class="c">Pagamento: ${esc(d.paymentLabel)}</div>` : "")}
     ${d.receivedCents != null ? lead("Recebido", brl(d.receivedCents)) : ""}
     ${d.changeCents != null && d.changeCents > 0 ? lead("Troco", brl(d.changeCents)) : ""}

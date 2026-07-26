@@ -325,6 +325,12 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const grand = consumo + coverCharged + serviceFee;
   const paid = comanda?.paidCents ?? 0;
   const falta = Math.max(0, grand - paid);
+  // linhas de "já pago" pro cupom (pré-conta e fechamento). Vazio quando ninguém adiantou nada,
+  // então o cupom da conta paga de uma vez só continua igual ao de sempre.
+  const pagosNoCupom = (comanda?.payments ?? []).map((p) => ({
+    label: `Pago (${(PAYS.find(([id]) => id === p.method) ?? [null, p.method])[1]})`,
+    cents: p.amountCents,
+  }));
 
   async function criarMesas() {
     const n = Math.floor(Number(addN) || 0);
@@ -417,6 +423,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           ...(serviceFee > 0 ? [{ label: "Taxa de serviço 10%", cents: serviceFee }] : []),
         ],
         totalCents: closedTotal,
+        // conta paga em parcelas: o cupom de fechamento lista o que já tinha sido recebido antes,
+        // senão "TOTAL 100 · Pagamento: PIX" dá a entender que os 100 saíram todos no PIX.
+        payments: pagosNoCupom,
       }));
       // abre a gaveta na venda em dinheiro (se a máquina tem gaveta ligada) — igual ao balcão
       if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
@@ -497,7 +506,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         ...(serviceFee > 0 ? [{ label: "Taxa de serviço 10%", cents: serviceFee }] : []),
       ],
       totalCents: grand,
-      collectCents: grand,
+      // adiantamento/split já recebido abate no papel — antes a pré-conta saía com o valor CHEIO
+      // mesmo com pagamento registrado, e o cliente pagava duas vezes o mesmo pedaço.
+      payments: pagosNoCupom,
+      // conta já quitada: não imprime a caixa "RECEBER R$ 0,00" — o abatimento acima já conta a história
+      collectCents: falta > 0 ? falta : undefined,
     });
     if (canClose) { void printTicket(html, "caixa"); return; }
     // garçom: enfileira pro caixa imprimir (celular não imprime)
