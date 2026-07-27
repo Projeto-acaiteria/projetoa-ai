@@ -45,15 +45,11 @@ export async function openDrawer(station = "caixa"): Promise<void> {
   try { await qzKickDrawer(printer); } catch { /* QZ caiu / sem gaveta — ignora */ }
 }
 
-// Imprime o cupom de VENDA em 1 ou 2 vias (cliente + loja), conforme a preferência POR-MÁQUINA
-// `print:duasvias` (default LIGADO). makeHtml recebe o rótulo da via e devolve o HTML do cupom
-// (ex: (via) => ticketHtml({ ...dados, via })). Imprime sequencial pra não embaralhar na térmica.
+// Imprime o cupom de VENDA em UMA via. (27/07: era 1 ou 2 vias conforme `print:duasvias`, uma
+// preferência POR-MÁQUINA — desligar no PC de casa não desligava no PC do bar, e o Medellín seguia
+// gastando papel em dobro.) Regra cravada pelo Eduardo: a via do cliente é o comprovante da
+// maquininha; se ele quiser a nota, o caixa entrega esta. makeHtml mantém o parâmetro `via` só por
+// compatibilidade de assinatura — ninguém mais rotula via.
 export async function printVias(makeHtml: (via?: string) => string, station = "caixa"): Promise<void> {
-  const duas = typeof window !== "undefined" && localStorage.getItem("print:duasvias") !== "0";
-  if (duas) {
-    await printTicket(makeHtml("VIA DO CLIENTE"), station);
-    await printTicket(makeHtml("VIA DA LOJA"), station);
-  } else {
-    await printTicket(makeHtml(), station);
-  }
+  await printTicket(makeHtml(), station);
 }

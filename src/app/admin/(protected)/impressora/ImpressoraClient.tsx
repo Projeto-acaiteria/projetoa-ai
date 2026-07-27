@@ -134,8 +134,6 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   const [msg, setMsg] = useState<string | null>(null);
   // auto-imprimir cupom ao finalizar venda (balcão/mesa) — POR-MÁQUINA, default ligado
   const [printOnSale, setPrintOnSale] = useState(true);
-  // imprimir 2 vias (cliente + loja) — POR-MÁQUINA, default ligado
-  const [duasVias, setDuasVias] = useState(true);
   // abrir gaveta de dinheiro ao finalizar venda em dinheiro — POR-MÁQUINA, default DESLIGADO (opt-in: só quem tem gaveta)
   const [drawerAuto, setDrawerAuto] = useState(false);
   // imprimir via de preparo (cozinha/bar) no balcão ao finalizar — POR-MÁQUINA, default DESLIGADO (só relacional com estação)
@@ -151,7 +149,6 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
   // qzConnect() estabelece de fato (silencioso) e reflete o estado REAL — igual ao badge do Caixa.
   useEffect(() => { qzConnect().then(() => setActive(true)).catch(() => setActive(false)); }, []);
   useEffect(() => { setPrintOnSale(localStorage.getItem("autoprint:venda") !== "0"); }, []);
-  useEffect(() => { setDuasVias(localStorage.getItem("print:duasvias") !== "0"); }, []);
   useEffect(() => { setDrawerAuto(localStorage.getItem("drawer:auto") === "1"); }, []);
   useEffect(() => { setPrepAuto(localStorage.getItem("autoprint:preparo") === "1"); }, []);
   useEffect(() => { setMovComp(localStorage.getItem("mov:comprovante") !== "0"); }, []);
@@ -175,7 +172,6 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
     }
   }
   const togglePrintOnSale = () => setPrintOnSale((v) => { const n = !v; localStorage.setItem("autoprint:venda", n ? "1" : "0"); return n; });
-  const toggleDuasVias = () => setDuasVias((v) => { const n = !v; localStorage.setItem("print:duasvias", n ? "1" : "0"); return n; });
   const toggleDrawer = () => setDrawerAuto((v) => { const n = !v; localStorage.setItem("drawer:auto", n ? "1" : "0"); return n; });
   const togglePrep = () => setPrepAuto((v) => { const n = !v; localStorage.setItem("autoprint:preparo", n ? "1" : "0"); return n; });
   const toggleMovComp = () => setMovComp((v) => { const n = !v; localStorage.setItem("mov:comprovante", n ? "1" : "0"); return n; });
@@ -282,20 +278,6 @@ export default function ImpressoraClient({ storeName, stations }: { storeName: s
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${printOnSale ? "brand-gradient" : "bg-bg-surface-2"}`}
           >
             <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${printOnSale ? "left-[22px]" : "left-0.5"}`} />
-          </button>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-          <div>
-            <div className="font-bold text-ink">Imprimir 2 vias (cliente + loja)</div>
-            <div className="mt-0.5 text-xs text-[var(--text-muted)]">Sai uma via pro cliente e uma pra loja, cada uma rotulada. Vale pra venda, mesa e delivery.</div>
-          </div>
-          <button
-            onClick={toggleDuasVias}
-            role="switch"
-            aria-checked={duasVias}
-            className={`relative h-7 w-12 shrink-0 rounded-full transition ${duasVias ? "brand-gradient" : "bg-bg-surface-2"}`}
-          >
-            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${duasVias ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
         <div className="mt-3 border-t border-line pt-3">
