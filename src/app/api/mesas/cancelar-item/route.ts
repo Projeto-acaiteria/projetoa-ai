@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cancelTabItem } from "@/lib/tables-store";
 import { getCurrentUser, getCurrentMembership } from "@/lib/auth/store";
+import { resolveStoreId } from "@/lib/auth/current";
+import { withIdempotency } from "@/lib/idempotency";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Garçom não cancela item já lançado — chame o caixa." }, { status: 403 });
   }
 
-  let b: { itemId?: number; units?: number; reason?: string };
+  let b: { itemId?: number; units?: number; reason?: string; opId?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const itemId = Number(b.itemId);
@@ -25,10 +27,16 @@ export async function POST(req: Request) {
   const units = Number.isFinite(Number(b.units)) && Number(b.units) > 0 ? Math.floor(Number(b.units)) : undefined;
 
   try {
-    const by = (await getCurrentUser())?.email ?? undefined;
-    const r = await cancelTabItem(itemId, { units, reason, by });
-    return NextResponse.json({ ok: true, ...r });
+    const sid = await resolveStoreId();
+    // idempotência (offline): replay do cancelamento devolve o mesmo resultado (não estorna 2×, e não
+    // erra "item não encontrado" quando o item já foi apagado no 1º cancel).
+    const { result } = await withIdempotency(b.opId, sid, "cancelar-item", async () => {
+      const by = (await getCurrentUser())?.email ?? undefined;
+      return cancelTabItem(itemId, { units, reason, by });
+    });
+    return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    const status = (e as { inflight?: boolean }).inflight ? 409 : 500;
+    return NextResponse.json({ error: (e as Error).message }, { status });
   }
 }

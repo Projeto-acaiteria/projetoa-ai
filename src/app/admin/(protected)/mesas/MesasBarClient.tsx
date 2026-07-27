@@ -367,17 +367,44 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // pagamento PARCIAL (split): registra um pagamento sem fechar — método/máquina do picker.
   // vários parciais (métodos diferentes) → "Fechar conta" paga o que sobrar.
   async function registrarParcial() {
-    if (!drawer?.tabId || busy) return;
-    const amountCents = parcial ? Math.round((parseFloat(parcial) || 0) * 100) : falta;
-    if (amountCents <= 0) return;
+    if (!drawer || busy) return; // aceita tabId OU número (mesa aberta offline)
+    const amt = parcial ? Math.round((parseFloat(parcial) || 0) * 100) : falta;
+    if (amt <= 0) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, method, amountCents, applyFee: fee, applyCover: coverOn, machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined, parcelas: method === "credito" ? parcelas : 1 }) });
+      const body = {
+        ...(drawer.tabId ? { tabId: drawer.tabId } : { tableNumber: drawer.table.number }),
+        method, amountCents: amt, applyFee: fee, applyCover: coverOn,
+        machineId: (method === "debito" || method === "credito") && machineId ? machineId : undefined,
+        parcelas: method === "credito" ? parcelas : 1,
+      };
+      // OFFLINE (flag on): enfileira com opId (idempotente, não grava 2×) e soma otimista o pago
+      if (offlineOn) {
+        const res = await submitOrQueue("/api/mesas/pagamento", { ...body, opId: genOpId() }, `Pagamento parcial · Mesa ${drawer.table.number}`);
+        setParcial("");
+        if ("queued" in res) {
+          const recorded = Math.min(amt, falta); // troco não é receita
+          setComanda((c) => {
+            if (!c) return c;
+            const next = { ...c, paidCents: (c.paidCents ?? 0) + recorded, payments: [...(c.payments ?? []), { method, amountCents: recorded }] };
+            if (c.tab?.id) void cacheSet("comanda:" + c.tab.id, next);
+            return next;
+          });
+          setSplitTroco(method === "dinheiro" ? Math.max(0, amt - falta) : 0);
+        } else {
+          setSplitTroco(method === "dinheiro" ? ((res.data as { trocoCents?: number })?.trocoCents ?? 0) : 0);
+          if (drawer.tabId) await loadComanda(drawer.tabId);
+        }
+        onSaleClosed?.();
+        return;
+      }
+      // flag off → fetch direto (comportamento original)
+      const r = await fetch("/api/mesas/pagamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
       setSplitTroco(method === "dinheiro" ? (d.trocoCents ?? 0) : 0); // troco só faz sentido em dinheiro
-      await loadComanda(drawer.tabId);
+      if (drawer.tabId) await loadComanda(drawer.tabId);
       onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
     finally { setBusy(false); }
@@ -456,25 +483,48 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // cancela item já lançado na comanda ABERTA. 'one' → 1 unidade da linha-fonte mais recente;
   // 'all' → cancela todas as linhas-fonte da linha visual. O servidor estorna o estoque e registra
   // o motivo (log auditável). Read-after-write: recarrega a comanda fresca do banco (λ.prova-na-fonte).
+  // otimista: tira/decrementa o item da comanda LOCAL (estado + cache) — usado no cancelamento offline
+  function removeItemLocal(itemId: number, units?: number) {
+    setComanda((c) => {
+      if (!c) return c;
+      const orders = c.orders.map((o) => ({ ...o, items: o.items.flatMap((it) => (it.id !== itemId ? [it] : (it.qty - (units ?? it.qty) > 0 ? [{ ...it, qty: it.qty - (units ?? it.qty) }] : []))) }));
+      const consumoCents = orders.flatMap((o) => o.items).reduce((s, it) => s + it.qty * it.unitPriceCents, 0);
+      const next = { ...c, orders, consumoCents };
+      if (c.tab?.id) void cacheSet("comanda:" + c.tab.id, next);
+      return next;
+    });
+  }
+
   async function doCancel() {
     if (!cancelFor || busy) return;
     const reason = cancelReason.trim();
     if (!reason) { setErr("Diga o motivo do cancelamento."); return; }
     setBusy(true); setErr("");
     try {
+      const targets = cancelFor.mode === "one"
+        ? [{ id: cancelFor.parts[cancelFor.parts.length - 1].id, units: 1 as number | undefined }]
+        : cancelFor.parts.map((p) => ({ id: p.id, units: undefined as number | undefined }));
+
+      // OFFLINE (flag on): enfileira cada cancelamento com opId (idempotente) e tira do local na hora.
+      // O estorno de estoque/log acontece no sync (server-side). Sem net não trava.
+      if (offlineOn) {
+        for (const t of targets) {
+          await submitOrQueue("/api/mesas/cancelar-item", { itemId: t.id, units: t.units, reason, opId: genOpId() }, `Cancelar item · Mesa ${drawer?.table.number ?? ""}`);
+          removeItemLocal(t.id, t.units);
+        }
+        setCancelFor(null); setCancelReason("");
+        loadTables();
+        return;
+      }
+
+      // flag off → fetch direto (comportamento original)
       const post = (itemId: number, units?: number) =>
         fetch("/api/mesas/cancelar-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, units, reason }) })
           .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Não consegui cancelar."); return d as { tabFreed?: boolean }; });
       let freed = false;
-      if (cancelFor.mode === "one") {
-        const d = await post(cancelFor.parts[cancelFor.parts.length - 1].id, 1); // tira 1 da linha-fonte mais recente
-        freed = !!d.tabFreed;
-      } else {
-        for (const p of cancelFor.parts) { const d = await post(p.id); freed = freed || !!d.tabFreed; } // units ausente = linha-fonte inteira
-      }
+      if (cancelFor.mode === "one") { const d = await post(targets[0].id, 1); freed = !!d.tabFreed; }
+      else { for (const p of cancelFor.parts) { const d = await post(p.id); freed = freed || !!d.tabFreed; } }
       setCancelFor(null); setCancelReason("");
-      // comanda esvaziou de vez → a mesa foi liberada no servidor: fecha o drawer (NÃO recarrega a
-      // comanda deletada, senão dá 500). Senão, recarrega a comanda fresca (λ.prova-na-fonte).
       if (freed) closeDrawer();
       else if (drawer?.tabId) await loadComanda(drawer.tabId);
       loadTables();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { addPayment, getTabFull } from "@/lib/tables-store";
+import { addPayment, getTabFull, getOrCreateTableByNumber } from "@/lib/tables-store";
+import { db } from "@/lib/supabase";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
@@ -12,15 +13,17 @@ export const dynamic = "force-dynamic";
 
 // POST /api/mesas/pagamento — registra um pagamento PARCIAL (split) na comanda
 export async function POST(req: Request) {
-  let b: { tabId?: number; method?: string; amountCents?: number; machineId?: string; parcelas?: number; applyFee?: boolean; applyCover?: boolean; opId?: string };
+  let b: { tabId?: number; tableNumber?: number; method?: string; amountCents?: number; machineId?: string; parcelas?: number; applyFee?: boolean; applyCover?: boolean; opId?: string };
   try {
     b = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  if (typeof b.tabId !== "number" || !Number.isFinite(b.tabId)) {
-    return NextResponse.json({ error: "tabId é obrigatório" }, { status: 400 });
+  const hasTab = typeof b.tabId === "number" && Number.isFinite(b.tabId);
+  const hasNum = typeof b.tableNumber === "number" && Number.isFinite(b.tableNumber);
+  if (!hasTab && !hasNum) {
+    return NextResponse.json({ error: "tabId ou tableNumber é obrigatório" }, { status: 400 });
   }
   const method = (b.method ?? "").trim();
   if (!method) {
@@ -30,12 +33,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "amountCents é obrigatório" }, { status: 400 });
   }
 
-  const tabId = b.tabId;
-  const amountCents = b.amountCents;
+  const amountCents = b.amountCents as number;
   try {
     const sid = await resolveStoreId();
     // idempotência (offline Fatia 1): sem opId roda igual a hoje; com opId, replay NÃO grava 2º pagamento
     const { result } = await withIdempotency(b.opId, sid, "pagamento", async () => {
+      // resolve o tabId por NÚMERO quando a mesa nasceu offline (só vira tabId real no sync; o pagamento
+      // sincroniza depois dos lançamentos por ser FIFO, então a comanda já existe aqui, achável por número)
+      let tabId = hasTab ? (b.tabId as number) : 0;
+      if (!hasTab) {
+        const tableId = await getOrCreateTableByNumber(b.tableNumber as number, sid);
+        const { data } = await db().from("tabs").select("id").eq("store_id", sid).eq("table_id", tableId).eq("status", "aberta").maybeSingle();
+        if (!data) return { ok: true, recordedCents: 0, trocoCents: 0 }; // sem comanda aberta (fechou?)
+        tabId = Number((data as { id: number }).id);
+      }
       // TROCO NÃO É RECEITA: limita o valor GRAVADO ao que ainda falta (grand − pago). O excedente
       // que o cliente deu em dinheiro é troco e volta pra ele — não pode inflar caixa/faturamento.
       const full = await getTabFull(tabId, sid);
