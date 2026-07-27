@@ -90,22 +90,30 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [offlineOn, setOfflineOn] = useState(offlineEnabled);
   // Peça 3: mesas FECHADAS offline (por número) — somem da tela como provisórias até a fila subir
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+  // mesas FECHADAS offline (tabId) cujo fechamento ainda não subiu. Persistido (sobrevive reload/
+  // reconexão) e FILTRADO em toda leitura → a comanda antiga não ressurge do servidor antes do sync.
+  const closedTabsRef = useRef<Set<number>>(new Set());
+  const addClosedTab = (id: number) => { closedTabsRef.current.add(id); void cacheSet("closedTabs", [...closedTabsRef.current]); };
+  const clearClosedTabs = () => { if (!closedTabsRef.current.size) return; closedTabsRef.current.clear(); void cacheSet("closedTabs", []); };
+  const dropClosed = (ts: TableCard[]) => ts.map((t) => (t.tabId != null && closedTabsRef.current.has(t.tabId) ? { ...t, tabId: null, openTotalCents: 0, openedAt: null, contaCalled: false } : t));
 
   const loadTables = useCallback(async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) { // OFFLINE: cache instantâneo (não pendura no fetch)
-      const cch = await cacheGet<TableCard[]>("tables"); if (cch) setTables(cch); return;
+      const cch = await cacheGet<TableCard[]>("tables"); if (cch) setTables(dropClosed(cch)); return;
     }
     try {
       const r = await fetchTimeout("/api/mesas", { cache: "no-store" }, 3000);
       const d = await r.json();
-      setTables(d.tables ?? []);
+      cacheSet("tables", d.tables ?? []); // espelho CRU (sem filtro) — a verdade do servidor
+      setTables(dropClosed(d.tables ?? [])); // na TELA, esconde as fechadas offline até o sync
       if (typeof d.offlineEnabled === "boolean") setOfflineOn(d.offlineEnabled);
-      cacheSet("tables", d.tables ?? []); // Peça 1: espelho pra ver as mesas offline
     } catch {
       const cch = await cacheGet<TableCard[]>("tables"); // net caiu no meio → último estado bom
-      if (cch) setTables(cch);
+      if (cch) setTables(dropClosed(cch));
     }
   }, []);
+  // carrega as mesas fechadas offline persistidas ANTES de listar (senão a antiga aparece 1 ciclo)
+  useEffect(() => { cacheGet<number[]>("closedTabs").then((c) => { if (c?.length) closedTabsRef.current = new Set(c); void loadTables(); }); }, [loadTables]);
   useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
   // OFFLINE: pré-aquece o cache de TODAS as comandas abertas enquanto tem net, pra qualquer mesa abrir
   // com os itens offline (não só a que já foi aberta online). Roda na entrada e ao reconectar.
@@ -115,7 +123,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       const r = await fetchTimeout("/api/mesas", { cache: "no-store" }, 3000);
       const tbls: TableCard[] = (await r.json()).tables ?? [];
       for (const t of tbls) {
-        if (!t.tabId) continue;
+        if (!t.tabId || closedTabsRef.current.has(t.tabId)) continue; // fechada offline: não re-cacheia a antiga
         try { const rc = await fetchTimeout(`/api/mesas/comanda?tabId=${t.tabId}`, { cache: "no-store" }, 3000); if (rc.ok) await cacheSet("comanda:" + t.tabId, await rc.json()); } catch { /* pula essa */ }
       }
     } catch { /* offline — mantém o que tem */ }
@@ -136,6 +144,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     const onChange = async () => {
       if ((await pendingCount()) > 0) return; // ainda há escrita pra subir
       setPendingLines((p) => (p.length ? [] : p));
+      clearClosedTabs(); // fechamentos subiram → o servidor já tem as mesas fechadas; vale a verdade dele
       await loadTables();
       if (!drawer) return;
       if (drawer.tabId) { await loadComanda(drawer.tabId); return; }
@@ -152,6 +161,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, [offlineOn, drawer, loadTables]);
 
   async function loadComanda(tabId: number) {
+    if (closedTabsRef.current.has(tabId)) { setComanda(null); return; } // fechada offline → não ressuscita a antiga
     if (typeof navigator !== "undefined" && !navigator.onLine) { // OFFLINE: cache instantâneo (não espera o servidor ~1min)
       setComanda(await cacheGet<Comanda>("comanda:" + tabId)); return;
     }
@@ -430,15 +440,13 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       // abre a gaveta na venda em dinheiro (se a máquina tem gaveta ligada) — igual ao balcão
       if (method === "dinheiro" && localStorage.getItem("drawer:auto") === "1") void openDrawer("caixa");
       if (queued) {
-        // fechamento PROVISÓRIO: marca a mesa LIVRE no ESTADO e no CACHE, limpa o pendente e a comanda
-        // ANTIGA do cache — senão reabrir mostrava os itens da comanda fechada (bug 25/07). Vira
-        // definitivo no sync; a fila mostra a escrita pendente. Ordem FIFO garante: fecha a antiga,
-        // depois os novos lançamentos por número criam a comanda nova.
+        // fechamento PROVISÓRIO: registra a mesa fechada (persistente, filtrada em TODA leitura) — a
+        // comanda antiga não ressurge, nem mesmo se a net voltar antes do sync (o servidor ainda a tem
+        // aberta). Limpa o pendente. Vira definitivo no sync (reconcile limpa o set). Reabrir = comanda
+        // nova; FIFO garante: fecha a antiga, depois os novos lançamentos por número criam a nova.
         setPendingLines((p) => p.filter((x) => x.tableNumber !== numMesa));
-        const freeTile = (ts: TableCard[]) => ts.map((t) => (t.number === numMesa ? { ...t, tabId: null, openTotalCents: 0, openedAt: null, contaCalled: false } : t));
-        setTables(freeTile);
-        const cur = await cacheGet<TableCard[]>("tables"); if (cur) await cacheSet("tables", freeTile(cur));
-        if (drawer.tabId) await cacheSet("comanda:" + drawer.tabId, null); // some a comanda antiga do cache
+        if (drawer.tabId) addClosedTab(drawer.tabId);
+        setTables((ts) => dropClosed(ts)); // aplica o filtro na tela já (mesa vira Livre)
       }
       closeDrawer(); loadTables(); onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao fechar."); }
