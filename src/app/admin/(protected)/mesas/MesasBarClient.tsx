@@ -506,6 +506,37 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     void cacheGet<TableCard[]>("tables").then((cur) => { if (cur) void cacheSet("tables", apply(cur)); });
   }
 
+  // otimista: JUNTA a comanda A (origem) na B (destino) — combina as comandas cacheadas (itens, couvert,
+  // pagamentos somam), esvazia A e soma o total no card de B. No sync o servidor funde de verdade (op_id).
+  async function mergeLocal(fromNum: number, toNum: number, fromTabId: number, toTabId: number | null) {
+    if (toTabId) {
+      const [ca, cb] = await Promise.all([cacheGet<Comanda>("comanda:" + fromTabId), cacheGet<Comanda>("comanda:" + toTabId)]);
+      if (cb) {
+        const merged: Comanda = {
+          ...cb,
+          orders: [...cb.orders, ...(ca?.orders ?? [])],
+          consumoCents: (cb.consumoCents ?? 0) + (ca?.consumoCents ?? 0),
+          coverCents: (cb.coverCents ?? 0) + (ca?.coverCents ?? 0),
+          totalCents: (cb.totalCents ?? 0) + (ca?.totalCents ?? 0),
+          paidCents: (cb.paidCents ?? 0) + (ca?.paidCents ?? 0),
+          payments: [...(cb.payments ?? []), ...(ca?.payments ?? [])],
+        };
+        await cacheSet("comanda:" + toTabId, merged);
+      }
+    }
+    await cacheSet("comanda:" + fromTabId, null); // origem esvazia
+    const apply = (ts: TableCard[]) => {
+      const add = ts.find((t) => t.number === fromNum)?.openTotalCents ?? 0;
+      return ts.map((t) => {
+        if (t.number === fromNum) return { ...t, tabId: null, openTotalCents: 0, openedAt: null, contaCalled: false };
+        if (t.number === toNum) return { ...t, openTotalCents: t.openTotalCents + add };
+        return t;
+      });
+    };
+    setTables(apply);
+    const cur = await cacheGet<TableCard[]>("tables"); if (cur) await cacheSet("tables", apply(cur));
+  }
+
   // otimista: tira/decrementa o item da comanda LOCAL (estado + cache) — usado no cancelamento offline
   function removeItemLocal(itemId: number, units?: number) {
     setComanda((c) => {
@@ -563,22 +594,17 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     if (!drawer || busy) return;
     setBusy(true); setErr("");
     try {
-      // JUNTAR (destino ocupado) offline NÃO é suportado — funde 2 comandas. Tenta online (com timeout);
-      // se estiver offline, avisa em vez de travar. Transferir pra LIVRE é offline-capable (abaixo).
-      if (merge) {
-        if (typeof navigator !== "undefined" && !navigator.onLine) { setErr("Juntar comandas precisa de conexão."); return; }
-        const r = await fetchTimeout("/api/mesas/transferir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, toTableNumber: toNumber, merge: true }) }, 4000);
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Não consegui juntar.");
-        setMoveConfirm(null); setMoveOpen(false); closeDrawer(); loadTables();
-        return;
-      }
-
-      // TRANSFERIR pra mesa LIVRE — offline (flag on): enfileira com opId e move o card na hora
+      // OFFLINE (flag on): transferir E juntar pela fila (opId idempotente). Online posta na hora;
+      // offline enfileira + otimista na tela (move o card / funde as comandas). Mesa aberta offline
+      // (sem tabId) não transfere/junta até subir (o servidor ainda não tem a comanda dela).
       if (offlineOn) {
-        if (!drawer.tabId) { setErr("Essa mesa foi aberta offline e ainda não subiu — transfira quando reconectar."); return; }
-        const res = await submitOrQueue("/api/mesas/transferir", { tabId: drawer.tabId, toTableNumber: toNumber, opId: genOpId() }, `Trocar Mesa ${drawer.table.number}→${toNumber}`);
-        if ("queued" in res) moveTileLocal(drawer.table.number, toNumber, drawer.tabId); else loadTables();
+        if (!drawer.tabId) { setErr("Essa mesa foi aberta offline e ainda não subiu — troque/junte quando reconectar."); return; }
+        const toTabId = tables.find((t) => t.number === toNumber)?.tabId ?? null;
+        const res = await submitOrQueue("/api/mesas/transferir", { tabId: drawer.tabId, toTableNumber: toNumber, merge, opId: genOpId() }, `${merge ? "Juntar" : "Trocar"} Mesa ${drawer.table.number}→${toNumber}`);
+        if ("queued" in res) {
+          if (merge) await mergeLocal(drawer.table.number, toNumber, drawer.tabId, toTabId);
+          else moveTileLocal(drawer.table.number, toNumber, drawer.tabId);
+        } else loadTables();
         setMoveConfirm(null); setMoveOpen(false); closeDrawer();
         return;
       }
