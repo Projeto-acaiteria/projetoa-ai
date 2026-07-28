@@ -483,6 +483,14 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // cancela item já lançado na comanda ABERTA. 'one' → 1 unidade da linha-fonte mais recente;
   // 'all' → cancela todas as linhas-fonte da linha visual. O servidor estorna o estoque e registra
   // o motivo (log auditável). Read-after-write: recarrega a comanda fresca do banco (λ.prova-na-fonte).
+  // otimista: ajusta o TOTAL do card da mesa (estado + cache) — o card lê openTotalCents, separado da
+  // comanda; sem isso o cancelamento sumia da comanda mas o card ficava com o valor cheio.
+  function bumpTileTotal(numMesa: number, deltaCents: number) {
+    const apply = (ts: TableCard[]) => ts.map((t) => (t.number === numMesa ? { ...t, openTotalCents: Math.max(0, t.openTotalCents + deltaCents) } : t));
+    setTables(apply);
+    void cacheGet<TableCard[]>("tables").then((cur) => { if (cur) void cacheSet("tables", apply(cur)); });
+  }
+
   // otimista: tira/decrementa o item da comanda LOCAL (estado + cache) — usado no cancelamento offline
   function removeItemLocal(itemId: number, units?: number) {
     setComanda((c) => {
@@ -512,9 +520,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           await submitOrQueue("/api/mesas/cancelar-item", { itemId: t.id, units: t.units, reason, opId: genOpId() }, `Cancelar item · Mesa ${drawer?.table.number ?? ""}`);
           removeItemLocal(t.id, t.units);
         }
+        // abate o valor cancelado do CARD da mesa (consumo): −1un (modo one) ou a linha toda (modo all)
+        const canceledCents = cancelFor.mode === "one" ? cancelFor.unitCents : cancelFor.unitCents * cancelFor.qtyTotal;
+        if (drawer) bumpTileTotal(drawer.table.number, -canceledCents);
         setCancelFor(null); setCancelReason("");
-        loadTables();
-        return;
+        return; // NÃO chama loadTables (offline recarregaria o card cheio do cache antes do sync)
       }
 
       // flag off → fetch direto (comportamento original)
