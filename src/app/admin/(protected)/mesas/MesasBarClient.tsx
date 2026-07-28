@@ -9,7 +9,7 @@ import { brl } from "@/lib/format";
 import type { BarCategory, BarProduct } from "@/lib/menu-bar-store";
 import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag, IconMinus, IconTrash } from "@/components/Icons";
-import { submitOrQueue, pendingCount, QUEUE_EVENT, fetchTimeout } from "@/lib/offline-queue";
+import { submitOrQueue, pendingCount, QUEUE_EVENT, fetchTimeout, rebuildTableLancar } from "@/lib/offline-queue";
 import { cacheSet, cacheGet } from "@/lib/offline-cache";
 import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
@@ -85,7 +85,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // Fatia 2: itens lançados OFFLINE numa comanda aberta, mostrados otimistas até a fila subir.
   // itens lançados OFFLINE, chaveados por NÚMERO da mesa (fonte única — o card e o drawer leem daqui).
   // Some quando a fila sincroniza e o servidor devolve o consumo real.
-  const [pendingLines, setPendingLines] = useState<{ tableNumber: number; label: string; qty: number; unitPriceCents: number }[]>([]);
+  const [pendingLines, setPendingLines] = useState<{ uid: string; tableNumber: number; label: string; qty: number; unitPriceCents: number; item: { productId: string; qty: number; modifierIds?: string[]; grams?: number; note?: string } }[]>([]);
   // flag offline: inicia com o prop (pode vir velho do cache do PWA) e AUTOCORRIGE pela /api/mesas fresca
   const [offlineOn, setOfflineOn] = useState(offlineEnabled);
   // Peça 3: mesas FECHADAS offline (por número) — somem da tela como provisórias até a fila subir
@@ -252,7 +252,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         const body = drawer.tabId
           ? { tabId: drawer.tabId, items, opId }
           : { tableNumber: num, pax: coverShow ? pax : undefined, waiterId: waiter || undefined, items, opId };
-        const pend = temp.map((l) => ({ tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents }));
+        const pend = temp.map((l) => ({ uid: genOpId(), tableNumber: num, label: l.label, qty: l.qty, unitPriceCents: l.unitPriceCents, item: { productId: l.product.id, qty: l.qty, modifierIds: l.modifierIds, grams: l.grams, note: l.note } }));
         // queuedExtra prePrinted: só o corpo ENFILEIRADO leva — no sync o servidor marca o pedido
         // como já impresso (imprimi local abaixo) e o vigia headless NÃO reimprime. Online não leva
         // (post imediato) → quem imprime é o vigia, sem duplicar.
@@ -573,6 +573,14 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     });
   }
 
+  // remove um item PENDENTE (comanda aberta offline, ainda não sincronizada): tira da FILA + do local.
+  // Não é "cancelar" (nunca subiu ao servidor) — só desfaz. O card/gaveta leem pendingLines → atualizam sós.
+  async function removePendingItem(uid: string, numMesa: number) {
+    const remaining = pendingLines.filter((p) => p.tableNumber === numMesa && p.uid !== uid).map((p) => p.item);
+    try { await rebuildTableLancar(numMesa, remaining, { prePrinted: true }); } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao remover."); return; }
+    setPendingLines((p) => p.filter((x) => x.uid !== uid));
+  }
+
   async function doCancel() {
     if (!cancelFor || busy) return;
     const reason = cancelReason.trim();
@@ -886,10 +894,14 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
                     <div className="border-t border-dashed border-[var(--gold)]/60">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase text-[var(--gold)]">⏳ aguardando sincronizar</div>
                       <ul className="divide-y divide-line/50">
-                        {myPending.map((p, i) => (
-                          <li key={`pend-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm opacity-70">
+                        {myPending.map((p) => (
+                          <li key={p.uid} className="flex items-center justify-between gap-2 px-3 py-2 text-sm opacity-70">
                             <span className="min-w-0 text-ink"><b className="tabular-nums">{p.qty}×</b> {p.label}</span>
-                            <span className="tabular-nums text-[var(--text-muted)]">{brl(p.qty * p.unitPriceCents)}</span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              <span className="tabular-nums text-[var(--text-muted)]">{brl(p.qty * p.unitPriceCents)}</span>
+                              {/* remover item pendente (só caixa/admin) — item que ainda não sincronizou: tira da fila */}
+                              {canClose && <button onClick={() => removePendingItem(p.uid, p.tableNumber)} title="Remover item (ainda não sincronizado)" className="grid h-7 w-7 place-items-center rounded-lg border border-line text-[var(--text-faded)] hover:border-[var(--red-no)] hover:text-[var(--red-no)]"><IconTrash width={13} height={13} /></button>}
+                            </span>
                           </li>
                         ))}
                       </ul>

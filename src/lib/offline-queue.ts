@@ -91,3 +91,24 @@ export async function flushQueue(): Promise<number> {
   if (sent > 0) notifyChange();
   return sent;
 }
+
+/** Remove os lançamentos OFFLINE de uma mesa (por NÚMERO) e re-enfileira UM com os itens que sobraram.
+ *  Usado pra REMOVER um item de comanda aberta offline (ainda não sincronizada): como o item nunca
+ *  chegou ao servidor, não há o que "cancelar" — só tirar da fila. Preserva pax/waiterId do 1º lançamento. */
+export async function rebuildTableLancar(tableNumber: number, items: unknown[], queuedExtra?: Record<string, unknown>): Promise<void> {
+  const all = await getPending();
+  const isMine = (w: QueuedWrite) => {
+    if (!w.url.includes("/api/mesas/lancar")) return false;
+    try { return (JSON.parse(w.body) as { tableNumber?: number }).tableNumber === tableNumber; } catch { return false; }
+  };
+  const mine = all.filter(isMine);
+  let base: Record<string, unknown> = {};
+  if (mine[0]) { try { const b = JSON.parse(mine[0].body) as Record<string, unknown>; base = { pax: b.pax, waiterId: b.waiterId }; } catch {} }
+  for (const w of mine) await removePending(w.id);
+  if (items.length) {
+    const opId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : newId();
+    const body = JSON.stringify({ tableNumber, ...base, items, opId, ...(queuedExtra || {}) });
+    await enqueue({ id: newId(), url: "/api/mesas/lancar", method: "POST", body, label: `Mesa ${tableNumber} · ${items.length} item(ns)`, createdAt: Date.now() });
+  }
+  notifyChange();
+}
