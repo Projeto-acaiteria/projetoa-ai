@@ -182,7 +182,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     else if (pendingLines.some((p) => p.tableNumber === t.number)) { setDrawer({ table: t, tabId: null }); setView("comanda"); setComanda(null); } // mesa aberta OFFLINE (só na fila) → já vê a comanda com os pendentes + Fechar conta
     else { setDrawer({ table: t, tabId: null }); setView("pick"); setComanda(null); } // rascunho — não cria nada ainda
   }
-  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setSplitTroco(0); setSentToCaixa(false); }
+  function closeDrawer() { setDrawer(null); setComanda(null); setTemp([]); setPickedCat(null); setPaying(false); setRecebido(""); setSplitMode(false); setCoverOn(true); setFee(true); setSplitTroco(0); setSentToCaixa(false); }
 
   // toca no produto: peso → WeightModal · com grupos → ProductCustomizer · simples → soma a linha
   function onProduct(p: BarProduct) {
