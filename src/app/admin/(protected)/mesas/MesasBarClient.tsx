@@ -318,9 +318,27 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // couvert ajustável DEPOIS da abertura: muda nº de pessoas → servidor re-faz o snapshot do cover
   async function setPeople(next: number) {
     if (!drawer?.tabId || busy) return;
+    const np = Math.max(1, Math.round(next));
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/mesas/pessoas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, pax: Math.max(1, next) }) });
+      // OFFLINE (flag on): enfileira (a rota seta pax ABSOLUTO → replay não duplica) e ajusta o
+      // couvert/pessoas otimista. Servidor faz cover_cents = coverShow.coverCents × pax — espelho igual.
+      if (offlineOn) {
+        const res = await submitOrQueue("/api/mesas/pessoas", { tabId: drawer.tabId, pax: np }, `Pessoas · Mesa ${drawer.table.number}`);
+        if ("queued" in res) {
+          const newCover = (coverShow?.coverCents ?? 0) * np;
+          const oldCover = comanda?.coverCents ?? 0;
+          bumpTileTotal(drawer.table.number, newCover - oldCover); // couvert não leva taxa
+          setComanda((c) => {
+            if (!c) return c;
+            const nextC = { ...c, coverCents: newCover, tab: { ...c.tab, people_count: np } };
+            if (c.tab?.id) void cacheSet("comanda:" + c.tab.id, nextC);
+            return nextC;
+          });
+        } else if (drawer.tabId) { await loadComanda(drawer.tabId); loadTables(); }
+        return;
+      }
+      const r = await fetch("/api/mesas/pessoas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, pax: np }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui ajustar.");
       await loadComanda(drawer.tabId); loadTables();
