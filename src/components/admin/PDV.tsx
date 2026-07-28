@@ -8,7 +8,7 @@ import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox,
 import { type CupomData } from "@/components/admin/CupomPrinter";
 import { printVias, openDrawer } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
-import { submitOrQueue } from "@/lib/offline-queue";
+import { submitOrQueue, fetchTimeout } from "@/lib/offline-queue";
 import WeightModal from "@/components/admin/WeightModal";
 import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
@@ -239,7 +239,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
 
             {/* Fidelidade no TOPO da comanda — sempre visível, sem precisar rolar (achado Eduardo no caixa) */}
             <div className="mb-3 shrink-0 border-b border-line pb-3">
-              <CustomerBox customer={customer} onChange={setCustomer} />
+              <CustomerBox customer={customer} onChange={setCustomer} offlineEnabled={offlineEnabled} />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -326,6 +326,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           }}
           cart={cart}
           phone={customer?.phone || ""}
+          customerName={customer?.name || ""}
         />
       )}
 
@@ -449,7 +450,7 @@ function MontarModal({ size, groups, onClose, onAdd }: { size: Size; groups: Mod
   );
 }
 
-function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: (c: Cust | null) => void }) {
+function CustomerBox({ customer, onChange, offlineEnabled = false }: { customer: Cust | null; onChange: (c: Cust | null) => void; offlineEnabled?: boolean }) {
   const [phone, setPhone] = useState("");
   const [notfound, setNotfound] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -509,23 +510,34 @@ function CustomerBox({ customer, onChange }: { customer: Cust | null; onChange: 
     if (!phone.trim()) return;
     setBusy(true);
     setNotfound(false);
-    // /api/pontos devolve cliente + prêmios da loja (saldo já é o VÁLIDO, com expiração)
-    const d = await fetch(`/api/pontos?phone=${encodeURIComponent(phone)}`, { cache: "no-store" }).then((r) => r.json());
-    setBusy(false);
-    setRewards(Array.isArray(d.rewards) ? d.rewards : []);
-    if (d.customer) onChange({ phone: d.customer.phone, name: d.customer.name, points: d.customer.points });
-    else setNotfound(true);
+    try {
+      // /api/pontos devolve cliente + prêmios da loja (saldo já é o VÁLIDO, com expiração)
+      const d = await fetchTimeout(`/api/pontos?phone=${encodeURIComponent(phone)}`, { cache: "no-store" }, 4000).then((r) => r.json());
+      setRewards(Array.isArray(d.rewards) ? d.rewards : []);
+      if (d.customer) onChange({ phone: d.customer.phone, name: d.customer.name, points: d.customer.points });
+      else setNotfound(true);
+    } catch {
+      // OFFLINE: não dá pra consultar saldo/prêmios — parte pro cadastro (pontua no sync)
+      setNotfound(true);
+    } finally { setBusy(false); }
   }
 
   async function cadastrar() {
+    if (!phone.trim() || !name.trim()) return;
     setBusy(true);
-    const d = await fetch("/api/clientes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, name, birthday: bday || undefined }),
-    }).then((r) => r.json());
-    setBusy(false);
-    if (d.customer) onChange({ phone: d.customer.phone, name: d.customer.name, points: d.customer.points });
+    try {
+      const d = await fetchTimeout("/api/clientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name, birthday: bday || undefined }),
+      }, 4000).then((r) => r.json());
+      if (d.customer) onChange({ phone: d.customer.phone, name: d.customer.name, points: d.customer.points });
+      else if (offlineEnabled) onChange({ phone: phone.trim(), name: name.trim(), points: 0 });
+    } catch {
+      // OFFLINE (flag on): anexa o cliente LOCAL — a venda leva phone+nome e o servidor
+      // cria/pontua no sync. Sem a flag, não mascara erro de rede (não anexa).
+      if (offlineEnabled) onChange({ phone: phone.trim(), name: name.trim(), points: 0 });
+    } finally { setBusy(false); }
   }
 
   // formulário de cadastro rápido
@@ -632,6 +644,7 @@ function PayModal({
   fees,
   machines,
   offlineEnabled = false,
+  customerName = "",
 }: {
   total: number;
   discountCents: number;
@@ -640,6 +653,7 @@ function PayModal({
   fees: Fees;
   machines: CardMachine[];
   offlineEnabled?: boolean;
+  customerName?: string;
   onClose: () => void;
   onDone: (r: { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string }) => void;
 }) {
@@ -697,6 +711,7 @@ function PayModal({
         parcelas: (splitMode ? splitCents.credito > 0 : method === "credito") ? parcelas : 1,
         amountPaidCents: !splitMode && method === "dinheiro" ? recCents : undefined,
         customerPhone: phone.trim() || undefined,
+        customerName: customerName.trim() || undefined, // servidor cria/pontua o cliente certo no sync (offline)
         discountCents: discountCents || undefined,
       };
       const doneCommon = { method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined };
