@@ -52,7 +52,7 @@ function groupCost(g: ModifierGroup, qty: Qty) {
   return cents;
 }
 
-export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, pricePerKgCents, offlineEnabled = false, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; pricePerKgCents: number; offlineEnabled?: boolean; onSold?: () => void }) {
+export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, pricePerKgCents, offlineEnabled = false, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; pricePerKgCents: number; offlineEnabled?: boolean; onSold?: (delta?: { totalCents: number }) => void }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [tab, setTab] = useState<"peso" | "acai" | "produtos">(pricePerKgCents > 0 ? "peso" : "acai");
   const [weighing, setWeighing] = useState(false);
@@ -318,7 +318,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           onDone={(r) => {
             setPay(false);
             setResult(r);
-            onSold?.();
+            onSold?.(r.offlineTotalCents != null ? { totalCents: r.offlineTotalCents } : undefined);
             // auto-impressão POR-MÁQUINA: mesma política do Balcão (respeita o toggle autoprint:venda)
             if (typeof window !== "undefined" && localStorage.getItem("autoprint:venda") !== "0") printCupom(r);
             // abre a gaveta na venda em dinheiro (se a máquina tiver gaveta ligada)
@@ -655,7 +655,7 @@ function PayModal({
   offlineEnabled?: boolean;
   customerName?: string;
   onClose: () => void;
-  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string }) => void;
+  onDone: (r: { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string; offlineTotalCents?: number }) => void;
 }) {
   const [method, setMethod] = useState<PayMethod>("dinheiro");
   const [received, setReceived] = useState("");
@@ -721,7 +721,7 @@ function PayModal({
       if (offlineEnabled) {
         const res = await submitOrQueue("/api/vendas", { ...body, opId: genOpId() }, "Venda PDV · açaí");
         if ("queued" in res) {
-          onDone({ display: "LOCAL-" + String(Date.now()).slice(-5), changeCents: change, pointsAwarded: 0, ...doneCommon });
+          onDone({ display: "LOCAL-" + String(Date.now()).slice(-5), changeCents: change, pointsAwarded: 0, ...doneCommon, offlineTotalCents: total });
           return;
         }
         const data = res.data as { order: { display: string }; changeCents: number; pointsAwarded: number; pointsInfo?: string; stockWarning?: string };

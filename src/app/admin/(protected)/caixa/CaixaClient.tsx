@@ -15,6 +15,7 @@ import { IconWallet, IconCheck, IconArrowRight, IconClock, IconPlus, IconMinus, 
 import type { BarCategory } from "@/lib/menu-bar-store";
 import MesasBarClient from "../mesas/MesasBarClient";
 import BalcaoClient from "../balcao/BalcaoClient";
+import { pendingCount, QUEUE_EVENT } from "@/lib/offline-queue";
 
 type StoreHeader = { name: string; endereco: string; cnpj: string; tel: string };
 const dmyhm = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -54,6 +55,21 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
     load();
   }, [load]);
 
+  // Opção A (offline): vendas feitas SEM net ficam na fila (não commitadas) → o resumo do servidor não
+  // as conhece até sincronizar. Em vez de inflar "total vendido" (mistura pendente com commitado, atrapalha
+  // a conferência de gaveta), mostra um SELO honesto de pendentes. onSold no ramo offline manda o total.
+  const [pendingSales, setPendingSales] = useState({ count: 0, totalCents: 0 });
+  const handleSold = useCallback((delta?: { totalCents: number }) => {
+    if (delta) setPendingSales((p) => ({ count: p.count + 1, totalCents: p.totalCents + delta.totalCents }));
+    else load(); // online: resposta commitada → recarrega o resumo autoritativo
+  }, [load]);
+  // quando a fila DRENA (tudo sincronizou), zera o selo e recarrega o resumo — que agora já inclui as vendas.
+  useEffect(() => {
+    const onQueue = async () => { if ((await pendingCount()) === 0) { setPendingSales({ count: 0, totalCents: 0 }); load(); } };
+    window.addEventListener(QUEUE_EVENT, onQueue);
+    return () => window.removeEventListener(QUEUE_EVENT, onQueue);
+  }, [load]);
+
   if (!loaded) return <div className="card p-8 text-center text-sm text-[var(--text-muted)]">Carregando caixa...</div>;
 
   // tela de resultado do fechamento
@@ -66,12 +82,18 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
   // rolando por dentro — sem scroll de PÁGINA no desktop. Mobile mantém o scroll natural.
   return (
     <div className={`flex flex-col gap-5 ${showPdv ? "lg:h-[calc(100dvh-4rem)] lg:gap-4 lg:overflow-hidden" : ""}`}>
+      {pendingSales.count > 0 && (
+        <div className="shrink-0 flex items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/10 px-3.5 py-2.5 text-sm">
+          <span className="flex items-center gap-2 font-bold text-ink">⏳ {pendingSales.count} venda{pendingSales.count === 1 ? "" : "s"} offline · {brl(pendingSales.totalCents)}</span>
+          <span className="text-xs text-[var(--text-muted)]">entram no caixa ao sincronizar</span>
+        </div>
+      )}
       <div className="shrink-0">
         <PainelCaixa session={session} resumo={resumo!} store={{ name: storeName, endereco, cnpj, tel }} cupomRodape={cupomRodape} cashPinSet={cashPinSet} onChanged={load} onClosed={(s) => setCloseResult(s)} />
       </div>
       {showPdv ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} offlineEnabled={offlineEnabled} onSold={load} />
+          <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} offlineEnabled={offlineEnabled} onSold={handleSold} />
         </div>
       ) : (
         family === "service" ? (
@@ -105,7 +127,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <BalcaoClient categories={barCategories} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} loyaltyEnabled={loyaltyEnabled} offlineEnabled={offlineEnabled} onSold={load} />
+            <BalcaoClient categories={barCategories} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} loyaltyEnabled={loyaltyEnabled} offlineEnabled={offlineEnabled} onSold={handleSold} />
           </div>
         </div>
       )}
