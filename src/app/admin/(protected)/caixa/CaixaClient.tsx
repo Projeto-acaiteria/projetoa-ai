@@ -33,7 +33,7 @@ const hhmm = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family, pdvHub = false, barCategories = [], coverShow = null, staff = [], loyaltyEnabled = false, stations = [] }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service"; pdvHub?: boolean; barCategories?: BarCategory[]; coverShow?: { artist: string; coverCents: number } | null; staff?: { id: string; name: string }[]; loyaltyEnabled?: boolean; stations?: string[] }) {
+export default function CaixaClient({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, showPdv, pricePerKgCents, cashPinSet, family, pdvHub = false, barCategories = [], coverShow = null, staff = [], loyaltyEnabled = false, offlineEnabled = false, stations = [] }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; showPdv: boolean; pricePerKgCents: number; cashPinSet: boolean; family: "food" | "service"; pdvHub?: boolean; barCategories?: BarCategory[]; coverShow?: { artist: string; coverCents: number } | null; staff?: { id: string; name: string }[]; loyaltyEnabled?: boolean; offlineEnabled?: boolean; stations?: string[] }) {
   const [session, setSession] = useState<CashSession | null>(null);
   const [avulsa, setAvulsa] = useState(false);
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -105,7 +105,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <BalcaoClient categories={barCategories} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} loyaltyEnabled={loyaltyEnabled} onSold={load} />
+            <BalcaoClient categories={barCategories} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} loyaltyEnabled={loyaltyEnabled} offlineEnabled={offlineEnabled} onSold={load} />
           </div>
         </div>
       )}

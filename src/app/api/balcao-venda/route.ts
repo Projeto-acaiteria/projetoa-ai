@@ -10,6 +10,7 @@ import { pointsForSale, validBalance, loyaltyReceiptInfo } from "@/lib/loyalty";
 import { getLoyalty } from "@/lib/loyalty-store";
 import { incrementCouponUsage } from "@/lib/coupons-store";
 import { dateBR } from "@/lib/date-br";
+import { withIdempotency, httpError } from "@/lib/idempotency";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ type Body = {
   discountCents?: number; // desconto do operador (R$ ou % já convertido em centavos)
   couponId?: string; // cupom aplicado — conta o uso após a venda (best-effort)
   payments?: { method: PaymentMethod; amountCents: number }[]; // split de pagamento (>1 forma)
+  opId?: string; // idempotência (venda offline): replay no sync devolve a mesma venda, sem duplicar
 };
 
 export async function POST(req: Request) {
@@ -51,11 +53,14 @@ export async function POST(req: Request) {
   }
 
   try {
+    // idempotência (venda offline): sem opId roda igual a hoje; com opId, replay no sync devolve a
+    // MESMA venda gravada (não duplica). Toda a venda roda dentro do claim.
+    const { result } = await withIdempotency(b.opId, storeId, "balcao-venda", async () => {
     const resolved = await resolveOrderItems(storeId, sel);
-    if (!resolved.length) return NextResponse.json({ error: "itens indisponíveis" }, { status: 400 });
+    if (!resolved.length) throw httpError(400, "itens indisponíveis");
 
     const subtotalCents = resolved.reduce((s, it) => s + it.qty * it.unitPriceCents, 0);
-    if (subtotalCents <= 0) return NextResponse.json({ error: "Confira os pesos/itens — total zerado." }, { status: 400 });
+    if (subtotalCents <= 0) throw httpError(400, "Confira os pesos/itens — total zerado.");
 
     // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
     const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
@@ -66,7 +71,7 @@ export async function POST(req: Request) {
     const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && PAYMENTS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
     const isSplit = rawPays.length >= 2;
     if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
-      return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
+      throw httpError(400, "A soma das formas de pagamento não bate com o total.");
     }
     const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : method;
     // taxa: total (forma única) OU soma de TODAS as parcelas no cartão (split — ex: débito + crédito)
@@ -150,8 +155,13 @@ export async function POST(req: Request) {
       if (balanceAfter > 0) pointsInfo = loyaltyReceiptInfo(pointsAwarded, balanceAfter, cfg.rewards);
     }
 
-    return NextResponse.json({ ok: true, order, pointsAwarded, pointsInfo, stockWarning, prep }, { status: 201 });
+    return { ok: true, order, pointsAwarded, pointsInfo, stockWarning, prep };
+    });
+    return NextResponse.json(result, { status: 201 });
   } catch (e) {
+    const he = e as { httpStatus?: number; inflight?: boolean };
+    if (he.httpStatus) return NextResponse.json({ error: (e as Error).message }, { status: he.httpStatus });
+    if (he.inflight) return NextResponse.json({ error: (e as Error).message }, { status: 409 });
     console.error("balcao-venda:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });
   }

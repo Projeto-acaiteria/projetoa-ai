@@ -7,6 +7,7 @@ import type { CardMachine } from "@/lib/settings-store";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
+import { submitOrQueue } from "@/lib/offline-queue";
 import QzStatus from "@/components/admin/QzStatus";
 import { brl } from "@/lib/format";
 import WeightModal from "@/components/admin/WeightModal";
@@ -14,6 +15,13 @@ import { IconSearch } from "@/components/Icons";
 import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
 type Line = { uid: string; productId: string; name: string; qty: number; unitPriceCents: number; grams?: number; modifierIds?: string[]; note?: string };
+
+// resposta da venda (servidor OU sintetizada local no offline). O bloco de impressão lê só isto.
+type SaleResp = {
+  order: { display: string; code?: string; items: { qty: number; name: string; paidCents: number; note?: string }[]; totalCents: number; subtotalCents?: number; discountCents?: number };
+  prep?: { station: string; qty: number; name: string; sizeLabel?: string | null; mods?: { name: string; price_cents: number }[] | null; note?: string | null }[];
+  pointsAwarded?: number; pointsInfo?: string; stockWarning?: string;
+};
 
 // normaliza p/ busca: minúsculo + sem acento (açaí → acai)
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -27,8 +35,9 @@ const PAYS: { id: PaymentMethod; label: string }[] = [
 
 let seq = 0;
 const uid = () => `l${++seq}`;
+const genOpId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 
-export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, cupomRodape, loyaltyEnabled, onSold }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; loyaltyEnabled: boolean; onSold?: () => void }) {
+export default function BalcaoClient({ categories, storeName, machines, endereco, cnpj, tel, cupomRodape, loyaltyEnabled, offlineEnabled = false, onSold }: { categories: BarCategory[]; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; loyaltyEnabled: boolean; offlineEnabled?: boolean; onSold?: () => void }) {
   const [cart, setCart] = useState<Line[]>([]);
   const [query, setQuery] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -157,12 +166,27 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
     }
     setSaving(true); setErr("");
     try {
-      const r = await fetch("/api/balcao-venda", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: custName.trim() || (customer?.found ? customer.name : undefined), discountCents: discountCents || undefined, couponId: couponId || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Falha ao registrar a venda.");
+      const body = { paymentMethod: splitMode ? splitDominant : pay, payments: splitMode ? splitPays : undefined, machineId: ((splitMode ? splitCardCents > 0 : pay === "debito" || pay === "credito") && machineId) ? machineId : undefined, parcelas: (splitMode ? splitCents.credito > 0 : pay === "credito") ? parcelas : 1, customerPhone: phone.trim() || undefined, customerName: custName.trim() || (customer?.found ? customer.name : undefined), discountCents: discountCents || undefined, couponId: couponId || undefined, items: cart.map((l) => ({ productId: l.productId, qty: l.qty, grams: l.grams, modifierIds: l.modifierIds, note: l.note?.trim() || undefined })) };
+      let d: SaleResp; let local = false;
+      if (offlineEnabled) {
+        // OFFLINE (flag on): enfileira com opId (idempotente, não duplica no sync) e SINTETIZA a resposta
+        // pra imprimir cupom + vias de estação local. Opção A: número PROVISÓRIO marcado ("LOCAL-…").
+        const res = await submitOrQueue("/api/balcao-venda", { ...body, opId: genOpId() }, "Venda avulsa · balcão");
+        if ("queued" in res) {
+          local = true;
+          const stationOf = (pid: string) => { for (const c of categories) for (const p of c.products) if (p.id === pid) return c.station; return "cozinha"; };
+          const display = "LOCAL-" + String(Date.now()).slice(-5);
+          d = {
+            order: { display, code: display, items: cart.map((l) => ({ qty: l.qty, name: l.name, paidCents: l.qty * l.unitPriceCents, note: l.note })), totalCents: finalTotal, subtotalCents: total, discountCents },
+            prep: cart.map((l) => ({ station: stationOf(l.productId), qty: l.qty, name: l.name, sizeLabel: null, mods: null, note: l.note ?? null })),
+            pointsAwarded: 0, // pontos são creditados no SYNC (servidor pontua pelo phone enfileirado)
+          };
+        } else { d = res.data as SaleResp; }
+      } else {
+        const r = await fetch("/api/balcao-venda", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        d = await r.json();
+        if (!r.ok) throw new Error((d as { error?: string }).error || "Falha ao registrar a venda.");
+      }
       // cupom (auto-impressão é POR-MÁQUINA — desligável na tela de Impressora; default ligado)
       const o = d.order;
       const now = new Date(); const p2 = (n: number) => String(n).padStart(2, "0");
@@ -194,7 +218,7 @@ export default function BalcaoClient({ categories, storeName, machines, endereco
         }
       }
       const pts = d.pointsAwarded ?? 0;
-      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "")); setCart([]); setDiscInput(""); setCouponId(null); setCouponCode(""); setCouponMsg(""); onSold?.();
+      setDone(o.display + (pts > 0 ? ` · +${pts} pts` : "") + (d.stockWarning ? " · ⚠ confira o estoque" : "") + (local ? " · sincronizando" : "")); setCart([]); setDiscInput(""); setCouponId(null); setCouponCode(""); setCouponMsg(""); onSold?.();
       setPhone(""); setCustName(""); setRecebido(""); setCustomer(null); setRewards([]); setLoyMsg("");
       setTimeout(() => setDone(null), 3500);
     } catch (e) {
