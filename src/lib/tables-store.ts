@@ -171,11 +171,15 @@ export async function getTables(): Promise<TableCard[]> {
   }
 
   // FALTA RECEBER (o mesmo número que a gaveta da mesa mostra em "Falta"): consumo + couvert +
-  // taxa 10% − já pago. A taxa é 10% SÓ sobre o consumo, nunca sobre o couvert, e ambas as telas de
-  // mesa (bar e açaí) já assumem a taxa ligada por padrão — assim tile e gaveta nunca discordam.
+  // taxa − já pago. A taxa é 10% SÓ sobre o consumo, nunca sobre o couvert.
+  // ⚠️ A taxa só entra no SALÃO (bar/grid), onde a gaveta nasce com os 10% marcados. No açaí a
+  // mesma caixinha nasce DESmarcada (MesasClient), então somar 10% aqui faria o card anunciar mais
+  // do que a comanda cobra. Card e gaveta têm que dizer o mesmo número.
+  const cfg = await getStoreConfig(sid);
+  const cobraTaxa = cfg?.menu_template === "bar" || cfg?.menu_template === "grid";
   const faltaDoTab = (tabId: number, coverCents: number) => {
     const consumo = totalByTab.get(tabId) ?? 0;
-    const total = consumo + coverCents + Math.round(consumo * 0.1);
+    const total = consumo + coverCents + (cobraTaxa ? Math.round(consumo * 0.1) : 0);
     return Math.max(0, total - (paidByTab.get(tabId) ?? 0));
   };
 
