@@ -118,12 +118,12 @@ export async function getTables(): Promise<TableCard[]> {
   // comandas abertas → indexa por mesa
   const { data: openTabs } = await d
     .from("tabs")
-    .select("id, table_id, opened_at, cover_cents")
+    .select("id, table_id, opened_at, cover_cents, people_count")
     .eq("store_id", sid)
     .eq("status", "aberta");
-  const tabByTable = new Map<number, { id: number; opened_at: string; cover_cents: number }>();
+  const tabByTable = new Map<number, { id: number; opened_at: string; cover_cents: number; people_count: number }>();
   for (const t of openTabs ?? []) {
-    if (t.table_id != null) tabByTable.set(num(t.table_id), { id: num(t.id), opened_at: t.opened_at, cover_cents: num(t.cover_cents) });
+    if (t.table_id != null) tabByTable.set(num(t.table_id), { id: num(t.id), opened_at: t.opened_at, cover_cents: num(t.cover_cents), people_count: num(t.people_count) });
   }
 
   // total dos itens das comandas abertas
@@ -177,9 +177,15 @@ export async function getTables(): Promise<TableCard[]> {
   // do que a comanda cobra. Card e gaveta têm que dizer o mesmo número.
   const cfg = await getStoreConfig(sid);
   const cobraTaxa = cfg?.menu_template === "bar" || cfg?.menu_template === "grid";
-  const faltaDoTab = (tabId: number, coverCents: number) => {
+  // Couvert do card = MESMA fonte da gaveta: snapshot se já gravado, senão evento ativo × pessoas.
+  // Sem isso o card fica sem couvert quando o show foi criado DEPOIS da mesa abrir (cover_cents=0),
+  // divergindo da gaveta que recomputa ao vivo (bug 28/07, Mesa 10: card 80,30 vs gaveta 100,30).
+  const ev = cfg?.cover_enabled ? await getActiveEvent(sid) : null;
+  const coverDoTab = (coverCents: number, people: number) =>
+    coverCents > 0 ? coverCents : (ev ? ev.cover_cents * Math.max(1, people) : 0);
+  const faltaDoTab = (tabId: number, coverCents: number, people: number) => {
     const consumo = totalByTab.get(tabId) ?? 0;
-    const total = consumo + coverCents + (cobraTaxa ? Math.round(consumo * 0.1) : 0);
+    const total = consumo + coverDoTab(coverCents, people) + (cobraTaxa ? Math.round(consumo * 0.1) : 0);
     return Math.max(0, total - (paidByTab.get(tabId) ?? 0));
   };
 
@@ -189,7 +195,7 @@ export async function getTables(): Promise<TableCard[]> {
       number: num(tbl.number),
       area: (tbl.area as string) ?? "salao",
       tabId: open?.id ?? null,
-      openTotalCents: open ? faltaDoTab(open.id, open.cover_cents) : 0,
+      openTotalCents: open ? faltaDoTab(open.id, open.cover_cents, open.people_count) : 0,
       openedAt: open?.opened_at ?? null,
       contaCalled: open ? contaTabIds.has(open.id) || contaTableNums.has(num(tbl.number)) : false,
     };
