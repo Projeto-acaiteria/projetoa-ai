@@ -83,6 +83,7 @@ export type TableCard = {
   number: number;
   area: string;
   tabId: number | null;
+  /** FALTA RECEBER da mesa: consumo + couvert + taxa 10% − já pago (mesmo "Falta" da gaveta). */
   openTotalCents: number;
   openedAt: string | null;
   contaCalled: boolean; // cliente pediu a conta (service_call 'conta' pendente) — tile âmbar no topo
@@ -117,12 +118,12 @@ export async function getTables(): Promise<TableCard[]> {
   // comandas abertas → indexa por mesa
   const { data: openTabs } = await d
     .from("tabs")
-    .select("id, table_id, opened_at")
+    .select("id, table_id, opened_at, cover_cents")
     .eq("store_id", sid)
     .eq("status", "aberta");
-  const tabByTable = new Map<number, { id: number; opened_at: string }>();
+  const tabByTable = new Map<number, { id: number; opened_at: string; cover_cents: number }>();
   for (const t of openTabs ?? []) {
-    if (t.table_id != null) tabByTable.set(num(t.table_id), { id: num(t.id), opened_at: t.opened_at });
+    if (t.table_id != null) tabByTable.set(num(t.table_id), { id: num(t.id), opened_at: t.opened_at, cover_cents: num(t.cover_cents) });
   }
 
   // total dos itens das comandas abertas
@@ -145,6 +146,15 @@ export async function getTables(): Promise<TableCard[]> {
     }
   }
 
+  // pagamento já recebido na comanda ABERTA (adiantamento / split). Sem isto o tile mostrava o
+  // consumo cheio: mesa de R$30 com R$10 pagos seguia anunciando R$30 pro caixa (bug 28/07).
+  const paidByTab = new Map<number, number>();
+  if (tabIds.length) {
+    const { data: pays } = await d
+      .from("tab_payments").select("tab_id, amount_cents").eq("store_id", sid).in("tab_id", tabIds);
+    for (const p of pays ?? []) paidByTab.set(num(p.tab_id), (paidByTab.get(num(p.tab_id)) ?? 0) + num(p.amount_cents));
+  }
+
   // "pediu a conta": chamados 'conta' pendentes — mapeia por tab_id (preferido) ou nº da mesa.
   // Como só marcamos contaCalled em mesa COM comanda aberta, chamado de mesa já liberada não vaza.
   const { data: calls } = await d
@@ -160,13 +170,22 @@ export async function getTables(): Promise<TableCard[]> {
     else contaTableNums.add(num(c.table_number));
   }
 
+  // FALTA RECEBER (o mesmo número que a gaveta da mesa mostra em "Falta"): consumo + couvert +
+  // taxa 10% − já pago. A taxa é 10% SÓ sobre o consumo, nunca sobre o couvert, e ambas as telas de
+  // mesa (bar e açaí) já assumem a taxa ligada por padrão — assim tile e gaveta nunca discordam.
+  const faltaDoTab = (tabId: number, coverCents: number) => {
+    const consumo = totalByTab.get(tabId) ?? 0;
+    const total = consumo + coverCents + Math.round(consumo * 0.1);
+    return Math.max(0, total - (paidByTab.get(tabId) ?? 0));
+  };
+
   return (tables ?? []).map((tbl) => {
     const open = tabByTable.get(num(tbl.id));
     return {
       number: num(tbl.number),
       area: (tbl.area as string) ?? "salao",
       tabId: open?.id ?? null,
-      openTotalCents: open ? totalByTab.get(open.id) ?? 0 : 0,
+      openTotalCents: open ? faltaDoTab(open.id, open.cover_cents) : 0,
       openedAt: open?.opened_at ?? null,
       contaCalled: open ? contaTabIds.has(open.id) || contaTableNums.has(num(tbl.number)) : false,
     };

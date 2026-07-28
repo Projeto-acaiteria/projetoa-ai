@@ -485,6 +485,11 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // o motivo (log auditável). Read-after-write: recarrega a comanda fresca do banco (λ.prova-na-fonte).
   // otimista: ajusta o TOTAL do card da mesa (estado + cache) — o card lê openTotalCents, separado da
   // comanda; sem isso o cancelamento sumia da comanda mas o card ficava com o valor cheio.
+  // o tile mostra FALTA RECEBER (consumo + couvert + taxa 10% − pago), então todo ajuste otimista
+  // de consumo precisa carregar a taxa junto — senão o card diverge do servidor em 10% até o
+  // próximo loadTables. Arredonda por delta; centavo de diferença se acerta no próximo carregamento.
+  const comTaxa = (cents: number) => cents + Math.round(cents * 0.1);
+
   function bumpTileTotal(numMesa: number, deltaCents: number) {
     const apply = (ts: TableCard[]) => ts.map((t) => (t.number === numMesa ? { ...t, openTotalCents: Math.max(0, t.openTotalCents + deltaCents) } : t));
     setTables(apply);
@@ -568,7 +573,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
         }
         // abate o valor cancelado do CARD da mesa (consumo): −1un (modo one) ou a linha toda (modo all)
         const canceledCents = cancelFor.mode === "one" ? cancelFor.unitCents : cancelFor.unitCents * cancelFor.qtyTotal;
-        if (drawer) bumpTileTotal(drawer.table.number, -canceledCents);
+        if (drawer) bumpTileTotal(drawer.table.number, -comTaxa(canceledCents));
         setCancelFor(null); setCancelReason("");
         return; // NÃO chama loadTables (offline recarregaria o card cheio do cache antes do sync)
       }
@@ -695,7 +700,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
               {list.map((t) => {
                 const pendCents = pendingForTable(t.number); // itens offline desta mesa (ainda na fila)
                 const oc = !!t.tabId || pendCents > 0;        // pendente deixa a mesa "ocupada" no card
-                const shownTotal = t.openTotalCents + pendCents; // card mostra servidor + pendente (fonte única)
+                const shownTotal = t.openTotalCents + comTaxa(pendCents); // servidor + pendente, ambos com taxa
                 const conta = t.contaCalled; // pediu a conta → âmbar pulsando, no topo
                 const topColor = conta ? "#D97706" : oc ? "var(--brand-600)" : "#16A34A";
                 return (
