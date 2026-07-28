@@ -390,6 +390,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
             if (c.tab?.id) void cacheSet("comanda:" + c.tab.id, next);
             return next;
           });
+          bumpTileTotal(drawer.table.number, -recorded); // A.V abate a falta no card na hora (espelha o online; pagamento não leva taxa)
           setSplitTroco(method === "dinheiro" ? Math.max(0, amt - falta) : 0);
         } else {
           setSplitTroco(method === "dinheiro" ? ((res.data as { trocoCents?: number })?.trocoCents ?? 0) : 0);
