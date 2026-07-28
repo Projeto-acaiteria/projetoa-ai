@@ -491,6 +491,21 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     void cacheGet<TableCard[]>("tables").then((cur) => { if (cur) void cacheSet("tables", apply(cur)); });
   }
 
+  // otimista: move a comanda de uma mesa pra outra LIVRE (card + cache). O tabId é o mesmo (transferir
+  // só muda a mesa), então a comanda cacheada "comanda:tabId" segue válida na mesa destino.
+  function moveTileLocal(fromNum: number, toNum: number, tabId: number) {
+    const apply = (ts: TableCard[]) => {
+      const src = ts.find((t) => t.number === fromNum);
+      return ts.map((t) => {
+        if (t.number === fromNum) return { ...t, tabId: null, openTotalCents: 0, openedAt: null, contaCalled: false };
+        if (t.number === toNum) return { ...t, tabId, openTotalCents: src?.openTotalCents ?? 0, openedAt: src?.openedAt ?? null };
+        return t;
+      });
+    };
+    setTables(apply);
+    void cacheGet<TableCard[]>("tables").then((cur) => { if (cur) void cacheSet("tables", apply(cur)); });
+  }
+
   // otimista: tira/decrementa o item da comanda LOCAL (estado + cache) — usado no cancelamento offline
   function removeItemLocal(itemId: number, units?: number) {
     setComanda((c) => {
@@ -545,14 +560,34 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   // transfere a comanda pra outra mesa. Destino livre = move; destino ocupado + merge = funde as
   // comandas. Depois fecha o drawer e ressincroniza os tiles (a comanda mudou de mesa/id).
   async function doTransfer(toNumber: number, merge: boolean) {
-    if (!drawer?.tabId || busy) return;
+    if (!drawer || busy) return;
     setBusy(true); setErr("");
     try {
+      // JUNTAR (destino ocupado) offline NÃO é suportado — funde 2 comandas. Tenta online (com timeout);
+      // se estiver offline, avisa em vez de travar. Transferir pra LIVRE é offline-capable (abaixo).
+      if (merge) {
+        if (typeof navigator !== "undefined" && !navigator.onLine) { setErr("Juntar comandas precisa de conexão."); return; }
+        const r = await fetchTimeout("/api/mesas/transferir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, toTableNumber: toNumber, merge: true }) }, 4000);
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Não consegui juntar.");
+        setMoveConfirm(null); setMoveOpen(false); closeDrawer(); loadTables();
+        return;
+      }
+
+      // TRANSFERIR pra mesa LIVRE — offline (flag on): enfileira com opId e move o card na hora
+      if (offlineOn) {
+        if (!drawer.tabId) { setErr("Essa mesa foi aberta offline e ainda não subiu — transfira quando reconectar."); return; }
+        const res = await submitOrQueue("/api/mesas/transferir", { tabId: drawer.tabId, toTableNumber: toNumber, opId: genOpId() }, `Trocar Mesa ${drawer.table.number}→${toNumber}`);
+        if ("queued" in res) moveTileLocal(drawer.table.number, toNumber, drawer.tabId); else loadTables();
+        setMoveConfirm(null); setMoveOpen(false); closeDrawer();
+        return;
+      }
+
+      // flag off → fetch direto (comportamento original)
       const r = await fetch("/api/mesas/transferir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tabId: drawer.tabId, toTableNumber: toNumber, merge }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Não consegui transferir.");
-      setMoveConfirm(null); setMoveOpen(false);
-      closeDrawer(); loadTables();
+      setMoveConfirm(null); setMoveOpen(false); closeDrawer(); loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao transferir."); }
     finally { setBusy(false); }
   }
