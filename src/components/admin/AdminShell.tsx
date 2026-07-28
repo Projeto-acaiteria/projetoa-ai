@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import CaixaPrintQueue from "@/components/admin/CaixaPrintQueue";
 import CaixaPrepPrinter from "@/components/admin/CaixaPrepPrinter";
+import VersionCheck from "@/components/admin/VersionCheck";
 import {
   IconBowl,
   IconFlame,
@@ -110,6 +111,8 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
           (com impressora configurada). Fila sob demanda (conta do garçom) + vias de preparo novas. */}
       <CaixaPrintQueue station="caixa" />
       {prepStations.length > 0 && <CaixaPrepPrinter stations={prepStations} loja={storeName} />}
+      {/* Auto-update do PWA: detecta deploy novo e recarrega (senão o operador fica no bundle velho). */}
+      <VersionCheck />
       {/* Sidebar desktop */}
       <aside className="hidden border-r border-line bg-bg-elevated lg:flex lg:flex-col">
         <div className="flex items-center gap-2.5 px-5 py-5">
