@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { staffReport, createStaff, updateStaff, deleteStaff, createStaffAccess, listShifts, updateShift, addShift, removeShift, taxaServicoPorNoite, payShifts, listStaffPayments, reverseStaffPayment } from "@/lib/staff-store";
 import { getCurrentUser } from "@/lib/auth/store";
+import { createInvite, revokeAccess, revokeAllWaiters, accessStatus, deleteInvite } from "@/lib/staff-invite-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,13 +16,14 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const to = searchParams.get("to") || ymdBR(new Date());
   const from = searchParams.get("from") || ymdBR(new Date(Date.now() - 29 * 864e5));
-  const [acerto, shifts, taxa, pagamentos] = await Promise.all([
+  const [acerto, shifts, taxa, pagamentos, acesso] = await Promise.all([
     staffReport(undefined, undefined, storeId),
     listShifts(from, to, storeId),
     taxaServicoPorNoite(from, to, storeId),
     listStaffPayments(storeId),
+    accessStatus(storeId),
   ]);
-  return NextResponse.json({ acerto, shifts, taxa, pagamentos, from, to });
+  return NextResponse.json({ acerto, shifts, taxa, pagamentos, acesso, from, to });
 }
 
 export async function POST(req: Request) {
@@ -64,6 +66,21 @@ export async function POST(req: Request) {
       case "reversePayment":
         await reverseStaffPayment(Number(p.id), storeId);
         return NextResponse.json({ ok: true });
+      // ACESSO POR CÓDIGO (mt-38): o dono gera 6 dígitos, o garçom digita dentro do app instalado
+      case "invite": {
+        const inv = await createInvite(String(p.id), storeId);
+        return NextResponse.json({ ok: true, ...inv });
+      }
+      case "deleteInvite":
+        await deleteInvite(String(p.inviteId), storeId);
+        return NextResponse.json({ ok: true });
+      case "revoke":
+        await revokeAccess(String(p.id), storeId);
+        return NextResponse.json({ ok: true });
+      case "revokeAll": {
+        const n = await revokeAllWaiters(storeId);
+        return NextResponse.json({ ok: true, desconectados: n });
+      }
       case "createAccess": {
         const email = String(p.email ?? "").trim();
         const senha = String(p.senha ?? "");

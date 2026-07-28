@@ -6,6 +6,7 @@ import { updateSession } from "@/lib/auth/middleware";
 // da própria rota (pedidos: POST público/GET admin; pontos: GET?phone público/listar+POST admin).
 const API_PUBLICAS = [
   "/api/mesa-pedido", "/api/mesa-chamado", "/api/delivery-pedido", "/api/cadastro", "/api/cadastro/check", "/api/leads",
+  "/api/garcom/entrar", // garçom entra por código (mt-38): é esta rota que CRIA a sessão dele
   "/api/webhooks/asaas", "/api/cron/billing-check", "/api/qz-sign",
   "/api/pedidos", "/api/pontos",
   "/api/loja", // vitrine headless: catálogo/montagem/pedido do site (público por slug)

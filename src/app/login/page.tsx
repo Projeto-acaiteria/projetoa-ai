@@ -78,6 +78,16 @@ export default function LoginPage() {
           {carregando ? "Entrando…" : "Entrar"}
         </button>
 
+        {/* garçom não tem email nem senha (mt-38): entra pelo código de 6 dígitos. O app instalado
+            abre em /admin e cai aqui quando a sessão não existe — por isso a porta dele fica visível. */}
+        <a
+          href="/garcom"
+          className="mt-5 block w-full rounded-xl border py-3 text-center font-bold transition hover:bg-black/[0.03]"
+          style={{ borderColor: BRAND.line, color: BRAND.ink }}
+        >
+          Sou garçom — entrar com código
+        </a>
+
         <p className="mt-6 text-center text-sm" style={{ color: BRAND.mut }}>
           Ainda não tem loja?{" "}
           <a href="/cadastro" className="font-bold hover:underline" style={{ color: BRAND.coral }}>Criar grátis</a>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import QRCode from "react-qr-code";
 import { Card } from "@/components/admin/ui";
 
 type PayType = "comissao" | "diaria" | "salario";
@@ -23,10 +24,9 @@ export default function GarconsClient() {
   const [name, setName] = useState("");
   const [payType, setPayType] = useState<PayType>("comissao");
   const [value, setValue] = useState(""); // % se comissão, R$ se diária/salário
-  // criar acesso (login) inline por garçom
-  const [accessFor, setAccessFor] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
+  // acesso do garçom por CÓDIGO (mt-38): sem email/senha — ele instala o app e digita 6 dígitos
+  const [acesso, setAcesso] = useState<Record<string, { conectado: boolean; codigos: { id: string; code: string; expiresAt: string }[] }>>({});
+  const [codigo, setCodigo] = useState<{ staffId: string; name: string; code: string } | null>(null);
   const [err, setErr] = useState("");
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [taxa, setTaxa] = useState<Taxa>({ totalCents: 0, porNoite: [] });
@@ -34,6 +34,8 @@ export default function GarconsClient() {
   const [verTaxa, setVerTaxa] = useState(false);
   const [novaNoite, setNovaNoite] = useState(hojeBR());
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [origin, setOrigin] = useState(""); // QR do garçom aponta pra ESTA instalação (dev ou prod)
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/garcons", { cache: "no-store" });
@@ -42,6 +44,7 @@ export default function GarconsClient() {
     setShifts(d.shifts ?? []);
     setTaxa(d.taxa ?? { totalCents: 0, porNoite: [] });
     setPagamentos(d.pagamentos ?? []);
+    setAcesso(d.acesso ?? {});
     setLoading(false);
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -63,9 +66,19 @@ export default function GarconsClient() {
       : { name: name.trim(), pay_type: payType, pay_value_cents: reaisToCents(value) };
     if (await api("create", payload)) { setName(""); setValue(""); setPayType("comissao"); }
   }
-  async function grantAccess(id: string) {
-    if (!email.trim() || senha.length < 6) { setErr("Informe email e senha (mín. 6)."); return; }
-    if (await api("createAccess", { id, email: email.trim(), senha })) { setAccessFor(null); setEmail(""); setSenha(""); }
+  // gera os 6 dígitos do garçom. Uso único e 30 min de validade — o código anterior dele morre.
+  async function gerarCodigo(id: string, name: string) {
+    setSaving(true); setErr("");
+    try {
+      const r = await fetch("/api/garcons", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "invite", payload: { id } }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error || "Não consegui gerar o código."); return; }
+      setCodigo({ staffId: id, name, code: d.code });
+      await reload();
+    } finally { setSaving(false); }
   }
 
   if (loading) return <p className="text-sm text-[var(--text-muted)]">Carregando…</p>;
@@ -127,22 +140,44 @@ export default function GarconsClient() {
               <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-xs font-semibold text-[var(--text-muted)]">
                 {g.pay_type === "comissao" ? `${g.commission_percent}% comissão` : `${PAY_LABEL[g.pay_type]} ${brl(g.pay_value_cents)}`}
               </span>
-              {g.hasLogin
-                ? <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-600">✓ tem acesso</span>
-                : <button onClick={() => { setAccessFor(accessFor === g.id ? null : g.id); setEmail(""); setSenha(""); setErr(""); }} className="rounded-full border border-brand-400 px-2 py-0.5 text-xs font-bold text-brand-600">criar acesso</button>}
+              {acesso[g.id]?.conectado
+                ? <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-600">✓ conectado</span>
+                : <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-xs text-[var(--text-faded)]">sem acesso</span>}
               {!g.active && <span className="rounded-full bg-bg-surface-2 px-2 py-0.5 text-xs text-[var(--text-faded)]">inativo</span>}
             </div>
-            <button onClick={() => confirm(`Excluir ${g.name}?`) && api("delete", { id: g.id })} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => gerarCodigo(g.id, g.name)} disabled={saving} className="rounded-full border border-brand-400 px-3 py-1 text-xs font-bold text-brand-600 disabled:opacity-50">
+                {acesso[g.id]?.conectado ? "novo código" : "gerar acesso"}
+              </button>
+              {acesso[g.id]?.conectado && (
+                <button onClick={() => confirm(`Desconectar ${g.name}? O celular dele perde o acesso.`) && api("revoke", { id: g.id })} disabled={saving} className="text-xs font-bold text-[var(--text-muted)]">desconectar</button>
+              )}
+              <button onClick={() => confirm(`Excluir ${g.name}?`) && api("delete", { id: g.id })} disabled={saving} className="text-xs font-bold text-red-500">excluir</button>
+            </div>
           </div>
 
-          {accessFor === g.id && (
-            <div className="mt-3 rounded-xl border border-line bg-bg-surface-2 p-3">
-              <p className="mb-2 text-xs font-semibold text-[var(--text-muted)]">Login do garçom (ele acessa no próprio celular em comandapro.net.br)</p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email de acesso (ex: garcom@bar.com)" className={`${inputCls} flex-1`} autoComplete="off" />
-                <input value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="senha (mín. 6)" className={`${inputCls} w-40`} autoComplete="new-password" />
-                <button onClick={() => grantAccess(g.id)} disabled={saving} className="rounded-xl brand-gradient px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Criar acesso</button>
-              </div>
+          {/* códigos VIVOS do garçom: ficam à mostra até serem usados, vencerem ou o dono excluir.
+              Gerar um novo NÃO mata os outros — numa noite com vários garçons, cada um pega o seu. */}
+          {!!acesso[g.id]?.codigos.length && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {acesso[g.id].codigos.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-2 rounded-full border border-dashed border-brand-400 bg-brand-50 px-3 py-1">
+                  <b className="text-sm font-extrabold tracking-widest text-brand-600 tabular-nums">{c.code}</b>
+                  <button
+                    onClick={() => setCodigo({ staffId: g.id, name: g.name, code: c.code })}
+                    className="text-[11px] font-bold text-brand-600 underline"
+                  >
+                    mostrar
+                  </button>
+                  <button
+                    onClick={() => api("deleteInvite", { inviteId: c.id })}
+                    disabled={saving}
+                    className="text-[11px] font-bold text-red-500 disabled:opacity-50"
+                  >
+                    excluir
+                  </button>
+                </span>
+              ))}
             </div>
           )}
 
@@ -241,8 +276,44 @@ export default function GarconsClient() {
         </Card>
       ))}
 
+      {/* CÓDIGO DO GARÇOM (mt-38): a ordem é instalar → abrir o ícone → digitar. No iPhone o app
+          instalado tem armazenamento separado do navegador, então logar antes de instalar não vale. */}
+      {codigo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setCodigo(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-sm rounded-3xl bg-bg-surface p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-extrabold text-ink">Acesso de {codigo.name}</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Mostre esta tela pro garçom.</p>
+
+            <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3">
+              <QRCode value={`${origin}/garcom`} size={132} fgColor="#111827" bgColor="#FFFFFF" />
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">1. Aponte a câmera e <b className="text-ink">instale o aplicativo</b></p>
+
+            <div className="mt-4 rounded-2xl border-2 border-dashed border-line py-4">
+              <div className="text-xs font-semibold text-[var(--text-muted)]">2. Abra pelo ícone e digite</div>
+              <div className="mt-1 text-4xl font-extrabold tracking-[0.25em] text-ink tabular-nums">{codigo.code}</div>
+            </div>
+
+            <p className="mt-3 text-xs text-[var(--text-muted)]">Vale <b className="text-ink">30 minutos</b> e serve <b className="text-ink">uma vez só</b>. Se vencer, é só gerar outro.</p>
+            <button onClick={() => setCodigo(null)} className="mt-5 w-full rounded-xl brand-gradient py-3 font-bold text-white">Fechar</button>
+          </div>
+        </div>
+      )}
+
+      {Object.values(acesso).some((a) => a.conectado) && (
+        <button
+          onClick={() => confirm("Desconectar TODOS os garçons? Quem continua na equipe reentra com um código novo.") && api("revokeAll", {})}
+          disabled={saving}
+          className="self-start rounded-xl border border-line px-4 py-2 text-xs font-bold text-[var(--text-muted)] disabled:opacity-50"
+        >
+          Desconectar todos os garçons
+        </button>
+      )}
+
       <p className="rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
-        <b>Diária:</b> o garçom bate ponto sozinho ao entrar no sistema (1 registro por noite, das 6h às 6h). O Adm ajusta o valor da noite e o bônus — o valor cadastrado entra como padrão, e mexer nele depois não altera noite já trabalhada. Dá pra lançar presença na mão se ele trabalhou sem logar.
+        <b>Acesso do garçom:</b> ele não tem email nem senha. Você gera o código, ele instala o app pelo QR e digita os 6 números — a partir daí o celular dele fica conectado até alguém desconectar. Quando sair da equipe, use <b>desconectar</b>.
+        <br /><b>Diária:</b> o garçom bate ponto sozinho ao entrar no sistema (1 registro por noite, das 6h às 6h). O Adm ajusta o valor da noite e o bônus — o valor cadastrado entra como padrão, e mexer nele depois não altera noite já trabalhada. Dá pra lançar presença na mão se ele trabalhou sem logar.
         <br />A <b>taxa de serviço (10%)</b> fica no caixa da casa; o card acima mostra quanto entrou pra vocês decidirem o repasse. Encargos de folha (13º, FGTS) = contador.
       </p>
     </div>
