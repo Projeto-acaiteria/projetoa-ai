@@ -8,6 +8,7 @@ import { IconCart, IconPlus, IconMinus, IconCheck, IconTrash, IconBowl, IconBox,
 import { type CupomData } from "@/components/admin/CupomPrinter";
 import { printVias, openDrawer } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
+import { submitOrQueue } from "@/lib/offline-queue";
 import WeightModal from "@/components/admin/WeightModal";
 import { usePdvHotkeys, ShortcutsHelp, ShortcutsHint } from "@/components/admin/PdvShortcuts";
 
@@ -32,6 +33,8 @@ type Qty = Record<string, number>;
 type Cust = { phone: string; name: string; points: number };
 type SaleResult = { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string };
 
+const genOpId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+
 function groupUnits(g: ModifierGroup, qty: Qty) {
   return g.items.reduce((n, it) => n + (qty[it.id] || 0), 0);
 }
@@ -49,7 +52,7 @@ function groupCost(g: ModifierGroup, qty: Qty) {
   return cents;
 }
 
-export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, pricePerKgCents, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; pricePerKgCents: number; onSold?: () => void }) {
+export default function PDV({ sizes, groups, produtos, fees, storeName, machines, endereco, cnpj, tel, cupomRodape, pricePerKgCents, offlineEnabled = false, onSold }: { sizes: Size[]; groups: ModifierGroup[]; produtos: Produto[]; fees: Fees; storeName: string; machines: CardMachine[]; endereco: string; cnpj: string; tel: string; cupomRodape: string; pricePerKgCents: number; offlineEnabled?: boolean; onSold?: () => void }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [tab, setTab] = useState<"peso" | "acai" | "produtos">(pricePerKgCents > 0 ? "peso" : "acai");
   const [weighing, setWeighing] = useState(false);
@@ -310,6 +313,7 @@ export default function PDV({ sizes, groups, produtos, fees, storeName, machines
           discountCents={discountCents}
           fees={fees}
           machines={machines}
+          offlineEnabled={offlineEnabled}
           onClose={() => setPay(false)}
           onDone={(r) => {
             setPay(false);
@@ -627,6 +631,7 @@ function PayModal({
   onDone,
   fees,
   machines,
+  offlineEnabled = false,
 }: {
   total: number;
   discountCents: number;
@@ -634,6 +639,7 @@ function PayModal({
   phone: string;
   fees: Fees;
   machines: CardMachine[];
+  offlineEnabled?: boolean;
   onClose: () => void;
   onDone: (r: { display: string; changeCents: number; pointsAwarded: number; pointsInfo?: string; method: string; receivedCents?: number; stockWarning?: string }) => void;
 }) {
@@ -682,20 +688,35 @@ function PayModal({
   async function finalize() {
     setSending(true); setErr("");
     try {
+      const body = {
+        items: cart.map((l) => ({ name: l.note ? `${l.label} — ${l.note}` : l.label, qty: l.qty, unitCents: l.unitCents, group: l.group, stockId: l.stockId })),
+        consumes: buildConsumes(),
+        paymentMethod: splitMode ? splitDominant : method,
+        payments: splitMode ? splitPays : undefined,
+        machineId: ((splitMode ? splitCardCents > 0 : method === "debito" || method === "credito") && machineId) ? machineId : undefined,
+        parcelas: (splitMode ? splitCents.credito > 0 : method === "credito") ? parcelas : 1,
+        amountPaidCents: !splitMode && method === "dinheiro" ? recCents : undefined,
+        customerPhone: phone.trim() || undefined,
+        discountCents: discountCents || undefined,
+      };
+      const doneCommon = { method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined };
+      // OFFLINE (flag on): enfileira com opId (idempotente, não duplica no sync) e sintetiza a venda —
+      // número PROVISÓRIO "LOCAL-…", troco é local, pontos/estoque creditam no sync. Sem estação (açaí
+      // é montado no balcão). O onDone imprime o cupom igual ao online.
+      if (offlineEnabled) {
+        const res = await submitOrQueue("/api/vendas", { ...body, opId: genOpId() }, "Venda PDV · açaí");
+        if ("queued" in res) {
+          onDone({ display: "LOCAL-" + String(Date.now()).slice(-5), changeCents: change, pointsAwarded: 0, ...doneCommon });
+          return;
+        }
+        const data = res.data as { order: { display: string }; changeCents: number; pointsAwarded: number; pointsInfo?: string; stockWarning?: string };
+        onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, pointsInfo: data.pointsInfo, stockWarning: data.stockWarning, ...doneCommon });
+        return;
+      }
       const res = await fetch("/api/vendas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((l) => ({ name: l.note ? `${l.label} — ${l.note}` : l.label, qty: l.qty, unitCents: l.unitCents, group: l.group, stockId: l.stockId })),
-          consumes: buildConsumes(),
-          paymentMethod: splitMode ? splitDominant : method,
-          payments: splitMode ? splitPays : undefined,
-          machineId: ((splitMode ? splitCardCents > 0 : method === "debito" || method === "credito") && machineId) ? machineId : undefined,
-          parcelas: (splitMode ? splitCents.credito > 0 : method === "credito") ? parcelas : 1,
-          amountPaidCents: !splitMode && method === "dinheiro" ? recCents : undefined,
-          customerPhone: phone.trim() || undefined,
-          discountCents: discountCents || undefined,
-        }),
+        body: JSON.stringify(body),
       });
       // corpo pode vir vazio (500 não-tratado do Next) → parse tolerante, nunca deixa o erro invisível
       const data = await res.json().catch(() => null);
@@ -704,8 +725,10 @@ function PayModal({
         return;
       }
       onDone({ display: data.order.display, changeCents: data.changeCents, pointsAwarded: data.pointsAwarded, pointsInfo: data.pointsInfo, method: splitMode ? splitDominant : method, receivedCents: !splitMode && method === "dinheiro" ? recCents : undefined, stockWarning: data.stockWarning });
-    } catch {
-      setErr("Sem conexão com o servidor. A venda não foi registrada — confira a internet e tente de novo.");
+    } catch (e) {
+      // com a flag, submitOrQueue só LANÇA em erro do SERVIDOR (rede vira fila) → mostra a causa real
+      const se = e as { server?: boolean; message?: string };
+      setErr(se.server && se.message ? se.message : "Sem conexão com o servidor. A venda não foi registrada — confira a internet e tente de novo.");
     } finally {
       setSending(false);
     }

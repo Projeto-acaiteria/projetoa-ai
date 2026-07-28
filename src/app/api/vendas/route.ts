@@ -8,6 +8,7 @@ import { getOpenSession } from "@/lib/cash-store";
 import { resolveCardFee, resolveSplitCardFee } from "@/lib/settings-store";
 import { resolveStoreId } from "@/lib/auth/current";
 import { dateBR } from "@/lib/date-br";
+import { withIdempotency, httpError } from "@/lib/idempotency";
 import type { PaymentMethod } from "@/lib/orders-store";
 
 const METHODS: PaymentMethod[] = ["dinheiro", "pix", "debito", "credito"];
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
     customerName?: string;
     discountCents?: number;
     payments?: { method: PaymentMethod; amountCents: number }[];
+    opId?: string; // idempotência (venda offline): replay no sync devolve a mesma venda, sem duplicar
   };
   try {
     b = await req.json();
@@ -51,7 +53,11 @@ export async function POST(req: Request) {
     if (!b.paymentMethod || !METHODS.includes(b.paymentMethod)) {
       return NextResponse.json({ error: "Forma de pagamento inválida" }, { status: 400 });
     }
-
+    const pMethod: PaymentMethod = b.paymentMethod; // já estreitado pelo guard; usado dentro do claim
+    const storeId = await resolveStoreId();
+    // idempotência (venda offline): sem opId roda igual a hoje; com opId, replay no sync devolve a
+    // MESMA venda gravada (não duplica). Toda a venda roda dentro do claim.
+    const { result } = await withIdempotency(b.opId, storeId, "venda", async () => {
     const subtotalCents = items.reduce((s, i) => s + i.unitCents * i.qty, 0);
     // desconto do operador (clampa em [0, subtotal]); total = o que o cliente paga
     const discountCents = Math.max(0, Math.min(Math.round(b.discountCents ?? 0), subtotalCents));
@@ -61,14 +67,13 @@ export async function POST(req: Request) {
     const rawPays = Array.isArray(b.payments) ? b.payments.filter((p) => p && METHODS.includes(p.method) && Math.round(p.amountCents) > 0).map((p) => ({ method: p.method, amountCents: Math.round(p.amountCents) })) : [];
     const isSplit = rawPays.length >= 2;
     if (isSplit && rawPays.reduce((s, p) => s + p.amountCents, 0) !== totalCents) {
-      return NextResponse.json({ error: "A soma das formas de pagamento não bate com o total." }, { status: 400 });
+      throw httpError(400, "A soma das formas de pagamento não bate com o total.");
     }
-    const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : b.paymentMethod;
+    const effMethod: PaymentMethod = isSplit ? rawPays.slice().sort((a, b) => b.amountCents - a.amountCents)[0].method : pMethod;
     // taxa do cartão sobre o TOTAL pago (forma única) OU soma de TODAS as parcelas no cartão (split)
-    const storeId = await resolveStoreId();
     const card = isSplit
       ? await resolveSplitCardFee(rawPays.filter((p) => isCard(p.method)), storeId, { machineId: b.machineId, parcelas: b.parcelas })
-      : await resolveCardFee(b.paymentMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
+      : await resolveCardFee(pMethod, totalCents, storeId, { machineId: b.machineId, parcelas: b.parcelas });
     const orderItems: OrderItem[] = items.map((i) => ({
       group: i.group || "Venda",
       name: i.name,
@@ -146,11 +151,13 @@ export async function POST(req: Request) {
         ? Math.max(0, b.amountPaidCents - totalCents)
         : 0;
 
-    return NextResponse.json(
-      { ok: true, order, pointsAwarded, pointsInfo, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning },
-      { status: 201 },
-    );
+    return { ok: true, order, pointsAwarded, pointsInfo, changeCents, feeCents: card.feeCents, netCents: totalCents - card.feeCents, stockWarning };
+    });
+    return NextResponse.json(result, { status: 201 });
   } catch (e) {
+    const he = e as { httpStatus?: number; inflight?: boolean };
+    if (he.httpStatus) return NextResponse.json({ error: (e as Error).message }, { status: he.httpStatus });
+    if (he.inflight) return NextResponse.json({ error: (e as Error).message }, { status: 409 });
     console.error("vendas:", e);
     return NextResponse.json({ error: "Não consegui registrar a venda. Tente de novo." }, { status: 500 });
   }

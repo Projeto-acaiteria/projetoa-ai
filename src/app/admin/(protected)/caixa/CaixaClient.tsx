@@ -71,7 +71,7 @@ export default function CaixaClient({ sizes, groups, produtos, fees, storeName, 
       </div>
       {showPdv ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} onSold={load} />
+          <PDV sizes={sizes} groups={groups} produtos={produtos} fees={fees} storeName={storeName} machines={machines} endereco={endereco} cnpj={cnpj} tel={tel} cupomRodape={cupomRodape} pricePerKgCents={pricePerKgCents} offlineEnabled={offlineEnabled} onSold={load} />
         </div>
       ) : (
         family === "service" ? (
