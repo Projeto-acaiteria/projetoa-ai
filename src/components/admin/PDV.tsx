@@ -523,7 +523,7 @@ function CustomerBox({ customer, onChange, offlineEnabled = false }: { customer:
   }
 
   async function cadastrar() {
-    if (!phone.trim() || !name.trim()) return;
+    if (!phone.trim() || (!name.trim() && !offlineEnabled)) return; // offline: nome é opcional (cliente existente = só telefone)
     setBusy(true);
     try {
       const d = await fetchTimeout("/api/clientes", {
@@ -545,14 +545,19 @@ function CustomerBox({ customer, onChange, offlineEnabled = false }: { customer:
     return (
       <div className="space-y-2 rounded-xl border border-line bg-bg-surface-2 p-3">
         <div className="text-xs font-bold text-ink">Cadastrar cliente — começa a pontuar já</div>
+        {offlineEnabled && (
+          <p className="rounded-lg bg-[#FBF1DC] px-2.5 py-1.5 text-[11px] font-semibold text-gold">
+            Sem conexão: digite o telefone. Se o cliente já tem cadastro, os pontos entram nele ao sincronizar — nome só pra cliente novo.
+          </p>
+        )}
         <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Telefone" className="w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm outline-none focus:border-brand-600" />
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" className="w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm outline-none focus:border-brand-600" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={offlineEnabled ? "Nome (só se for cliente novo)" : "Nome"} className="w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm outline-none focus:border-brand-600" />
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-muted)]">Nascimento (cupom de aniversário)</label>
           <input type="date" value={bday} onChange={(e) => setBday(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-bg-base px-3 py-2 text-sm outline-none focus:border-brand-600" />
         </div>
         <div className="flex gap-2">
-          <button onClick={cadastrar} disabled={busy || !phone.trim() || !name.trim()} className="flex-1 rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-60">
+          <button onClick={cadastrar} disabled={busy || !phone.trim() || (!name.trim() && !offlineEnabled)} className="flex-1 rounded-lg brand-gradient py-2 text-sm font-bold text-white disabled:opacity-60">
             {busy ? "..." : "Cadastrar e pontuar"}
           </button>
           <button onClick={() => setRegistering(false)} className="rounded-lg border border-line px-3 text-sm font-semibold text-[var(--text-muted)]">
