@@ -38,9 +38,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
       <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
-      {/* offline (resiliência a quedas): motor de plataforma, ativado por ora só no vertical service
-          (Starteq) — food/Cantinho NÃO recebe agora (não é cobaia; entra depois, com impacto). */}
-      {nav.family === "service" && <OfflineIndicator />}
+      {/* offline (resiliência a quedas): motor de plataforma. Montado GLOBAL pra qualquer loja com
+          offline ligado (drena a fila no reconnect + router.refresh) — senão vendas offline feitas no
+          Caixa/PDV/Balcão nunca sincronizam (só a tela de Mesas tinha o drenador). service = Starteq. */}
+      {(nav.family === "service" || !!cfg?.offline_enabled) && <OfflineIndicator />}
       {children}
     </AdminShell>
   );

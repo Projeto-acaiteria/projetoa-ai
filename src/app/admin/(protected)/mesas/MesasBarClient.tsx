@@ -11,7 +11,6 @@ import type { CardMachine } from "@/lib/settings-store";
 import { IconArrowRight, IconReceipt, IconBag, IconMinus, IconTrash } from "@/components/Icons";
 import { submitOrQueue, pendingCount, QUEUE_EVENT, fetchTimeout, rebuildTableLancar } from "@/lib/offline-queue";
 import { cacheSet, cacheGet } from "@/lib/offline-cache";
-import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import ProductCustomizer, { type CustomizeResult } from "@/components/menu/ProductCustomizer";
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
@@ -696,9 +695,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
 
   return (
     <>
-      {/* Fatia 2: barra de status offline (sem conexão / pendentes) — só quando o flag da loja liga.
-          Ela drena a fila ao reconectar; o efeito acima reconcilia a comanda quando zera. */}
-      {offlineOn && <OfflineIndicator />}
+      {/* OfflineIndicator agora é GLOBAL (no layout, pra toda loja com offline) — não montar aqui
+          também, senão dá dois drenadores/banners na tela de Mesas. */}
 
       {/* toolbar: adicionar mesas (pergunta quantas — não despeja de uma vez).
           Garçom (canClose=false) não vê QZ (não imprime — quem imprime é o caixa) nem gerencia mesas. */}
