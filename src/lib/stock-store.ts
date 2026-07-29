@@ -148,13 +148,14 @@ export async function updateItem(id: string, patch: Partial<StockItem>, at: stri
   return item;
 }
 
-export async function moveStock(id: string, type: "entrada" | "saida", qty: number, reason: string, at: string, storeId?: string): Promise<StockItem | null> {
+export async function moveStock(id: string, type: "entrada" | "saida", qty: number, reason: string, at: string, storeId?: string, base?: StockItem | null): Promise<StockItem | null> {
   // storeId explícito é OBRIGATÓRIO no caminho público (pedido pela mesa, sem auth) — senão
   // resolveStoreId cai na loja errada, o item não é achado e a baixa falha em silêncio.
   const sid = storeId ?? (await resolveStoreId());
-  // o item pode ainda não existir no banco (estado seed) — readAll acha o seed e dá a base/existência
-  const all = await readAll(sid);
-  const cur = all.find((x) => x.id === id);
+  // o item pode ainda não existir no banco (estado seed) — readAll acha o seed e dá a base/existência.
+  // `base` evita reler o estoque INTEIRO a cada insumo: quem já leu (ex.: addTabItems) passa a linha
+  // pronta. Sem isso, uma comanda com 3 insumos fazia 3 leituras completas do estoque só pra baixar.
+  const cur = base ?? (await readAll(sid)).find((x) => x.id === id) ?? null;
   if (!cur) return null;
   // baixa ATÔMICA no servidor (RPC move_stock, mt-22): upsert com lock de linha aplica o delta
   // sobre o valor SEMPRE fresco → não perde vendas simultâneas do mesmo insumo (antes era
@@ -176,19 +177,24 @@ export async function applyConsumes(
   reason: string,
   at: string,
   storeId?: string,
+  stock?: StockItem[], // estoque já lido por quem chamou → não relê e não vai um por vez
 ): Promise<{ applied: number; failed: { stockId: string; qty: number; error: string }[] }> {
   const failed: { stockId: string; qty: number; error: string }[] = [];
   let applied = 0;
-  for (const c of consumes) {
-    if (!c.stockId || !(c.qty > 0)) continue;
+  // EM PARALELO: a RPC move_stock é atômica por linha (mt-22), então disparar junto não perde baixa
+  // nem embaralha total — inclusive pro mesmo insumo repetido. Antes era um `await` por insumo, em
+  // fila: numa comanda com 4 insumos, 4 idas ao banco esperando uma pela outra.
+  const byId = stock ? new Map(stock.map((s) => [s.id, s])) : null;
+  const alvos = consumes.filter((c) => c?.stockId && c.qty > 0);
+  const res = await Promise.all(alvos.map(async (c) => {
     try {
-      const item = await moveStock(c.stockId, "saida", c.qty, reason, at, storeId);
-      if (item) applied++;
-      else failed.push({ stockId: c.stockId, qty: c.qty, error: "item de estoque não encontrado" });
+      const item = await moveStock(c.stockId, "saida", c.qty, reason, at, storeId, byId?.get(c.stockId) ?? null);
+      return item ? null : { stockId: c.stockId, qty: c.qty, error: "item de estoque não encontrado" };
     } catch (e) {
-      failed.push({ stockId: c.stockId, qty: c.qty, error: e instanceof Error ? e.message : String(e) });
+      return { stockId: c.stockId, qty: c.qty, error: e instanceof Error ? e.message : String(e) };
     }
-  }
+  }));
+  for (const r of res) { if (r) failed.push(r); else applied++; }
   if (failed.length) console.error(`applyConsumes: ${failed.length} baixa(s) falharam (${reason}):`, JSON.stringify(failed));
   return { applied, failed };
 }

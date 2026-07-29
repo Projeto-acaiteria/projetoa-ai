@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { printTicket } from "@/lib/print";
+import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
 import { stationTicketHtml } from "@/lib/ticket";
 
 // KDS — telas de preparo por estação. Lê /api/kds (pedidos já roteados por estação pelo motor)
@@ -90,7 +91,7 @@ export default function KdsClient({ stations, loja, kitchenScreen = true }: { st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.join(","), autoprint]);
 
-  useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
+  useVisiblePolling(load, POLL.preparo); // quadro em segundo plano não pergunta (o Medellín nem usa esta tela)
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   async function advance(o: KdsOrder) {

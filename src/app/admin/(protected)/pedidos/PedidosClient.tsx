@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, Badge } from "@/components/admin/ui";
 import { brl } from "@/lib/format";
+import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
 import { IconMoto, IconBag, IconArrowRight, IconPrinter, IconCheck } from "@/components/Icons";
 import CupomPrinter, { type CupomData } from "@/components/admin/CupomPrinter";
 import type { Order, OrderStatus } from "@/lib/orders-store";
@@ -161,11 +162,7 @@ export default function PedidosClient({ storeName, storeSlug, endereco, cnpj, te
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 4000); // tempo real (polling)
-    return () => clearInterval(t);
-  }, [load]);
+  useVisiblePolling(load, POLL.pedidos); // tempo real por polling, mas só com a tela à vista
 
   function toggleAuto() {
     setAutoPrint((v) => {

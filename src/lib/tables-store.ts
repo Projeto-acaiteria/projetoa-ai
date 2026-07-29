@@ -305,10 +305,6 @@ export async function getOrCreateTableByNumber(tableNumber: number, storeId?: st
 export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: string, note?: string, prePrinted = false): Promise<TabOrder[]> {
   const d = db();
   const sid = storeId ?? (await resolveStoreId());
-  // a comanda tem que ser DESTA loja (anti-IDOR: não injetar item em comanda alheia)
-  const { data: ownTab } = await d.from("tabs").select("id").eq("id", tabId).eq("store_id", sid).maybeSingle();
-  if (!ownTab) throw new Error("Comanda não encontrada.");
-  const menu = await readMenu(storeId);
 
   // ficha técnica do BAR resolvida no SERVIDOR pelo productId (recipe do menu_products, nunca do client)
   const prodIds = [...new Set(items.map((it) => it.productId).filter(Boolean) as string[])];
@@ -316,22 +312,35 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const nameByProduct = new Map<string, string>();
   const sizeByProduct = new Map<string, string>(); // 'dose' | 'garrafa' | ... → roteia a baixa pro estoque certo
   const noPrepByProduct = new Map<string, boolean>(); // categoria "pronto pra servir" → some do quadro de Preparo (mas imprime/cobra normal)
-  if (prodIds.length) {
-    const { data: prods } = await d.from("menu_products").select("id, recipe, name, category_id, size_label").eq("store_id", sid).in("id", prodIds);
-    const catIds = [...new Set(((prods ?? []) as { category_id?: string }[]).map((p) => p.category_id).filter(Boolean) as string[])];
-    const noPrepByCat = new Map<string, boolean>();
-    if (catIds.length) {
-      const { data: cats } = await d.from("menu_categories").select("id, no_prep").in("id", catIds);
-      for (const c of (cats ?? []) as { id: string; no_prep?: boolean }[]) noPrepByCat.set(String(c.id), !!c.no_prep);
-    }
-    for (const p of (prods ?? []) as { id: string; recipe: unknown; name: string; category_id?: string; size_label?: string }[]) {
+
+  // UMA RODADA em vez de cinco idas em fila (perf 28/07: "demora pra lançar" no Medellín). Nenhuma
+  // dessas leituras depende da outra — esperavam por hábito. A categoria vem EMBUTIDA no produto
+  // (FK menu_products.category_id), então some a consulta que buscava as categorias depois.
+  const [ownTabRes, menu, prodsRes, stock] = await Promise.all([
+    d.from("tabs").select("id").eq("id", tabId).eq("store_id", sid).maybeSingle(),
+    readMenu(sid),
+    prodIds.length
+      ? d.from("menu_products").select("id, recipe, name, category_id, size_label, menu_categories(no_prep)").eq("store_id", sid).in("id", prodIds)
+      : Promise.resolve({ data: [] }),
+    // custo/estoque é NÃO-FATAL: falhou, segue sem congelar custo (o CMV usa o atual)
+    listStock(sid).catch((e) => {
+      console.error("addTabItems: falha ao ler estoque (segue sem custo):", e instanceof Error ? e.message : e);
+      return [] as Awaited<ReturnType<typeof listStock>>;
+    }),
+  ]);
+
+  // a comanda tem que ser DESTA loja (anti-IDOR: não injetar item em comanda alheia)
+  if (!ownTabRes.data) throw new Error("Comanda não encontrada.");
+  {
+    const prods = prodsRes.data as Array<{ id: string; recipe: unknown; name: string; category_id?: string; size_label?: string; menu_categories?: { no_prep?: boolean } | null }> | null;
+    for (const p of prods ?? []) {
       const r = Array.isArray(p.recipe)
         ? (p.recipe as StockConsume[]).map((x) => ({ stockId: String(x?.stockId ?? ""), qty: num(x?.qty) })).filter((x) => x.stockId && x.qty > 0)
         : [];
       recipeByProduct.set(String(p.id), r);
       nameByProduct.set(String(p.id), String(p.name ?? ""));
       sizeByProduct.set(String(p.id), String(p.size_label ?? "").toLowerCase());
-      noPrepByProduct.set(String(p.id), p.category_id ? (noPrepByCat.get(String(p.category_id)) ?? false) : false);
+      noPrepByProduct.set(String(p.id), !!p.menu_categories?.no_prep);
     }
   }
 
@@ -347,15 +356,11 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const doseStockByName = new Map<string, string>();
   const unitStockByName = new Map<string, string>();
   const normName = (s: string) => s.normalize("NFC").trim().toLowerCase();
-  try {
-    for (const s of await listStock(sid)) {
-      costById.set(s.id, unitCostCents(s));
-      if (!s.name) continue;
-      if (s.dosesPerBottle && s.dosesPerBottle > 0) doseStockByName.set(normName(s.name), s.id);
-      else unitStockByName.set(normName(s.name), s.id);
-    }
-  } catch (e) {
-    console.error("addTabItems: falha ao congelar custo no consumes (segue sem custo):", e instanceof Error ? e.message : e);
+  for (const s of stock) { // já veio da rodada única lá em cima
+    costById.set(s.id, unitCostCents(s));
+    if (!s.name) continue;
+    if (s.dosesPerBottle && s.dosesPerBottle > 0) doseStockByName.set(normName(s.name), s.id);
+    else unitStockByName.set(normName(s.name), s.id);
   }
 
   // ficha técnica resolvida no SERVIDOR (ignora consumes que vierem do client)
@@ -394,18 +399,21 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
     byStation.set(it.station, arr);
   }
 
-  const created: TabOrder[] = [];
-  for (const [station, group] of byStation) {
-    const { data: order, error } = await d
-      .from("tab_orders")
-      .insert({ store_id: sid, tab_id: tabId, status: "pendente", station, note: note ?? null, pre_printed: prePrinted })
-      .select()
-      .single();
-    if (error) throw error;
+  // grava TODAS as estações de uma vez (2 idas ao banco, não 2 por estação): insere os pedidos em
+  // lote, casa cada um com o grupo pela estação e insere todos os itens juntos.
+  const estacoes = [...byStation.keys()];
+  const { data: orders, error } = await d
+    .from("tab_orders")
+    .insert(estacoes.map((station) => ({ store_id: sid, tab_id: tabId, status: "pendente", station, note: note ?? null, pre_printed: prePrinted })))
+    .select();
+  if (error) throw error;
+  const created = (orders ?? []) as TabOrder[];
 
-    const rows = group.map((it) => ({
+  const orderIdByStation = new Map(created.map((o) => [o.station, o.id]));
+  const rows = [...byStation.entries()].flatMap(([station, group]) =>
+    group.map((it) => ({
       store_id: sid,
-      tab_order_id: (order as TabOrder).id,
+      tab_order_id: orderIdByStation.get(station)!,
       name: it.name,
       size_label: it.sizeLabel ?? null,
       qty: it.qty,
@@ -415,17 +423,16 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
       note: it.note ?? null,
       earns_points: it.earnsPoints !== false, // ausente = pontua (default)
       no_prep: it.noPrep, // "pronto pra servir": imprime/cobra, mas some do quadro de Preparo
-    }));
-    const { error: e2 } = await d.from("tab_order_items").insert(rows);
-    if (e2) throw e2;
-    created.push(order as TabOrder);
-  }
+    })),
+  );
+  const { error: e2 } = await d.from("tab_order_items").insert(rows);
+  if (e2) throw e2;
 
   // baixa de estoque pela ficha técnica resolvida — NÃO-FATAL (os itens já estão na comanda acima;
   // uma falha de baixa não pode derrubar o lançamento já commitado).
   const today = todayBR();
   const consumes = resolved.flatMap((it) => it.consumes.map((c) => ({ stockId: c.stockId, qty: c.qty * it.qty })));
-  await applyConsumes(consumes, "Mesa comanda", today, sid);
+  await applyConsumes(consumes, "Mesa comanda", today, sid, stock); // `stock` já lido: sem reler e em paralelo
   return created;
 }
 

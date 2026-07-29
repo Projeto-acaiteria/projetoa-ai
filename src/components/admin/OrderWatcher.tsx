@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { printVias } from "@/lib/print";
+import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
 import { ticketHtml } from "@/lib/ticket";
 import { ticketFromOrder } from "@/lib/order-ticket";
 import type { Order } from "@/lib/orders-store";
@@ -66,11 +67,9 @@ export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRoda
     }
   }, [beep, storeName, endereco, cnpj, tel, cupomRodape]);
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 4000); // mesmo ritmo da tela Pedidos
-    return () => clearInterval(t);
-  }, [load]);
+  // vigia de pedidos: roda no shell do admin, então QUALQUER tela aberta o mantinha perguntando de
+  // 4 em 4 segundos, a noite toda. Agora só enquanto alguém está de fato olhando.
+  useVisiblePolling(load, POLL.pedidos);
 
   return null;
 }

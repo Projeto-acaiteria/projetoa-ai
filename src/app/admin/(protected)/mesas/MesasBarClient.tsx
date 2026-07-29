@@ -15,6 +15,7 @@ import ProductCustomizer, { type CustomizeResult } from "@/components/menu/Produ
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
 import { warmQzSignKey } from "@/lib/qz";
+import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
@@ -113,7 +114,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, []);
   // carrega as mesas fechadas offline persistidas ANTES de listar (senão a antiga aparece 1 ciclo)
   useEffect(() => { cacheGet<number[]>("closedTabs").then((c) => { if (c?.length) closedTabsRef.current = new Set(c); void loadTables(); }); }, [loadTables]);
-  useEffect(() => { loadTables(); const t = setInterval(loadTables, 5000); return () => clearInterval(t); }, [loadTables]);
+  useVisiblePolling(loadTables, POLL.mesas); // para quando a tela não está à vista; volta atualizando na hora
   // OFFLINE: pré-aquece o cache de TODAS as comandas abertas enquanto tem net, pra qualquer mesa abrir
   // com os itens offline (não só a que já foi aberta online). Roda na entrada e ao reconectar.
   const warmComandas = useCallback(async () => {

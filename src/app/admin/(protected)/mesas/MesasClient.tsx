@@ -14,6 +14,7 @@ import {
 import { brl } from "@/lib/format";
 import { printVias } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
+import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
 import type { CupomData } from "@/components/admin/CupomPrinter";
 
 // ---- tipos do contrato das APIs ----
@@ -127,11 +128,7 @@ export default function MesasClient({
     }
   }, []);
 
-  useEffect(() => {
-    loadTables();
-    const t = setInterval(loadTables, 5000);
-    return () => clearInterval(t);
-  }, [loadTables]);
+  useVisiblePolling(loadTables, POLL.mesas); // para quando a tela não está à vista; volta atualizando na hora
 
   const loadComanda = useCallback(async (id: number) => {
     const res = await fetch(`/api/mesas/comanda?tabId=${id}`, { cache: "no-store" });
