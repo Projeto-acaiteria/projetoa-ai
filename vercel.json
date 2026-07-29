@@ -1,4 +1,6 @@
 {
+  "//": "Função em SÃO PAULO, junto do banco (Supabase sa-east-1). Antes rodava no iad1 (Washington) e cada consulta atravessava o continente: ~240ms por ida. Lançar um item faz 9+ consultas em fila = 2s só de deslocamento. Hobby permite 1 região; se a plataforma recusar, o deploy falha e o anterior segue no ar.",
+  "regions": ["gru1"],
   "crons": [
     { "path": "/api/cron/billing-check", "schedule": "0 11 * * *" },
     { "path": "/api/cron/points-expire", "schedule": "0 4 * * *" }
