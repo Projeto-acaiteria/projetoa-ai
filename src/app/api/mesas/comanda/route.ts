@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTabFull } from "@/lib/tables-store";
+import { getTabFull, comandaPayload } from "@/lib/tables-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,18 +15,7 @@ export async function GET(req: Request) {
 
   try {
     const full = await getTabFull(tabId);
-    // mapeia snake_case do banco → camelCase que a UI lê (senão preço/pagamento viram "R$ NaN")
-    return NextResponse.json({
-      tab: { id: full.tab.id, label: full.tab.label, people_count: full.tab.people_count },
-      orders: full.orders.map((o) => ({
-        items: o.items.map((i) => ({ id: i.id, name: i.name, sizeLabel: i.size_label, qty: i.qty, unitPriceCents: i.unit_price_cents, station: o.station, note: i.note ?? null, mods: i.mods ?? null })),
-      })),
-      payments: full.payments.map((p) => ({ method: p.method, amountCents: p.amount_cents })),
-      consumoCents: full.consumoCents,
-      coverCents: full.coverCents,
-      totalCents: full.totalCents,
-      paidCents: full.paidCents,
-    });
+    return NextResponse.json(comandaPayload(full));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

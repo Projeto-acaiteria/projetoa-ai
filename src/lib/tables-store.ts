@@ -436,6 +436,24 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   return created;
 }
 
+/** Comanda no formato que a UI lê (snake_case do banco → camelCase; senão vira "R$ NaN").
+ *  Fonte ÚNICA desse mapeamento: a rota GET /api/mesas/comanda e as rotas de AÇÃO (lançar,
+ *  pagar) devolvem exatamente a mesma coisa — a ação já traz a comanda fresca, e o cliente não
+ *  precisa de uma segunda chamada só pra reler o que acabou de mudar. */
+export function comandaPayload(full: TabFull) {
+  return {
+    tab: { id: full.tab.id, label: full.tab.label, people_count: full.tab.people_count },
+    orders: full.orders.map((o) => ({
+      items: o.items.map((i) => ({ id: i.id, name: i.name, sizeLabel: i.size_label, qty: i.qty, unitPriceCents: i.unit_price_cents, station: o.station, note: i.note ?? null, mods: i.mods ?? null })),
+    })),
+    payments: full.payments.map((p) => ({ method: p.method, amountCents: p.amount_cents })),
+    consumoCents: full.consumoCents,
+    coverCents: full.coverCents,
+    totalCents: full.totalCents,
+    paidCents: full.paidCents,
+  };
+}
+
 // ── KDS (telas de preparo por estação) ───────────────────────────────────────
 export type KdsItem = { name: string; size_label: string | null; qty: number; mods: { name: string; price_cents: number }[] | null; note?: string | null; no_prep?: boolean };
 export type KdsOrder = {

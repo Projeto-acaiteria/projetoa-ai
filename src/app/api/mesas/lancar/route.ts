@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveStoreId } from "@/lib/auth/current";
 import { db } from "@/lib/supabase";
 import { resolveOrderItems } from "@/lib/menu-bar-store";
-import { getOrCreateTableByNumber, getOrCreateOpenTab, addTabItems, type Tab } from "@/lib/tables-store";
+import { getOrCreateTableByNumber, getOrCreateOpenTab, addTabItems, getTabFull, comandaPayload, type Tab } from "@/lib/tables-store";
 import { setTabWaiter } from "@/lib/staff-store";
 import { withIdempotency, httpError } from "@/lib/idempotency";
 
@@ -58,7 +58,14 @@ export async function POST(req: Request) {
       // 4) lança; se falhar e a comanda acabou de nascer, ROLLBACK (apaga) — sem mesa-fantasma
       try {
         const orders = await addTabItems(Number(tab.id), lines, storeId, note, !!b.prePrinted);
-        return { ok: true, tabId: Number(tab.id), stations: [...new Set(orders.map((o) => o.station))] };
+        // devolve a comanda já relida do banco (read-after-write no servidor): a tela abre a
+        // comanda com o item novo sem uma 2ª chamada. Uma viagem a menos no gesto mais repetido
+        // da noite — e é o gesto que o Medellín reclamou de lento.
+        return {
+          ok: true, tabId: Number(tab.id),
+          stations: [...new Set(orders.map((o) => o.station))],
+          comanda: comandaPayload(await getTabFull(Number(tab.id), storeId)),
+        };
       } catch (e) {
         if (createdNow) { try { await d.from("tabs").delete().eq("id", tab.id).eq("store_id", storeId); } catch {} }
         throw e;

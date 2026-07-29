@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addPayment, getTabFull, getOrCreateTableByNumber } from "@/lib/tables-store";
+import { addPayment, getTabFull, getOrCreateTableByNumber, comandaPayload } from "@/lib/tables-store";
 import { db } from "@/lib/supabase";
 import { getActiveEvent } from "@/lib/events-store";
 import { resolveCardFee } from "@/lib/settings-store";
@@ -67,7 +67,10 @@ export async function POST(req: Request) {
       // taxa do cartão: máquina escolhida (snapshot) ou flat por método — server-authoritative
       const card = await resolveCardFee(method as PaymentMethod, recorded, sid, { machineId: b.machineId, parcelas: b.parcelas });
       await addPayment(tabId, method, recorded, card.feePercent);
-      return { ok: true, recordedCents: recorded, trocoCents };
+      // read-after-write AQUI, no servidor (λ.prova-na-fonte): relê a comanda gravada e devolve
+      // junto. O cliente para de fazer uma 2ª chamada só pra ver o que acabou de mudar — a prova
+      // continua sendo a leitura do banco, só que numa viagem em vez de duas.
+      return { ok: true, recordedCents: recorded, trocoCents, comanda: comandaPayload(await getTabFull(tabId, sid)) };
     });
     return NextResponse.json(result);
   } catch (e) {

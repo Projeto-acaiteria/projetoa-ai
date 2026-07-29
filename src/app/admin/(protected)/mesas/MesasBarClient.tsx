@@ -160,6 +160,13 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
     return () => window.removeEventListener(QUEUE_EVENT, onChange);
   }, [offlineOn, drawer, loadTables]);
 
+  // aplica a comanda que a AÇÃO já devolveu (a rota relê o banco depois de gravar e manda junto).
+  // Economiza uma ida ao servidor por ação — e some uma espera do caminho do garçom.
+  function aplicarComanda(tabId: number, d: Comanda) {
+    setComanda(d);
+    cacheSet("comanda:" + tabId, d);
+  }
+
   async function loadComanda(tabId: number) {
     if (closedTabsRef.current.has(tabId)) { setComanda(null); return; } // fechada offline → não ressuscita a antiga
     if (typeof navigator !== "undefined" && !navigator.onLine) { // OFFLINE: cache instantâneo (não espera o servidor ~1min)
@@ -283,7 +290,10 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (!r.ok) throw new Error(d.error || "Não consegui lançar.");
       const tabId = Number(d.tabId);
       setTemp([]); setDrawer({ table: drawer.table, tabId });
-      setView("comanda"); await loadComanda(tabId); loadTables();
+      setView("comanda");
+      // a rota já mandou a comanda relida — abre a tela sem uma 2ª ida ao servidor
+      if (d.comanda) aplicarComanda(tabId, d.comanda); else await loadComanda(tabId);
+      loadTables();
     } catch (e) { setErr(e instanceof Error ? e.message : "Falha ao lançar."); }
     finally { setBusy(false); }
   }
@@ -411,8 +421,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
           bumpTileTotal(drawer.table.number, -recorded); // A.V abate a falta no card na hora (espelha o online; pagamento não leva taxa)
           setSplitTroco(method === "dinheiro" ? Math.max(0, amt - falta) : 0);
         } else {
-          setSplitTroco(method === "dinheiro" ? ((res.data as { trocoCents?: number })?.trocoCents ?? 0) : 0);
-          if (drawer.tabId) await loadComanda(drawer.tabId);
+          const dOff = res.data as { trocoCents?: number; comanda?: Comanda } | undefined;
+          setSplitTroco(method === "dinheiro" ? (dOff?.trocoCents ?? 0) : 0);
+          if (drawer.tabId) { if (dOff?.comanda) aplicarComanda(drawer.tabId, dOff.comanda); else await loadComanda(drawer.tabId); }
         }
         onSaleClosed?.();
         return;
@@ -423,7 +434,8 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
       if (!r.ok) throw new Error(d.error || "Não consegui registrar o pagamento.");
       setParcial("");
       setSplitTroco(method === "dinheiro" ? (d.trocoCents ?? 0) : 0); // troco só faz sentido em dinheiro
-      if (drawer.tabId) await loadComanda(drawer.tabId);
+      // a rota já devolveu a comanda relida do banco → não pede de novo (1 chamada a menos por pagamento)
+      if (drawer.tabId) { if (d.comanda) aplicarComanda(drawer.tabId, d.comanda); else await loadComanda(drawer.tabId); }
       onSaleClosed?.();
     } catch (e) { setErr(e instanceof Error ? e.message : "Erro ao registrar pagamento."); }
     finally { setBusy(false); }
