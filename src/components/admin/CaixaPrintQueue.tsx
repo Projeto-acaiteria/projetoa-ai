@@ -43,7 +43,10 @@ export default function CaixaPrintQueue({ station = "caixa" }: { station?: strin
   useEffect(() => {
     if (!hasPrinter) return; // sem impressora do caixa nesta máquina → não vigia
     tick();
-    const t = setInterval(tick, 5000);
+    // 8s (era 5s): a conta pedida pelo garçom sai em até 8 segundos, tempo de ele chegar na mesa.
+    // NÃO usa pausa por visibilidade de propósito — impressão tem que sair com o navegador
+    // minimizado. O conserto de verdade aqui é o tempo real (a fila avisar em vez de ser perguntada).
+    const t = setInterval(tick, 8000);
     return () => clearInterval(t);
   }, [tick, hasPrinter]);
 

@@ -36,8 +36,13 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   };
   return (
     <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations}>
-      {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos) */}
-      <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
+      {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos).
+          Só monta onde faz sentido (perf 29/07): loja SEM delivery não recebe pedido de link — no
+          Medellín ele ficava perguntando 900x/hora por pedido que nunca existiria. E garçom não
+          atende delivery (não vê nem imprime), então o celular dele também não precisa vigiar. */}
+      {cfg?.has_delivery !== false && (nav.role === "owner" || nav.role === "reception") && (
+        <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
+      )}
       {/* offline (resiliência a quedas): motor de plataforma. Montado GLOBAL pra qualquer loja com
           offline ligado (drena a fila no reconnect + router.refresh) — senão vendas offline feitas no
           Caixa/PDV/Balcão nunca sincronizam (só a tela de Mesas tinha o drenador). service = Starteq. */}
