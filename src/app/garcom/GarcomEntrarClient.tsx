@@ -19,6 +19,7 @@ export default function GarcomEntrarClient() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState("");
+  const [jaLogado, setJaLogado] = useState<string | null>(null); // sessão que já existe NESTE aparelho
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,6 +34,20 @@ export default function GarcomEntrarClient() {
   }, []);
 
   useEffect(() => { if (instalado) inputRef.current?.focus(); }, [instalado]);
+
+  // O app é UM por aparelho (manifesto da plataforma, escopo "/"). Se o celular já tem sessão — o
+  // garçom de outra casa, ou o dono — o Android ainda manda o link do QR pra cá, e sem aviso o cara
+  // acha que "abriu no app errado". Mostra quem está conectado e deixa trocar.
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => setJaLogado(data.user?.email ?? null));
+  }, []);
+
+  async function sairDaConta() {
+    await createClient().auth.signOut();
+    setJaLogado(null);
+    setInstalado(true);
+    router.refresh();
+  }
 
   async function instalar() {
     if (!deferred) return;
@@ -67,6 +82,24 @@ export default function GarcomEntrarClient() {
       <div className="w-full max-w-sm">
         <h1 className="text-center text-3xl font-extrabold tracking-tight">ComandaPRO</h1>
         <p className="mt-1 text-center text-sm text-white/50">Acesso do garçom</p>
+
+        {jaLogado && (
+          <div className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm">
+            <p className="font-bold text-amber-300">Este celular já está conectado</p>
+            <p className="mt-1 break-all text-white/70">{jaLogado}</p>
+            <p className="mt-2 text-white/60">
+              É um aparelho por conta. Digitar um código novo aqui <b className="text-white">troca</b> quem está usando este celular.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => router.push("/admin/mesas")} className="flex-1 rounded-xl border border-white/15 px-3 py-2.5 text-sm font-bold">
+                Continuar como está
+              </button>
+              <button onClick={sairDaConta} className="flex-1 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-black">
+                Trocar de conta
+              </button>
+            </div>
+          </div>
+        )}
 
         {!instalado ? (
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
