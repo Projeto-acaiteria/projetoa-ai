@@ -9,7 +9,9 @@ import TemplateGrid from "@/components/grid/TemplateGrid";
 
 // ISR 30s (era force-dynamic): cada scan de QR de mesa relia o cardápio inteiro do banco.
 // Agora cacheia por (loja, mesa) por 30s. Cardápio é igual em toda mesa; edição aparece em ≤30s.
-export const revalidate = 30;
+// 120s (era 30s): quem salva o cardápio dispara revalidatePath nesta rota, então a edição aparece
+// na hora. O teto é 2min por causa do selo Aberto/Fechado e do couvert do show, que mudam sozinhos.
+export const revalidate = 120;
 // habilita ISR on-demand (cacheia o render por loja+mesa por 30s). Sem generateStaticParams o
 // Next ignora o revalidate e relê o cardápio do banco a cada scan de QR. dynamicParams=true.
 export function generateStaticParams() {

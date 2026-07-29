@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { readMenu, writeMenu, type Menu } from "@/lib/menu-store";
 import type { Size, ModifierGroup } from "@/lib/menu";
+import { db } from "@/lib/supabase";
+import { resolveStoreId } from "@/lib/auth/current";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,5 +54,15 @@ export async function PUT(req: Request) {
   }));
 
   const saved = await writeMenu({ sizes, groups });
+  // menu mudou → revalida o cardápio público da loja NA HORA (o do bar já fazia isso; o do açaí
+  // ficava esperando o ISR). É o que permite o cache ser longo sem o cliente ver preço velho.
+  try {
+    const storeId = await resolveStoreId();
+    const { data: s } = await db().from("stores").select("slug").eq("id", storeId).maybeSingle();
+    const slug = (s as { slug?: string } | null)?.slug;
+    if (slug) { revalidatePath(`/${slug}`); revalidatePath(`/${slug}/mesa/[n]`, "page"); }
+  } catch (e) {
+    console.error("cardapio: revalidate falhou (menu salvo, cache expira sozinho):", e instanceof Error ? e.message : e);
+  }
   return NextResponse.json({ ok: true, menu: saved });
 }
