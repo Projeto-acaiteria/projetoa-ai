@@ -42,7 +42,7 @@ export async function createInvite(staffId: string, storeId: string): Promise<In
  *  o garçom reentra com o mesmo número quantas vezes precisar, sem ir ao PC do caixa. Morre só por
  *  validade (30 dias) ou porque o dono desconectou/excluiu. Devolve null se o código não existe ou
  *  venceu — o chamador não distingue os casos (não entrega pista pra quem fica chutando código). */
-export async function consumeInvite(code: string): Promise<{ email: string; password: string } | null> {
+export async function consumeInvite(code: string): Promise<{ email: string; tokenHash: string } | null> {
   const d = db();
   const limpo = code.replace(/\D/g, "");
   if (limpo.length !== 6) return null;
@@ -56,25 +56,32 @@ export async function consumeInvite(code: string): Promise<{ email: string; pass
   if (!inv) return null;
 
   const email = `garcom-${inv.staff_id}@${EMAIL_DOMINIO}`;
-  const password = crypto.randomUUID() + crypto.randomUUID(); // ninguém digita: some depois do login
   const sb = db();
 
-  const criado = await sb.auth.admin.createUser({ email, password, email_confirm: true });
+  // conta sintética: nasce com senha aleatória que NINGUÉM usa nem guarda (o login é por token).
+  const criado = await sb.auth.admin.createUser({
+    email, password: crypto.randomUUID() + crypto.randomUUID(), email_confirm: true,
+  });
   let userId = criado.data?.user?.id;
   if (criado.error) {
     if (!/already|registered|exists/i.test(criado.error.message)) throw criado.error;
     const list = await sb.auth.admin.listUsers({ perPage: 1000 });
     userId = list.data.users.find((u) => u.email?.toLowerCase() === email)?.id;
     if (!userId) throw criado.error;
-    // rotaciona a senha: o celular ANTIGO do garçom perde a credencial (troca de aparelho, demissão)
-    await sb.auth.admin.updateUserById(userId, { password, email_confirm: true });
+    // ⚠️ NUNCA rotacionar a senha aqui (bug 29/07, provado em teste): trocar a senha faz o Supabase
+    // MATAR as sessões existentes — o celular do garçom que estava operando caía pra tela de código
+    // a cada vez que alguém usava um código dele. No Medellín isso virou loop: 5 códigos em 34min.
   }
 
   const { data: exist } = await sb.from("store_members").select("id").eq("store_id", inv.store_id).eq("user_id", userId).maybeSingle();
   if (exist) await sb.from("store_members").update({ role: "waiter", active: true, staff_id: inv.staff_id }).eq("id", (exist as { id: string }).id);
   else await sb.from("store_members").insert({ store_id: inv.store_id, user_id: userId, role: "waiter", active: true, staff_id: inv.staff_id });
 
-  return { email, password };
+  // token de uso único que o app troca por sessão (verifyOtp). Cria a sessão do aparelho SEM tocar
+  // na senha — provado em teste: o outro aparelho do mesmo garçom continua conectado.
+  const link = await sb.auth.admin.generateLink({ type: "magiclink", email });
+  if (link.error || !link.data?.properties?.hashed_token) throw link.error ?? new Error("Falha ao gerar o acesso.");
+  return { email, tokenHash: String(link.data.properties.hashed_token) };
 }
 
 export type AcessoGarcom = { conectado: boolean; codigos: { id: string; code: string; expiresAt: string }[] };

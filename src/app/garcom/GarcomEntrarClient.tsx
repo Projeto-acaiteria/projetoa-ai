@@ -65,8 +65,9 @@ export default function GarcomEntrarClient() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Código inválido.");
-      // a sessão nasce AQUI dentro (cookie do app instalado) — é o ponto do fluxo todo
-      const { error } = await createClient().auth.signInWithPassword({ email: d.email, password: d.password });
+      // a sessão nasce AQUI dentro (cookie do app instalado) — é o ponto do fluxo todo.
+      // verifyOtp (token de link) em vez de senha: entrar num aparelho NÃO derruba o outro.
+      const { error } = await createClient().auth.verifyOtp({ token_hash: d.tokenHash, type: "magiclink" });
       if (error) throw new Error("Não consegui te conectar. Peça um código novo.");
       router.replace("/admin/mesas");
       router.refresh();
