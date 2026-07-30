@@ -162,7 +162,7 @@ export default function GarcomEntrarClient() {
               {busy ? "Entrando…" : "Entrar"}
             </button>
             <p className="mt-4 text-center text-xs text-white/40">
-              O código vale 30 minutos e serve uma vez só. Se venceu, peça outro pro gerente.
+              Guarde seu código: ele é seu e serve sempre que precisar entrar de novo.
             </p>
           </div>
         )}

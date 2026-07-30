@@ -295,7 +295,7 @@ export default function GarconsClient() {
               <div className="mt-1 text-4xl font-extrabold tracking-[0.25em] text-ink tabular-nums">{codigo.code}</div>
             </div>
 
-            <p className="mt-3 text-xs text-[var(--text-muted)]">Vale <b className="text-ink">30 minutos</b> e serve <b className="text-ink">uma vez só</b>. Se vencer, é só gerar outro.</p>
+            <p className="mt-3 text-xs text-[var(--text-muted)]">É o código <b className="text-ink">dele</b>: vale 30 dias e serve <b className="text-ink">quantas vezes precisar</b>. Anote e entregue — se o celular dele cair, ele reentra sozinho, sem vir aqui. Pra cortar o acesso, use <b className="text-ink">desconectar</b> ou exclua o código.</p>
             <button onClick={() => setCodigo(null)} className="mt-5 w-full rounded-xl brand-gradient py-3 font-bold text-white">Fechar</button>
           </div>
         </div>
@@ -312,7 +312,7 @@ export default function GarconsClient() {
       )}
 
       <p className="rounded-xl bg-bg-surface-2 p-3 text-xs text-[var(--text-muted)]">
-        <b>Acesso do garçom:</b> ele não tem email nem senha. Você gera o código, ele instala o app pelo QR e digita os 6 números — a partir daí o celular dele fica conectado até alguém desconectar. Quando sair da equipe, use <b>desconectar</b>.
+        <b>Acesso do garçom:</b> ele não tem email nem senha. Você gera o código, ele instala o app pelo QR e digita os 6 números — o celular dele fica conectado. O código continua valendo (30 dias, várias vezes), então se a sessão dele cair ele reentra sozinho, sem vir até o caixa. Quando sair da equipe, use <b>desconectar</b> — aí o código dele morre também.
         <br /><b>Diária:</b> o garçom bate ponto sozinho ao entrar no sistema (1 registro por noite, das 6h às 6h). O Adm ajusta o valor da noite e o bônus — o valor cadastrado entra como padrão, e mexer nele depois não altera noite já trabalhada. Dá pra lançar presença na mão se ele trabalhou sem logar.
         <br />A <b>taxa de serviço (10%)</b> fica no caixa da casa; o card acima mostra quanto entrou pra vocês decidirem o repasse. Encargos de folha (13º, FGTS) = contador.
       </p>

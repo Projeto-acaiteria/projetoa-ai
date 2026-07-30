@@ -9,7 +9,11 @@ import { db } from "@/lib/supabase";
 // convite já queimado, o garçom ficaria preso. Com código, a sessão nasce DENTRO do app instalado,
 // que é onde ela precisa estar, e a instrução é a mesma pra Android e iPhone.
 
-const VALIDADE_MIN = 30; // código curto = validade curta. Gerar outro custa 2 toques pro dono.
+// 30 DIAS (era 30 min) e REUTILIZÁVEL (29/07): enquanto a sessão do celular ainda pode cair, um
+// código de uso único obrigava o garçom a ir no PC do caixa a cada queda — aconteceu 5 vezes numa
+// noite no Medellín. Agora o código é do garçom: ele anota, reentra sozinho quantas vezes precisar.
+// Quem corta o acesso é o dono, no "desconectar" ou excluindo o código — não o relógio.
+const VALIDADE_MIN = 30 * 24 * 60;
 const EMAIL_DOMINIO = "garcom.comandapro.net.br"; // conta sintética: ninguém digita, ninguém recebe email
 
 export type Invite = { code: string; expiresAt: string };
@@ -34,21 +38,20 @@ export async function createInvite(staffId: string, storeId: string): Promise<In
   throw new Error("Não consegui gerar o código agora. Tente de novo.");
 }
 
-/** Troca o código pela credencial de acesso do garçom. Uso único: marca `used_at` ANTES de devolver
- *  qualquer coisa, então dois celulares com o mesmo código não entram. Devolve null se o código não
- *  existe, já foi usado ou expirou — o chamador não distingue os casos (não entrega pista pra quem
- *  fica chutando código). */
+/** Troca o código pela credencial de acesso do garçom. REUTILIZÁVEL: não queima no uso (29/07) —
+ *  o garçom reentra com o mesmo número quantas vezes precisar, sem ir ao PC do caixa. Morre só por
+ *  validade (30 dias) ou porque o dono desconectou/excluiu. Devolve null se o código não existe ou
+ *  venceu — o chamador não distingue os casos (não entrega pista pra quem fica chutando código). */
 export async function consumeInvite(code: string): Promise<{ email: string; password: string } | null> {
   const d = db();
   const limpo = code.replace(/\D/g, "");
   if (limpo.length !== 6) return null;
 
   const agora = new Date().toISOString();
-  // update condicional = trava a corrida: quem marcar used_at primeiro leva o convite
   const { data: rows } = await d.from("staff_invites")
-    .update({ used_at: agora })
+    .select("store_id, staff_id")
     .eq("code", limpo).is("used_at", null).gt("expires_at", agora)
-    .select("store_id, staff_id");
+    .limit(1);
   const inv = (rows ?? [])[0] as { store_id: string; staff_id: string } | undefined;
   if (!inv) return null;
 
