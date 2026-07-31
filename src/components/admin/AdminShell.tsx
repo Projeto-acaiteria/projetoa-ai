@@ -77,7 +77,7 @@ const NAV: NavItem[] = [
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor, prepStations = [], storeId = null }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string; prepStations?: string[]; storeId?: string | null }) {
+export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor, prepStations = [] }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string; prepStations?: string[] }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -109,8 +109,8 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={brandVars(brandColor)}>
       {/* Vigias de impressão GLOBAIS: rodam em qualquer página, mas só imprimem na máquina do caixa
           (com impressora configurada). Fila sob demanda (conta do garçom) + vias de preparo novas. */}
-      <CaixaPrintQueue station="caixa" storeId={storeId} />
-      {prepStations.length > 0 && <CaixaPrepPrinter stations={prepStations} loja={storeName} storeId={storeId} />}
+      <CaixaPrintQueue station="caixa" />
+      {prepStations.length > 0 && <CaixaPrepPrinter stations={prepStations} loja={storeName} />}
       {/* Auto-update do PWA: detecta deploy novo e recarrega (senão o operador fica no bundle velho). */}
       <VersionCheck />
       {/* Sidebar desktop */}

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { printTicket } from "@/lib/print";
 import { stationTicketHtml } from "@/lib/ticket";
 import { getStationPrinter } from "@/lib/qz";
-import { useStorePulse } from "@/lib/use-store-pulse";
 
 // Vigia HEADLESS no Caixa: o Caixa (sempre aberto no balcão) vira a ESTAÇÃO DE IMPRESSÃO.
 // Como o pedido pode vir de qualquer fonte (caixa/garçom/QR) e o celular do garçom/cliente NÃO
@@ -17,7 +16,7 @@ type KdsOrder = { id: number; station: string; status: string; created_at: strin
 
 export const CAIXA_PREP_KEY = "autoprint:caixa-preparo";
 
-export default function CaixaPrepPrinter({ stations, loja, storeId = null }: { stations: string[]; loja: string; storeId?: string | null }) {
+export default function CaixaPrepPrinter({ stations, loja }: { stations: string[]; loja: string }) {
   const [on, setOn] = useState(true);
   const printedRef = useRef<Set<number>>(new Set());
   const baselined = useRef(false);
@@ -65,15 +64,11 @@ export default function CaixaPrepPrinter({ stations, loja, storeId = null }: { s
     }
   }, [on, stations, loja]);
 
-  // TEMPO REAL: pedido novo avisa e a via de preparo sai na hora, em vez de esperar o ciclo.
-  const { conectado: aoVivo } = useStorePulse(storeId, () => { void load(); }, { topics: ["preparo"] });
-
   useEffect(() => {
     load();
-    // rede de segurança (impressão não pode depender só do websocket): 60s com aviso, 8s sem ele.
-    const t = setInterval(load, aoVivo ? 60_000 : 8_000);
+    const t = setInterval(load, 8000);
     return () => clearInterval(t);
-  }, [load, aoVivo]);
+  }, [load]);
 
   return null; // headless
 }

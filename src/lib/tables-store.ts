@@ -14,7 +14,6 @@ import { getLoyalty } from "@/lib/loyalty-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
-import { pulse } from "@/lib/realtime-pulse";
 
 const POLPA_STOCK_ID = WEIGHT_BASE_STOCK_ID; // insumo base do açaí pesado (kg) — fonte única em menu.ts
 
@@ -434,9 +433,6 @@ export async function addTabItems(tabId: number, items: NewTabItem[], storeId?: 
   const today = todayBR();
   const consumes = resolved.flatMap((it) => it.consumes.map((c) => ({ stockId: c.stockId, qty: c.qty * it.qty })));
   await applyConsumes(consumes, "Mesa comanda", today, sid, stock); // `stock` já lido: sem reler e em paralelo
-
-  // avisa as telas: o salão vê a mesa mudar e a cozinha/bar vê o pedido novo — sem esperar ciclo
-  await Promise.all([pulse(sid, "mesas"), pulse(sid, "preparo")]);
   return created;
 }
 
@@ -661,7 +657,6 @@ export async function cancelTabItem(
     await d.from("tab_order_items").update({ qty: have - units }).eq("id", itemId).eq("store_id", sid);
   }
 
-  await Promise.all([pulse(sid, "mesas"), pulse(sid, "preparo")]); // sai da comanda e do quadro de preparo
   return { cancelledQty: units, itemName: it.name, tabId, tabFreed };
 }
 
@@ -741,7 +736,6 @@ export async function addPayment(
     .select()
     .single();
   if (error) throw error;
-  await pulse(sid, "mesas"); // o card da mesa abate na hora em qualquer aparelho aberto
   return data as TabPayment;
 }
 
@@ -795,7 +789,6 @@ export async function closeTab(tabId: number, opts: CloseTabOpts = {}): Promise<
       await d.from("tabs").update({ points_awarded: pointsAwarded }).eq("id", tabId).eq("store_id", sid);
     }
   }
-  await pulse(sid, "mesas"); // mesa liberada aparece verde nas outras telas na hora
   return { pointsAwarded };
 }
 

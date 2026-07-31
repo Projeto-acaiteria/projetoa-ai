@@ -36,8 +36,3 @@ export const POLL = {
   pedidos: 10_000,
   preparo: 15_000,
 } as const;
-
-// Com o TEMPO REAL de pé (31/07), o polling deixa de ser o mecanismo e vira REDE DE SEGURANÇA:
-// o servidor avisa, a tela busca. O ciclo lento só existe pra cobrir websocket caído/bloqueado —
-// wi-fi de bar cai, e o sistema não pode ficar cego. Use: conectado ? POLL_REDE : POLL.x
-export const POLL_REDE = 60_000;

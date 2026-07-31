@@ -35,7 +35,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     family: familyOf(cfg?.business_type),
   };
   return (
-    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations} storeId={loja.id}>
+    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos).
           Só monta onde faz sentido (perf 29/07): loja SEM delivery não recebe pedido de link — no
           Medellín ele ficava perguntando 900x/hora por pedido que nunca existiria. E garçom não
