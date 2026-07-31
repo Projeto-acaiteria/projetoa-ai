@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { printTicket } from "@/lib/print";
 import { getStationPrinter } from "@/lib/qz";
+import { useStorePulse } from "@/lib/use-store-pulse";
 
 // Vigia HEADLESS da FILA de impressão: imprime jobs sob demanda (ex.: garçom pede "Imprimir conta"
 // pelo celular — o celular não imprime, o job cai aqui e a MÁQUINA DO CAIXA imprime na impressora do
 // balcão). Montado no AdminShell → roda em QUALQUER página do admin, mas SÓ na máquina que tem a
 // impressora do caixa configurada (getStationPrinter). Celular do garçom / outras máquinas não têm
 // impressora → nem faz polling. Assim a impressão é automática sem precisar estar na tela do Caixa. — ComandaPRO
-export default function CaixaPrintQueue({ station = "caixa" }: { station?: string }) {
+export default function CaixaPrintQueue({ station = "caixa", storeId = null }: { station?: string; storeId?: string | null }) {
   const busy = useRef(false);
   const [hasPrinter, setHasPrinter] = useState(false);
 
@@ -40,15 +41,17 @@ export default function CaixaPrintQueue({ station = "caixa" }: { station?: strin
     }
   }, [station]);
 
+  // TEMPO REAL: a fila AVISA quando entra cupom (o garçom pediu a conta) → imprime na hora.
+  const { conectado: aoVivo } = useStorePulse(hasPrinter ? storeId : null, () => { void tick(); }, { topics: ["impressao"] });
+
   useEffect(() => {
     if (!hasPrinter) return; // sem impressora do caixa nesta máquina → não vigia
     tick();
-    // 8s (era 5s): a conta pedida pelo garçom sai em até 8 segundos, tempo de ele chegar na mesa.
-    // NÃO usa pausa por visibilidade de propósito — impressão tem que sair com o navegador
-    // minimizado. O conserto de verdade aqui é o tempo real (a fila avisar em vez de ser perguntada).
-    const t = setInterval(tick, 8000);
+    // rede de segurança: com o aviso de pé, 60s basta; sem ele, volta aos 8s de sempre.
+    // NÃO usa pausa por visibilidade de propósito — impressão tem que sair com o navegador minimizado.
+    const t = setInterval(tick, aoVivo ? 60_000 : 8_000);
     return () => clearInterval(t);
-  }, [tick, hasPrinter]);
+  }, [tick, hasPrinter, aoVivo]);
 
   return null; // headless
 }

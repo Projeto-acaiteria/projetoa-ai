@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { pulse } from "@/lib/realtime-pulse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export async function POST(req: Request) {
     store_id: sid, station: b.station || "caixa", kind: b.kind || "conferencia", html: b.html.slice(0, 20000), status: "pending",
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // avisa a MÁQUINA DO CAIXA que tem cupom na fila — antes ela perguntava de 8 em 8 segundos a
+  // noite inteira (era o maior consumo ocioso do plano). Agora sai na hora que o garçom pede.
+  await pulse(sid, "impressao");
   return NextResponse.json({ ok: true });
 }
 

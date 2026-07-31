@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { printTicket } from "@/lib/print";
-import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
+import { useVisiblePolling, POLL, POLL_REDE } from "@/lib/use-visible-polling";
+import { useStorePulse } from "@/lib/use-store-pulse";
 import { stationTicketHtml } from "@/lib/ticket";
 
 // KDS — telas de preparo por estação. Lê /api/kds (pedidos já roteados por estação pelo motor)
@@ -35,7 +36,7 @@ function StationIcon({ station, size = 14 }: { station: string; size?: number })
   return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 11h16a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z" /><path d="M6 15l1 5h10l1-5" /></svg>);
 }
 
-export default function KdsClient({ stations, loja, kitchenScreen = true }: { stations: string[]; loja: string; kitchenScreen?: boolean }) {
+export default function KdsClient({ stations, loja, kitchenScreen = true, storeId = null }: { stations: string[]; loja: string; kitchenScreen?: boolean; storeId?: string | null }) {
   const multi = stations.length > 1;
   const [sel, setSel] = useState<string>("todas");
   const [orders, setOrders] = useState<KdsOrder[]>([]);
@@ -91,7 +92,9 @@ export default function KdsClient({ stations, loja, kitchenScreen = true }: { st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.join(","), autoprint]);
 
-  useVisiblePolling(load, POLL.preparo); // quadro em segundo plano não pergunta (o Medellín nem usa esta tela)
+  // TEMPO REAL: pedido novo/cancelado chega por aviso do servidor — a cozinha vê na hora, não em 15s
+  const { conectado: aoVivo } = useStorePulse(storeId, () => { void load(); }, { topics: ["preparo"] });
+  useVisiblePolling(load, aoVivo ? POLL_REDE : POLL.preparo); // polling vira rede de segurança
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   async function advance(o: KdsOrder) {
