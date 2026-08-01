@@ -15,7 +15,8 @@ import ProductCustomizer, { type CustomizeResult } from "@/components/menu/Produ
 import WeightModal from "@/components/admin/WeightModal";
 import { printVias, openDrawer, printTicket } from "@/lib/print";
 import { warmQzSignKey } from "@/lib/qz";
-import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
+import { useVisiblePolling, POLL, POLL_REDE } from "@/lib/use-visible-polling";
+import { useStorePulse } from "@/lib/use-store-pulse";
 import { ticketHtml, stationTicketHtml } from "@/lib/ticket";
 import QzStatus from "@/components/admin/QzStatus";
 
@@ -32,7 +33,7 @@ const PAYS = [["dinheiro", "Dinheiro"], ["pix", "PIX"], ["debito", "Débito"], [
 const genOpId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 const agoMin = (iso: string | null, now: number) => { if (!iso) return ""; const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 
-export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true, selfWaiterId = null, offlineEnabled = false }: {
+export default function MesasBarClient({ categories, coverShow, staff, storeName, machines, endereco, cnpj, tel, cupomRodape, onSaleClosed, canClose = true, selfWaiterId = null, offlineEnabled = false, storeId = null }: {
   categories: BarCategory[];
   coverShow: { artist: string; coverCents: number } | null;
   staff: { id: string; name: string }[];
@@ -46,6 +47,7 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   canClose?: boolean; // GARÇOM (false): abre e lança, mas NÃO fecha/recebe — quem fecha é o caixa
   selfWaiterId?: string | null; // garçom logado: pedido nasce no nome dele (sem escolher no seletor)
   offlineEnabled?: boolean; // Fatia 2: lançar em comanda aberta aguenta queda de rede (flag por loja)
+  storeId?: string | null; // tempo real: canal da loja (o servidor avisa, a tela busca)
 }) {
   const [tables, setTables] = useState<TableCard[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -53,6 +55,9 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   const [drawer, setDrawer] = useState<{ table: TableCard; tabId: number | null } | null>(null);
   const [view, setView] = useState<"pick" | "comanda">("pick");
   const [comanda, setComanda] = useState<Comanda | null>(null);
+  // comanda aberta na tela AGORA — o aviso do tempo real precisa saber o que recarregar além da grade
+  const drawerTabRef = useRef<number | null>(null);
+  useEffect(() => { drawerTabRef.current = drawer?.tabId ?? null; }, [drawer]);
   const [temp, setTemp] = useState<TempLine[]>([]);
   const [pickedCat, setPickedCat] = useState<string | null>(null); // picker category-first: null = grade de categorias
   const [paying, setPaying] = useState(false); // comanda: só mostra pagamento ao clicar "Fechar conta"
@@ -114,7 +119,10 @@ export default function MesasBarClient({ categories, coverShow, staff, storeName
   }, []);
   // carrega as mesas fechadas offline persistidas ANTES de listar (senão a antiga aparece 1 ciclo)
   useEffect(() => { cacheGet<number[]>("closedTabs").then((c) => { if (c?.length) closedTabsRef.current = new Set(c); void loadTables(); }); }, [loadTables]);
-  useVisiblePolling(loadTables, POLL.mesas); // para quando a tela não está à vista; volta atualizando na hora
+  // TEMPO REAL: o servidor avisa que a loja mudou → busca UMA vez. Com o canal de pé, o polling
+  // vira rede de segurança lenta (60s); se o websocket cair, volta ao ritmo normal sozinho.
+  const { conectado: aoVivo } = useStorePulse(storeId, () => { void loadTables(); if (drawerTabRef.current) void loadComanda(drawerTabRef.current); }, { topics: ["mesas"] });
+  useVisiblePolling(loadTables, aoVivo ? POLL_REDE : POLL.mesas);
   // OFFLINE: pré-aquece o cache de TODAS as comandas abertas enquanto tem net, pra qualquer mesa abrir
   // com os itens offline (não só a que já foi aberta online). Roda na entrada e ao reconectar.
   const warmComandas = useCallback(async () => {

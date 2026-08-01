@@ -21,7 +21,7 @@ export default async function PreparoPage() {
         sub={cfg?.kitchen_screen ? "Pedidos das mesas caem aqui já separados por estação" : "O que foi pedido e ainda não saiu — a cozinha trabalha pelo ticket impresso"}
         action={<Badge tone="lime">atualiza sozinho</Badge>}
       />
-      <KdsClient stations={stations} loja={store.name} kitchenScreen={!!cfg?.kitchen_screen} />
+      <KdsClient stations={stations} loja={store.name} kitchenScreen={!!cfg?.kitchen_screen} storeId={storeId} />
     </>
   );
 }
