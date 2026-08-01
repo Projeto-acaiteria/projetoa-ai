@@ -64,11 +64,26 @@ function genCode(): string {
 
 export type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito";
 
+const PAGINA = 1000; // teto do PostgREST por requisição
+
+// PAGINADO (bug 31/07, Cantinho): sem `range`, o PostgREST devolve no máximo 1000 linhas — e as
+// MAIS ANTIGAS. O Cantinho cruzou 1000 pedidos às 16:41 e, a partir dali, toda venda nova ficou
+// invisível pro CAIXA e pro FINANCEIRO (que leem daqui), enquanto a tela de Pedidos continuava
+// mostrando tudo (ela usa recentOrders, filtrado por data). O dono viu o faturamento congelar em
+// R$ 34,16 — a soma exata das duas últimas vendas que couberam na página.
+// Cresce devagar: 1 requisição a cada 1000 pedidos. Falha nunca vira lista vazia (throw).
 async function readAll(storeId?: string): Promise<Order[]> {
   const sid = storeId ?? (await resolveStoreId());
-  const { data, error } = await db().from("orders").select("data").eq("store_id", sid);
-  if (error) throw new Error("Erro ao ler pedidos: " + error.message); // nunca tratar erro como vazio
-  return (data ?? []).map((r) => (r as { data: Order }).data);
+  const out: Order[] = [];
+  for (let inicio = 0; ; inicio += PAGINA) {
+    const { data, error } = await db()
+      .from("orders").select("data").eq("store_id", sid)
+      .order("id", { ascending: true }).range(inicio, inicio + PAGINA - 1);
+    if (error) throw new Error("Erro ao ler pedidos: " + error.message); // nunca tratar erro como vazio
+    const linhas = data ?? [];
+    out.push(...linhas.map((r) => (r as { data: Order }).data));
+    if (linhas.length < PAGINA) return out;
+  }
 }
 
 export async function listOrders(storeId?: string): Promise<Order[]> {
