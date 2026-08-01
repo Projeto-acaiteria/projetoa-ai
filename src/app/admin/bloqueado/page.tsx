@@ -1,5 +1,5 @@
 import { getCurrentStore } from "@/lib/auth/store";
-import { db } from "@/lib/supabase";
+import { getSubscription, billingView } from "@/lib/auth/subscription";
 import { BILLING } from "@/config/billing";
 import PagarClient from "./PagarClient";
 import LogoutButton from "./LogoutButton";
@@ -11,9 +11,8 @@ export const dynamic = "force-dynamic";
 // login). Cobrança DENTRO do app: PIX com QR inline + cartão recorrente, igual AgendaPRO. — ComandaPRO 3.8
 export default async function BloqueadoPage() {
   const loja = await getCurrentStore();
-  const { data: sub } = loja
-    ? await db().from("subscriptions").select("status, pix_link_atual").eq("store_id", loja.id).maybeSingle()
-    : { data: null };
+  const sub = loja ? await getSubscription(loja.id) : null;
+  const view = billingView(sub);
 
   const planos = Object.entries(BILLING.planos).map(([id, p]) => ({
     id,
@@ -26,21 +25,32 @@ export default async function BloqueadoPage() {
 
   const reativar = sub?.status === "cancelled";
 
-  const titulo = reativar
-    ? "Assinatura cancelada"
-    : sub?.status === "past_due"
-      ? "Pagamento em atraso"
-      : sub?.status === "trial"
-        ? "Última etapa: liberar o painel"
-        : "Assinatura pendente";
+  // CLIENTE EM DIA renovando adiantado (chega aqui pelo botão "Renovar" da faixa de vencimento).
+  // Antes caía no texto genérico "Assinatura pendente" — o bom pagador abria a tela e lia que
+  // estava pendente, um dia antes de vencer. Agora fala com ele, e responde a dúvida que todo
+  // mundo tem ao pagar adiantado: "vou perder os dias que faltam?".
+  const renovando = sub?.status === "active" && !sub.permanent_courtesy && (view?.daysLeft ?? -1) >= 0;
+  const quandoVence = view?.daysLeft === 0 ? "hoje" : `em ${view?.daysLeft} dia${view?.daysLeft === 1 ? "" : "s"}`;
 
-  const mensagem = reativar
-    ? "Sua assinatura foi cancelada. Quer voltar? Escolhe um plano abaixo ou fala com a gente."
-    : sub?.status === "past_due"
-      ? "Tivemos uma falha na cobrança. Regularize pra manter o painel no ar."
-      : sub?.status === "trial"
-        ? `Sua conta${loja?.name ? ` da ${loja.name}` : ""} está pronta. Agora é só escolher um plano pra continuar usando.`
-        : "Escolha um plano pra continuar usando o painel.";
+  const titulo = renovando
+    ? "Renovar assinatura"
+    : reativar
+      ? "Assinatura cancelada"
+      : sub?.status === "past_due"
+        ? "Pagamento em atraso"
+        : sub?.status === "trial"
+          ? "Última etapa: liberar o painel"
+          : "Assinatura pendente";
+
+  const mensagem = renovando
+    ? `Sua mensalidade vence ${quandoVence}. Pagando agora, o novo período começa a partir do vencimento — você não perde os dias que faltam.`
+    : reativar
+      ? "Sua assinatura foi cancelada. Quer voltar? Escolhe um plano abaixo ou fala com a gente."
+      : sub?.status === "past_due"
+        ? "Tivemos uma falha na cobrança. Regularize pra manter o painel no ar."
+        : sub?.status === "trial"
+          ? `Sua conta${loja?.name ? ` da ${loja.name}` : ""} está pronta. Agora é só escolher um plano pra continuar usando.`
+          : "Escolha um plano pra continuar usando o painel.";
 
   const waMsg = `Olá! Quero ativar meu plano do ComandaPRO${loja?.name ? ` (${loja.name})` : ""}. Pode me ajudar?`;
   const whatsappLink = "https://wa.me/5563992920080?text=" + encodeURIComponent(waMsg);
