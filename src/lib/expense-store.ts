@@ -2,6 +2,7 @@
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
 import { dateBR } from "@/lib/date-br";
+import { lerPaginado } from "@/lib/db-paged";
 
 export type ExpenseCategory =
   | "insumos" | "aluguel" | "salarios" | "utilidades" | "embalagens" | "marketing" | "manutencao" | "impostos" | "outros";
@@ -23,11 +24,15 @@ export const EXPENSE_CATS: ExpenseCategory[] = [
   "insumos", "aluguel", "salarios", "utilidades", "embalagens", "marketing", "manutencao", "impostos", "outros",
 ];
 
+// PAGINADO (ver lib/db-paged): despesa acumula pra sempre — ao passar de 1000 o financeiro
+// começaria a ignorar as mais recentes sem avisar ninguém.
 async function readAll(storeId?: string): Promise<Expense[]> {
   const sid = storeId ?? (await resolveStoreId());
-  const { data, error } = await db().from("expenses").select("data").eq("store_id", sid);
-  if (error) throw new Error("Erro ao ler despesas: " + error.message); // nunca tratar erro como vazio
-  return (data ?? []).map((r) => (r as { data: Expense }).data);
+  const linhas = await lerPaginado<{ data: Expense }>(
+    (de, ate) => db().from("expenses").select("data").eq("store_id", sid).order("id", { ascending: true }).range(de, ate),
+    "Erro ao ler despesas",
+  );
+  return linhas.map((r) => r.data);
 }
 
 export async function listExpenses(): Promise<Expense[]> {

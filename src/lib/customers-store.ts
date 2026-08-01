@@ -3,6 +3,7 @@
 // Chave do cliente = telefone só com dígitos.
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { lerPaginado } from "@/lib/db-paged";
 
 export type PointsTx = {
   type: "earn" | "redeem" | "adjust" | "expire"; // expire = baixa do cron (auditoria); FIFO ignora
@@ -22,11 +23,15 @@ export type Customer = {
 
 export const normPhone = (s: string) => (s || "").replace(/\D+/g, "");
 
+// PAGINADO (ver lib/db-paged): base de clientes cresce sem teto — sem isto, ao passar de 1000 a
+// fidelidade pararia de enxergar os clientes mais novos, em silêncio.
 async function readAll(storeId?: string): Promise<Customer[]> {
   const sid = storeId ?? (await resolveStoreId());
-  const { data, error } = await db().from("customers").select("data").eq("store_id", sid);
-  if (error) throw new Error("Erro ao ler clientes: " + error.message); // nunca tratar erro como vazio
-  return (data ?? []).map((r) => (r as { data: Customer }).data);
+  const linhas = await lerPaginado<{ data: Customer }>(
+    (de, ate) => db().from("customers").select("data").eq("store_id", sid).order("phone", { ascending: true }).range(de, ate),
+    "Erro ao ler clientes",
+  );
+  return linhas.map((r) => r.data);
 }
 
 export async function listCustomers(): Promise<Customer[]> {

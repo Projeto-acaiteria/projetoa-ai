@@ -14,6 +14,7 @@ import { getLoyalty } from "@/lib/loyalty-store";
 import { readMenu } from "@/lib/menu-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { getActiveEvent } from "@/lib/events-store";
+import { lerPaginado } from "@/lib/db-paged";
 
 const POLPA_STOCK_ID = WEIGHT_BASE_STOCK_ID; // insumo base do açaí pesado (kg) — fonte única em menu.ts
 
@@ -893,11 +894,18 @@ export type MesaVenda = {
 /** Pagamentos de comanda no MESMO formato das vendas, pro financeiro e o caixa. */
 export async function listMesaPayments(): Promise<MesaVenda[]> {
   const sid = await resolveStoreId();
-  const { data, error } = await db()
-    .from("tab_payments")
-    .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, cancelled, tables(number))")
-    .eq("store_id", sid);
-  if (error) throw new Error("Erro ao ler pagamentos de mesa: " + error.message);
+  // PAGINADO: o caixa e o financeiro leem daqui e filtram por data DEPOIS, em memória — sem
+  // paginar, ao cruzar 1000 pagamentos o bar perderia justamente os do dia (foi o que aconteceu
+  // com os PEDIDOS do Cantinho em 31/07). Ver lib/db-paged.
+  const data = await lerPaginado<Record<string, unknown>>(
+    (de, ate) => db()
+      .from("tab_payments")
+      .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, cancelled, tables(number))")
+      .eq("store_id", sid)
+      .order("id", { ascending: true })
+      .range(de, ate),
+    "Erro ao ler pagamentos de mesa",
+  );
   return (data ?? []).filter((p) => !(p as { tabs?: { cancelled?: boolean } | null }).tabs?.cancelled).map((p) => {
     const row = p as {
       tab_id: string | number; amount_cents: number; method: string; fee_percent: number | null; paid_at: string;
