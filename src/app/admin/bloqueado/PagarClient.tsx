@@ -89,9 +89,18 @@ function buildOpcoes(planos: Plano[]): Opcao[] {
   return opcoes;
 }
 
-export default function PagarClient({ planos, lojaNome }: { planos: Plano[]; lojaNome: string }) {
+// Qual opção já vem marcada. Vinha marcado o ANUAL (era só o último da lista) — quem entrava pra
+// pagar a mensalidade de R$ 219 lia "Pagar 12 meses (R$ 2.100)" no botão e travava. Custou uma
+// renovação por fora em 03/08. Agora marca o plano que a loja JÁ contratou, no PIX.
+function planoInicial(opcoes: Opcao[], planoAtual: string): Modalidade {
+  const doPlano = opcoes.find((o) => o.plano === planoAtual && o.forma === "pix");
+  const mensalPix = opcoes.find((o) => o.key === "mensal_pix");
+  return doPlano?.key ?? mensalPix?.key ?? opcoes[0]?.key ?? "mensal_pix";
+}
+
+export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: Plano[]; lojaNome: string; planoAtual: string }) {
   const opcoes = buildOpcoes(planos);
-  const [selectedKey, setSelectedKey] = useState<Modalidade>(opcoes[opcoes.length - 1]?.key ?? "mensal_pix");
+  const [selectedKey, setSelectedKey] = useState<Modalidade>(planoInicial(opcoes, planoAtual));
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
