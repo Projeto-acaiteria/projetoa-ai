@@ -47,7 +47,7 @@ export default async function CaixaPage() {
   return (
     <>
       <PageHeader title="Caixa" sub={isPdvHub ? "Frente de caixa · mesas, venda avulsa e gestão" : "Frente de caixa · abra o caixa e venda"} />
-      {cfg?.has_tables && <CallsAlert />}
+      {cfg?.has_tables && <CallsAlert storeId={storeId} />}
       <CaixaClient sizes={menu.sizes} groups={menu.groups} produtos={produtos} fees={fees} storeName={store.name} machines={machines} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} showPdv={showPdv} pricePerKgCents={store.pricePerKgCents} cashPinSet={cashPinSet} family={family} pdvHub={isPdvHub} barCategories={barCategories} coverShow={coverShow} staff={staff} loyaltyEnabled={!!cfg?.loyalty_enabled} offlineEnabled={!!cfg?.offline_enabled} stations={stations} />
     </>
   );

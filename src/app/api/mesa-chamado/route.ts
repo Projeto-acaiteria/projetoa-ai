@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { getStoreConfig, qrPedidoOn } from "@/lib/auth/store-config";
+import { pulseDepois } from "@/lib/realtime-pulse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       .from("service_calls")
       .insert({ store_id: storeId, table_number: tableNumber, type, status: "pendente" });
     if (error) return NextResponse.json({ error: "não consegui registrar o chamado" }, { status: 500 });
+    pulseDepois(storeId, "mesas"); // avisa o cockpit (CallsAlert/Mesas) na hora, sem esperar o polling
   }
 
   return NextResponse.json({ ok: true });

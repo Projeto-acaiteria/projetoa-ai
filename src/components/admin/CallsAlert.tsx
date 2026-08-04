@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useVisiblePolling, POLL, POLL_REDE } from "@/lib/use-visible-polling";
+import { useStorePulse } from "@/lib/use-store-pulse";
 
-// Alerta de chamados de mesa no cockpit (adm/garçom). Polla /api/mesas/chamados a cada 8s e lista
-// "Mesa X chamou o garçom / pediu a conta" com botão Atender. — ComandaPRO 3.9
+// Alerta de chamados de mesa no cockpit (adm/garçom). Lista "Mesa X chamou o garçom / pediu a conta".
+// Tempo real (04/08): um chamado novo dispara o pulse "mesas" (rota mesa-chamado) → busca na hora.
+// O polling vira REDE DE SEGURANÇA e para quando a aba está oculta (antes era setInterval 8s cru,
+// rodando 24/7 no fundo — furo de CPU/invocação de função). — ComandaPRO 3.9
 type Call = { id: number; table_number: number; type: "conta" | "atendente"; created_at: string };
 
-export default function CallsAlert() {
+export default function CallsAlert({ storeId = null }: { storeId?: string | null }) {
   const [calls, setCalls] = useState<Call[]>([]);
 
   const load = useCallback(async () => {
@@ -20,11 +24,9 @@ export default function CallsAlert() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    const i = setInterval(load, 8000);
-    return () => clearInterval(i);
-  }, [load]);
+  useEffect(() => { void load(); }, [load]); // carga inicial (chamado que já existia ao abrir a tela)
+  const { conectado: aoVivo } = useStorePulse(storeId, () => { void load(); }, { topics: ["mesas"] });
+  useVisiblePolling(load, aoVivo ? POLL_REDE : POLL.mesas); // 60s com pulse, 12s sem; para quando oculta
 
   async function atender(id: number) {
     setCalls((c) => c.filter((x) => x.id !== id)); // otimista

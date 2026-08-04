@@ -33,7 +33,7 @@ export default async function MesasPage() {
   const header = (
     <>
       <PageHeader title="Mesas" sub={canClose ? "Salão · abra a comanda, lance itens e feche a conta" : "Salão · abra a comanda e lance os itens"} action={<Badge tone="lime">tempo real</Badge>} />
-      <CallsAlert />
+      <CallsAlert storeId={storeId} />
     </>
   );
 
