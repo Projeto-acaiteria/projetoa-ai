@@ -14,7 +14,8 @@ import {
 import { brl } from "@/lib/format";
 import { printVias } from "@/lib/print";
 import { ticketHtml } from "@/lib/ticket";
-import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
+import { useVisiblePolling, POLL, POLL_REDE } from "@/lib/use-visible-polling";
+import { useStorePulse } from "@/lib/use-store-pulse";
 import type { CupomData } from "@/components/admin/CupomPrinter";
 
 // ---- tipos do contrato das APIs ----
@@ -77,6 +78,7 @@ export default function MesasClient({
   cnpj,
   tel,
   cupomRodape,
+  storeId = null,
 }: {
   pricePerKgCents: number;
   sizes: SizeOption[];
@@ -88,6 +90,7 @@ export default function MesasClient({
   cnpj: string;
   tel: string;
   cupomRodape: string;
+  storeId?: string | null;
 }) {
   const [tables, setTables] = useState<TableCell[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -128,7 +131,9 @@ export default function MesasClient({
     }
   }, []);
 
-  useVisiblePolling(loadTables, POLL.mesas); // para quando a tela não está à vista; volta atualizando na hora
+  // tempo real: ação na mesa dispara o pulse "mesas" → busca na hora; polling vira rede de segurança
+  const { conectado: aoVivo } = useStorePulse(storeId, () => { void loadTables(); }, { topics: ["mesas"] });
+  useVisiblePolling(loadTables, aoVivo ? POLL_REDE : POLL.mesas); // só à vista; 60s com pulse
 
   const loadComanda = useCallback(async (id: number) => {
     const res = await fetch(`/api/mesas/comanda?tabId=${id}`, { cache: "no-store" });

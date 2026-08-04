@@ -51,5 +51,5 @@ export default async function MesasPage() {
   const produtos = stock
     .filter((i) => VENDA_CATS.includes(i.category) && i.sellPriceCents)
     .map((i) => ({ id: i.id, name: i.name, priceCents: i.sellPriceCents!, qty: i.qty, unit: i.unit }));
-  return <>{header}<MesasClient pricePerKgCents={store.pricePerKgCents} sizes={sizes} produtos={produtos} coverShow={coverShow} staff={staff} storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} /></>;
+  return <>{header}<MesasClient pricePerKgCents={store.pricePerKgCents} sizes={sizes} produtos={produtos} coverShow={coverShow} staff={staff} storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} storeId={storeId} /></>;
 }
