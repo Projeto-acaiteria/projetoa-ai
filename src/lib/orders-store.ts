@@ -72,13 +72,16 @@ const PAGINA = 1000; // teto do PostgREST por requisição
 // mostrando tudo (ela usa recentOrders, filtrado por data). O dono viu o faturamento congelar em
 // R$ 34,16 — a soma exata das duas últimas vendas que couberam na página.
 // Cresce devagar: 1 requisição a cada 1000 pedidos. Falha nunca vira lista vazia (throw).
-async function readAll(storeId?: string): Promise<Order[]> {
+async function readAll(storeId?: string, sinceISO?: string): Promise<Order[]> {
   const sid = storeId ?? (await resolveStoreId());
   const out: Order[] = [];
   for (let inicio = 0; ; inicio += PAGINA) {
-    const { data, error } = await db()
-      .from("orders").select("data").eq("store_id", sid)
-      .order("id", { ascending: true }).range(inicio, inicio + PAGINA - 1);
+    // sinceISO (janela do caixa/resumo): createdAt mora no JSONB (a tabela é {id,data,store_id}, sem
+    // coluna created_at). Filtra data->>createdAt (ISO "…Z", ordena = cronológico) por índice de
+    // expressão em vez de baixar a história e filtrar no JS. Mesmo resultado; egress/RAM despencam.
+    let q = db().from("orders").select("data").eq("store_id", sid);
+    if (sinceISO) q = q.gte("data->>createdAt", sinceISO);
+    const { data, error } = await q.order("id", { ascending: true }).range(inicio, inicio + PAGINA - 1);
     if (error) throw new Error("Erro ao ler pedidos: " + error.message); // nunca tratar erro como vazio
     const linhas = data ?? [];
     out.push(...linhas.map((r) => (r as { data: Order }).data));
@@ -86,8 +89,8 @@ async function readAll(storeId?: string): Promise<Order[]> {
   }
 }
 
-export async function listOrders(storeId?: string): Promise<Order[]> {
-  return (await readAll(storeId)).sort((a, b) => b.id - a.id);
+export async function listOrders(storeId?: string, sinceISO?: string): Promise<Order[]> {
+  return (await readAll(storeId, sinceISO)).sort((a, b) => b.id - a.id);
 }
 
 // Só o MAIOR id (baseline do vigia de pedidos) — 1 row via índice PK, não baixa o histórico.

@@ -899,18 +899,21 @@ export type MesaVenda = {
 };
 
 /** Pagamentos de comanda no MESMO formato das vendas, pro financeiro e o caixa. */
-export async function listMesaPayments(): Promise<MesaVenda[]> {
+export async function listMesaPayments(fromISO?: string): Promise<MesaVenda[]> {
   const sid = await resolveStoreId();
   // PAGINADO: o caixa e o financeiro leem daqui e filtram por data DEPOIS, em memória — sem
   // paginar, ao cruzar 1000 pagamentos o bar perderia justamente os do dia (foi o que aconteceu
   // com os PEDIDOS do Cantinho em 31/07). Ver lib/db-paged.
+  // fromISO (janela do resumo): filtra paid_at NO ÍNDICE — não baixa o histórico de pagamentos inteiro.
   const data = await lerPaginado<Record<string, unknown>>(
-    (de, ate) => db()
-      .from("tab_payments")
-      .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, cancelled, tables(number))")
-      .eq("store_id", sid)
-      .order("id", { ascending: true })
-      .range(de, ate),
+    (de, ate) => {
+      let q = db()
+        .from("tab_payments")
+        .select("tab_id, amount_cents, method, fee_percent, paid_at, tabs(customer_name, label, cancelled, tables(number))")
+        .eq("store_id", sid);
+      if (fromISO) q = q.gte("paid_at", fromISO);
+      return q.order("id", { ascending: true }).range(de, ate);
+    },
     "Erro ao ler pagamentos de mesa",
   );
   return (data ?? []).filter((p) => !(p as { tabs?: { cancelled?: boolean } | null }).tabs?.cancelled).map((p) => {

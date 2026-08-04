@@ -33,8 +33,10 @@ export async function resumoJanela(session: CashSession, fromMs: number, toMs?: 
     return t >= fromMs && (toMs == null || t < toMs);
   };
   const fromISO = new Date(fromMs).toISOString();
-  const orders = (await listOrders()).filter((o) => o.mode === "balcao" && !o.cancelled && dentro(o.createdAt));
-  const mesas = (await listMesaPayments()).filter((m) => dentro(m.date));
+  // janela no SQL (fromISO) — busca só a sessão, não a história. O filtro dentro() segue pro limite
+  // superior (toMs) + mode/cancelled; resultado idêntico, só muda quantas linhas trafegam.
+  const orders = (await listOrders(undefined, fromISO)).filter((o) => o.mode === "balcao" && !o.cancelled && dentro(o.createdAt));
+  const mesas = (await listMesaPayments(fromISO)).filter((m) => dentro(m.date));
   const mesaCashCents = mesas.filter((m) => m.method === "dinheiro").reduce((s, m) => s + m.grossCents, 0);
   const mesaTotalCents = mesas.reduce((s, m) => s + m.grossCents, 0);
   const salesTotalCents = orders.reduce((s, o) => s + o.totalCents, 0) + mesaTotalCents;

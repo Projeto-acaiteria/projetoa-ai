@@ -20,7 +20,8 @@ const resumo = (session: CashSession) => resumoJanela(session, janelaNoite(sessi
 // `kind` diferencia o estorno no POST (cancelar-venda × cancelar-mesa). Mais recente primeiro.
 async function vendasSessao(session: CashSession) {
   const winMs = janelaNoite(session);
-  const balcao = (await listOrders())
+  const winISO = new Date(winMs).toISOString();
+  const balcao = (await listOrders(undefined, winISO)) // janela no SQL — não baixa a história
     .filter((o) => o.mode === "balcao" && !o.cancelled && new Date(o.createdAt).getTime() >= winMs)
     .map((o) => ({
       kind: "balcao" as const, id: o.id, display: o.display, createdAt: o.createdAt, totalCents: o.totalCents,
