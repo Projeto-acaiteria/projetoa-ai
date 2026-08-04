@@ -4,6 +4,7 @@ import { readMenu } from "@/lib/menu-store";
 import { getStore } from "@/lib/settings-store";
 import { db } from "@/lib/supabase";
 import { resolveStoreId } from "@/lib/auth/current";
+import { pulseDepois } from "@/lib/realtime-pulse";
 import { getCurrentStore } from "@/lib/auth/store";
 import { snapshotConsumes } from "@/lib/stock-store";
 
@@ -167,5 +168,6 @@ export async function POST(req: Request) {
     storeId,
   );
 
+  pulseDepois(storeId, "pedidos"); // avisa o cockpit (OrderWatcher) na hora — mata o polling rápido
   return NextResponse.json({ ok: true, order }, { status: 201 });
 }

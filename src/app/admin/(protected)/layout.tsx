@@ -41,7 +41,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
           Medellín ele ficava perguntando 900x/hora por pedido que nunca existiria. E garçom não
           atende delivery (não vê nem imprime), então o celular dele também não precisa vigiar. */}
       {cfg?.has_delivery !== false && (nav.role === "owner" || nav.role === "reception") && (
-        <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} />
+        <OrderWatcher storeName={store.name} endereco={store.endereco} cnpj={store.cnpj} tel={store.whatsapp} cupomRodape={store.cupomRodape} storeId={loja.id} />
       )}
       {/* offline (resiliência a quedas): motor de plataforma. Montado GLOBAL pra qualquer loja com
           offline ligado (drena a fila no reconnect + router.refresh) — senão vendas offline feitas no

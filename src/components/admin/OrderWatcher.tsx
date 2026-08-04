@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { printVias } from "@/lib/print";
-import { useVisiblePolling, POLL } from "@/lib/use-visible-polling";
+import { useVisiblePolling, POLL, POLL_REDE } from "@/lib/use-visible-polling";
+import { useStorePulse } from "@/lib/use-store-pulse";
 import { ticketHtml } from "@/lib/ticket";
 import { ticketFromOrder } from "@/lib/order-ticket";
 import type { Order } from "@/lib/orders-store";
@@ -11,7 +12,7 @@ import type { Order } from "@/lib/orders-store";
 // apita + imprime pedido novo de delivery/retirada mesmo se o operador estiver no Caixa (não só
 // na tela Pedidos). Os toggles ficam na tela Pedidos e gravam no localStorage; aqui eu releio o
 // estado a cada ciclo, então ligar/desligar lá vale aqui em até ~4s. Renderiza null (sem UI).
-export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRodape }: { storeName: string; endereco: string; cnpj: string; tel: string; cupomRodape: string }) {
+export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRodape, storeId = null }: { storeName: string; endereco: string; cnpj: string; tel: string; cupomRodape: string; storeId?: string | null }) {
   const lastId = useRef<number | null>(null); // maior id já visto; null = ainda sem baseline
   const audioCtx = useRef<AudioContext | null>(null);
 
@@ -67,9 +68,10 @@ export default function OrderWatcher({ storeName, endereco, cnpj, tel, cupomRoda
     }
   }, [beep, storeName, endereco, cnpj, tel, cupomRodape]);
 
-  // vigia de pedidos: roda no shell do admin, então QUALQUER tela aberta o mantinha perguntando de
-  // 4 em 4 segundos, a noite toda. Agora só enquanto alguém está de fato olhando.
-  useVisiblePolling(load, POLL.pedidos);
+  // tempo real (04/08): pedido novo do link dispara o pulse "pedidos" → busca na hora. O polling
+  // vira rede de segurança: só enquanto alguém está olhando, e afrouxa pra 60s com o pulse de pé.
+  const { conectado: aoVivo } = useStorePulse(storeId, () => { void load(); }, { topics: ["pedidos"] });
+  useVisiblePolling(load, aoVivo ? POLL_REDE : POLL.pedidos);
 
   return null;
 }

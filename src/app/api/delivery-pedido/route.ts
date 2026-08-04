@@ -5,6 +5,7 @@ import { addOrder, type OrderItem, type PaymentMethod } from "@/lib/orders-store
 import { snapshotConsumes } from "@/lib/stock-store";
 import { getStore, isOpenNow } from "@/lib/settings-store";
 import { getStoreConfig } from "@/lib/auth/store-config";
+import { pulseDepois } from "@/lib/realtime-pulse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,6 +129,7 @@ export async function POST(req: Request) {
       storeId,
     );
 
+    pulseDepois(storeId, "pedidos"); // avisa o cockpit (OrderWatcher) na hora — mata o polling rápido
     return NextResponse.json({ ok: true, order: { display: order.display, totalCents, code: order.code } }, { status: 201 });
   } catch (e) {
     console.error("delivery-pedido:", e);

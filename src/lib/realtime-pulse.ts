@@ -15,7 +15,7 @@ import "server-only";
 
 import { after } from "next/server";
 
-export type PulseTopic = "mesas" | "preparo" | "impressao";
+export type PulseTopic = "mesas" | "preparo" | "impressao" | "pedidos";
 
 export const canalDaLoja = (storeId: string) => `loja:${storeId}`;
 
