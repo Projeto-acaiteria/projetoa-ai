@@ -81,7 +81,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, tipo: "cartao", url: first?.invoiceUrl ?? null, subscriptionId: r.data.id });
   }
 
-  // PIX avulso pelo período do plano
+  // PIX avulso pelo período do plano.
+  // Antes de emitir, procura cobrança do MESMO plano ainda pagável no Asaas e devolve o QR dela.
+  // Sem isso, cada clique em "Pagar via PIX" abria outra cobrança de R$ 219 — o cliente que clica
+  // três vezes fica com três em aberto e paga a errada. Mesma trava da /api/billing/pix-atual;
+  // o externalReference no filtro garante que trocar de plano (mensal → anual) emite nova.
+  const abertas = await asaas.listPaymentsByCustomer(customerId, 15);
+  const reaproveitavel = abertas.data?.data?.find(
+    (p) => p.externalReference === externalReference && (p.status === "PENDING" || p.status === "OVERDUE"),
+  );
+  if (reaproveitavel) {
+    const qrExistente = await asaas.getPixQrCode(reaproveitavel.id);
+    if (qrExistente.ok && qrExistente.data?.payload) {
+      await db()
+        .from("subscriptions")
+        .update({
+          asaas_customer_id: customerId,
+          asaas_payment_id_atual: reaproveitavel.id,
+          pix_link_atual: reaproveitavel.invoiceUrl ?? null,
+          plano: body.plano,
+        })
+        .eq("store_id", loja.id);
+      return NextResponse.json({
+        ok: true,
+        tipo: "pix",
+        reaproveitada: true,
+        invoiceUrl: reaproveitavel.invoiceUrl,
+        qrImage: qrExistente.data.encodedImage ?? null,
+        qrPayload: qrExistente.data.payload,
+      });
+    }
+  }
+
   const pay = await asaas.createPayment({
     customer: customerId,
     billingType: "PIX",
