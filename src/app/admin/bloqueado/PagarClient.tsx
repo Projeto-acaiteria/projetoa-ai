@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import PixInlineCheckout from "@/components/billing/PixInlineCheckout";
 
 type Plano = { id: string; label: string; cents: number; equivMes: number; meses: number };
 type Modalidade = "mensal_cartao" | "mensal_pix" | "semestral_pix" | "anual_pix";
 
-const brl = (cents: number) => "R$ " + (cents / 100).toFixed(2).replace(".", ",");
 const brlInt = (cents: number) => "R$ " + Math.round(cents / 100).toLocaleString("pt-BR");
 
 type Opcao = {
@@ -98,14 +97,33 @@ function planoInicial(opcoes: Opcao[], planoAtual: string): Modalidade {
   return doPlano?.key ?? mensalPix?.key ?? opcoes[0]?.key ?? "mensal_pix";
 }
 
-export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: Plano[]; lojaNome: string; planoAtual: string }) {
+// CPF tem 11 dígitos, CNPJ tem 14 — qualquer coisa no meio o Asaas recusa com 400 e o cliente
+// só vê "falha ao criar cliente". Trava aqui, antes de gastar a chamada.
+const docValido = (cpf: string) => {
+  const d = cpf.replace(/\D/g, "").length;
+  return d === 11 || d === 14;
+};
+
+export default function PagarClient({
+  planos,
+  lojaNome,
+  planoAtual,
+  precisaCadastro = false,
+}: {
+  planos: Plano[];
+  lojaNome: string;
+  planoAtual: string;
+  precisaCadastro?: boolean;
+}) {
   const opcoes = buildOpcoes(planos);
   const [selectedKey, setSelectedKey] = useState<Modalidade>(planoInicial(opcoes, planoAtual));
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qrImage: string | null; qrPayload: string | null; valorCents: number; label: string } | null>(null);
-  const [needsCustomerData, setNeedsCustomerData] = useState(false);
+  // Loja sem cadastro no Asaas já abre com os campos à mostra (o servidor sabe disso pelo
+  // asaas_customer_id). needs_customer_data continua ligando isso como rede de segurança.
+  const [needsCustomerData, setNeedsCustomerData] = useState(precisaCadastro);
   const [nome, setNome] = useState(lojaNome ?? "");
   const [cpf, setCpf] = useState("");
 
@@ -131,7 +149,7 @@ export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: 
     const newWindow = isCartao ? window.open("about:blank", "_blank") : null;
 
     const body: Record<string, unknown> = { plano: selected.plano, forma: selected.forma };
-    if (nome.trim() && cpf.replace(/\D/g, "").length >= 11) {
+    if (nome.trim() && docValido(cpf)) {
       body.nome = nome.trim();
       body.cpfCnpj = cpf.replace(/\D/g, "");
     }
@@ -184,7 +202,7 @@ export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: 
   // ── Tela de PIX inline (QR + copia-cola + polling) ──────────────────────────
   if (pix) {
     return (
-      <PixInline
+      <PixInlineCheckout
         qrImage={pix.qrImage}
         qrPayload={pix.qrPayload}
         valorCents={pix.valorCents}
@@ -279,7 +297,9 @@ export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: 
 
       {needsCustomerData && (
         <div className="space-y-2 rounded-xl p-3" style={{ background: "rgba(245,72,12,0.08)", border: "1.5px solid rgba(245,72,12,0.4)" }}>
-          <p className="text-xs font-semibold text-[#FFB380]">Pra emitir a cobrança a gente precisa de 2 dados rápidos:</p>
+          <p className="text-xs font-semibold text-[#FFB380]">
+            {selected?.forma === "pix" ? "Pra gerar o QR do PIX, preenche 2 dados:" : "Pra emitir a cobrança a gente precisa de 2 dados rápidos:"}
+          </p>
           <input
             type="text"
             placeholder="Nome ou razão social"
@@ -304,11 +324,15 @@ export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: 
       <button
         type="button"
         onClick={pagar}
-        disabled={loading || (needsCustomerData && (!nome.trim() || cpf.replace(/\D/g, "").length < 11))}
+        disabled={loading || (needsCustomerData && (!nome.trim() || !docValido(cpf)))}
         className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all disabled:opacity-40"
         style={{ background: "linear-gradient(135deg, #FF8A3D 0%, #F5480C 100%)", boxShadow: "0 8px 20px -6px rgba(245,72,12,0.5)" }}
       >
-        {loading ? "Abrindo pagamento…" : needsCustomerData ? "Continuar pro pagamento" : labelBotao}
+        {/* com os campos na frente o clique já emite a cobrança — o rótulo diz o que vai acontecer
+            ("gerar o QR"), não "continuar pro pagamento" (que prometia mais uma etapa). */}
+        {loading
+          ? selected?.forma === "pix" ? "Gerando o QR do PIX…" : "Abrindo pagamento…"
+          : labelBotao}
       </button>
 
       {erro && <p className="text-center text-sm text-red-400">{erro}</p>}
@@ -343,117 +367,3 @@ export default function PagarClient({ planos, lojaNome, planoAtual }: { planos: 
   );
 }
 
-// ── QR PIX inline com polling ─────────────────────────────────────────────────
-function PixInline({
-  qrImage,
-  qrPayload,
-  valorCents,
-  label,
-  onTrocar,
-}: {
-  qrImage: string | null;
-  qrPayload: string | null;
-  valorCents: number;
-  label: string;
-  onTrocar: () => void;
-}) {
-  const router = useRouter();
-  const [copiado, setCopiado] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("Aguardando pagamento…");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch("/api/billing/status", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data?.subscription?.status === "active") {
-          setStatusMsg("Pagamento confirmado! Liberando seu painel…");
-          if (pollRef.current) clearInterval(pollRef.current);
-          setTimeout(() => router.refresh(), 1500);
-        }
-      } catch {
-        // silencioso — próxima rodada tenta de novo
-      }
-    }, 5000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [router]);
-
-  async function copiar() {
-    if (!qrPayload) return;
-    try {
-      await navigator.clipboard.writeText(qrPayload);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2500);
-    } catch {
-      const el = document.getElementById("pix-payload") as HTMLInputElement | null;
-      el?.select();
-    }
-  }
-
-  return (
-    <div className="mt-6 space-y-4">
-      <div className="space-y-1 pt-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-3xl font-bold text-[#FF8A3D]">{brl(valorCents)}</p>
-      </div>
-
-      {qrImage ? (
-        <div className="flex items-center justify-center rounded-2xl bg-white p-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`data:image/png;base64,${qrImage}`} alt="QR Code PIX" width={240} height={240} style={{ width: 240, height: 240, display: "block" }} />
-        </div>
-      ) : (
-        <div className="rounded-2xl p-6 text-center text-xs text-amber-300" style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.30)" }}>
-          QR Code não chegou. Usa o código PIX abaixo no app do banco.
-        </div>
-      )}
-
-      <ol className="list-decimal space-y-1.5 pl-4 text-xs text-slate-300">
-        <li>Abre o app do seu banco</li>
-        <li>Escolhe pagar com PIX → escaneia o QR ou cola o código</li>
-        <li>A gente libera seu painel automático em segundos</li>
-      </ol>
-
-      {qrPayload && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ou cola no banco:</p>
-          <div className="flex items-stretch gap-2">
-            <input
-              id="pix-payload"
-              type="text"
-              readOnly
-              value={qrPayload}
-              onClick={(e) => (e.target as HTMLInputElement).select()}
-              className="min-w-0 flex-1 rounded-lg px-3 py-2.5 font-mono text-[11px]"
-              style={{ background: "rgba(0,0,0,0.30)", border: "1px solid rgba(255,255,255,0.10)", color: "#cbd5e1" }}
-            />
-            <button
-              type="button"
-              onClick={copiar}
-              className="flex-shrink-0 rounded-lg px-4 text-xs font-bold text-white transition-all"
-              style={{ background: copiado ? "linear-gradient(135deg,#22C55E,#16A34A)" : "linear-gradient(135deg,#FF8A3D,#F5480C)" }}
-            >
-              {copiado ? "Copiado!" : "Copiar"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{ background: "rgba(245,72,12,0.10)", border: "1px solid rgba(245,72,12,0.30)" }}>
-        <span className="relative flex h-2 w-2 flex-shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-        </span>
-        <p className="text-[11px] leading-snug text-[#FFB380]">{statusMsg}</p>
-      </div>
-
-      <button type="button" onClick={onTrocar} className="w-full pt-1 text-[11px] text-slate-400 underline hover:text-slate-200">
-        Trocar forma de pagamento
-      </button>
-    </div>
-  );
-}

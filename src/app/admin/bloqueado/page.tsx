@@ -133,7 +133,16 @@ export default async function BloqueadoPage() {
             </div>
           )}
 
-          <PagarClient planos={planos} lojaNome={loja?.name ?? ""} planoAtual={sub?.plano ?? "mensal"} />
+          {/* precisaCadastro: loja que NUNCA foi cadastrada no Asaas (sem customer_id) tem que informar
+              nome + CPF/CNPJ pra emitir a cobrança. Antes esses campos só apareciam DEPOIS do clique,
+              quando a rota devolvia needs_customer_data — o cliente clicava em "pagar", era surpreendido
+              por um formulário e tinha que clicar de novo. Agora vêm na tela, e um clique só gera o QR. */}
+          <PagarClient
+            planos={planos}
+            lojaNome={loja?.name ?? ""}
+            planoAtual={sub?.plano ?? "mensal"}
+            precisaCadastro={!sub?.asaas_customer_id}
+          />
 
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-white/10" />

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
+import { liberarPorPagamento } from "@/lib/billing/liberar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,25 +37,9 @@ export async function POST(req: Request) {
   const now = new Date();
 
   if (event === "PAYMENT_CONFIRMED" || event === "PAYMENT_RECEIVED") {
-    // dedup: libera (estende pago_ate) UMA vez só por payment.id
-    const ins = await db()
-      .from("billing_events")
-      .insert({ payment_id: payment.id, event, store_id: storeId });
-    if (ins.error) return NextResponse.json({ ok: true, duplicado: true });
-
-    // preserva crédito não usado em renovação antecipada
-    const base = sub.pago_ate && new Date(sub.pago_ate) > now ? new Date(sub.pago_ate) : now;
-    base.setMonth(base.getMonth() + meses);
-    await db()
-      .from("subscriptions")
-      .update({
-        status: "active",
-        pago_ate: base.toISOString(),
-        grace_ends_at: null,
-        pix_link_atual: null,
-        ...(sub.setup_paid_at ? {} : { setup_paid_at: now.toISOString() }),
-      })
-      .eq("store_id", storeId);
+    // mesma função que a conferência do checkout usa — dedup por payment.id na PK de billing_events
+    const r = await liberarPorPagamento({ storeId, paymentId: payment.id, event, meses });
+    if (!r.liberou) return NextResponse.json({ ok: true, motivo: r.motivo });
   } else if (event === "PAYMENT_OVERDUE") {
     const grace = new Date(now);
     grace.setDate(grace.getDate() + 3);

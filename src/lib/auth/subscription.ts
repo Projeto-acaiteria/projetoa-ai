@@ -10,9 +10,11 @@ export type Subscription = {
   status: SubStatus;
   pago_ate: string | null;
   grace_ends_at: string | null;
+  asaas_subscription_id: string | null; // preenchido = cartão recorrente (o Asaas retenta sozinho)
   permanent_courtesy: boolean;
   refunded_at: string | null;
   pix_link_atual: string | null;
+  asaas_customer_id: string | null; // null = loja nunca cadastrada no Asaas (a tela pede nome+CPF antes)
   plano: string | null;
   created_at: string | null; // nascimento da assinatura = início do TRIAL (o cron expira por aqui)
 };
@@ -101,4 +103,44 @@ export function billingBanner(sub: Subscription | null): { text: string; tone: "
   if (sub!.status === "past_due")
     return { text: `Mensalidade vencida — você tem ${v.graceDays ?? 0} dia${v.graceDays === 1 ? "" : "s"} antes do bloqueio. Renove agora.`, tone: "danger" };
   return null;
+}
+
+// Faixa de COBRANÇA PIX (a interativa, com "Pagar agora" que abre o QR na própria tela).
+// Espelha a condição do AgendaPRO: assinatura PIX viva, perto de vencer ou vencida na carência.
+// Fica de fora: cartão recorrente (o Asaas retenta sozinho), cortesia e trial — trial não tem
+// cobrança gerada, quem fala com ele é o billingBanner de texto.
+export type CobrancaBanner = {
+  diasAteVencer: number;
+  status: "active" | "past_due";
+  graceDays: number | null;
+  plano: string;
+  planoLabel: string;
+  valorCents: number;
+  precisaCadastro: boolean; // sem cadastro no Asaas → o modal pede nome + CPF/CNPJ antes do QR
+};
+
+export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null {
+  if (!sub || sub.permanent_courtesy || sub.asaas_subscription_id) return null;
+  if (sub.status !== "active" && sub.status !== "past_due") return null;
+  if (!sub.pago_ate) return null; // trial ainda não tem vencimento de mensalidade
+
+  const dias = Math.ceil((new Date(sub.pago_ate).getTime() - Date.now()) / DAY);
+  if (dias > 3) return null;
+
+  const graceDays = sub.grace_ends_at
+    ? Math.max(0, Math.ceil((new Date(sub.grace_ends_at).getTime() - Date.now()) / DAY))
+    : null;
+
+  const planoId = (sub.plano && sub.plano in BILLING.planos ? sub.plano : "mensal") as keyof typeof BILLING.planos;
+  const cfg = BILLING.planos[planoId];
+
+  return {
+    diasAteVencer: dias,
+    status: sub.status === "past_due" ? "past_due" : "active",
+    graceDays,
+    plano: planoId,
+    planoLabel: cfg.label,
+    valorCents: cfg.cents,
+    precisaCadastro: !sub.asaas_customer_id,
+  };
 }

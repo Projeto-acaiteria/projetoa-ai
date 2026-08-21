@@ -196,6 +196,16 @@ export async function getPaymentById(paymentId: string) {
   return asaasFetch<AsaasPayment>(`/payments/${paymentId}`, { method: "GET" });
 }
 
+// Cobranças do cliente, mais recentes primeiro. É a FONTE DA VERDADE de "o que está em aberto" —
+// o campo asaas_payment_id_atual do banco aponta pra última cobrança CRIADA, que pode já estar
+// paga. Sem isso, cada clique em "pagar" emitia uma cobrança nova no Asaas (lição do AgendaPRO).
+export async function listPaymentsByCustomer(customerId: string, limit = 10) {
+  return asaasFetch<{ data: AsaasPayment[]; totalCount: number }>(
+    `/payments?customer=${encodeURIComponent(customerId)}&limit=${limit}&order=desc`,
+    { method: "GET" },
+  );
+}
+
 // ── PIX QR CODE (renderizado inline, cliente não sai do app) ──────
 export type AsaasPixQrCode = {
   encodedImage: string; // base64 PNG

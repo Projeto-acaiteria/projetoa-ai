@@ -6,6 +6,8 @@ import { useState } from "react";
 import CaixaPrintQueue from "@/components/admin/CaixaPrintQueue";
 import CaixaPrepPrinter from "@/components/admin/CaixaPrepPrinter";
 import VersionCheck from "@/components/admin/VersionCheck";
+import BillingDueBanner from "@/components/admin/BillingDueBanner";
+import type { CobrancaBanner } from "@/lib/auth/subscription";
 import {
   IconBowl,
   IconFlame,
@@ -77,7 +79,7 @@ const NAV: NavItem[] = [
   { href: "/admin/configuracoes", label: "Ajustes", Icon: IconGear },
 ];
 
-export default function AdminShell({ children, storeName, nav, billing, logoUrl, brandColor, prepStations = [], storeId = null }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; logoUrl?: string; brandColor?: string; prepStations?: string[]; storeId?: string | null }) {
+export default function AdminShell({ children, storeName, nav, billing, cobranca = null, logoUrl, brandColor, prepStations = [], storeId = null }: { children: React.ReactNode; storeName: string; nav: NavCtx; billing?: { text: string; tone: "warn" | "danger" } | null; cobranca?: CobrancaBanner | null; logoUrl?: string; brandColor?: string; prepStations?: string[]; storeId?: string | null }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -165,12 +167,17 @@ export default function AdminShell({ children, storeName, nav, billing, logoUrl,
         )}
 
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-          {billing && (
+          {/* Cobrança da mensalidade: faixa INTERATIVA — "Pagar agora" abre o QR do PIX aqui mesmo,
+              reaproveitando a cobrança em aberto no Asaas. Quem não tem cobrança gerada (trial
+              acabando) segue na faixa de texto, que manda pro checkout completo. */}
+          {cobranca ? (
+            <BillingDueBanner cobranca={cobranca} lojaNome={storeName} />
+          ) : billing ? (
             <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border p-3 ${billing.tone === "danger" ? "border-[var(--red-no)] bg-[#FEECEC]" : "border-[var(--gold)] bg-[#FFF8E6]"}`}>
               <span className={`text-sm font-semibold ${billing.tone === "danger" ? "text-[var(--red-no)]" : "text-ink"}`}>{billing.text}</span>
               <Link href="/admin/bloqueado" className="shrink-0 rounded-lg brand-gradient px-3.5 py-1.5 text-xs font-bold text-white">Renovar</Link>
             </div>
-          )}
+          ) : null}
           {children}
         </main>
       </div>

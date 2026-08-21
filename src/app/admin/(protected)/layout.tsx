@@ -5,7 +5,7 @@ import OfflineIndicator from "@/components/admin/OfflineIndicator";
 import { getStore } from "@/lib/settings-store";
 import { getStations } from "@/lib/menu-bar-store";
 import { getCurrentStore, getCurrentRole } from "@/lib/auth/store";
-import { getSubscription, isBlocked, billingBanner } from "@/lib/auth/subscription";
+import { getSubscription, isBlocked, billingBanner, cobrancaBanner } from "@/lib/auth/subscription";
 import { getStoreConfig } from "@/lib/auth/store-config";
 import { familyOf } from "@/config/segments";
 
@@ -35,7 +35,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     family: familyOf(cfg?.business_type),
   };
   return (
-    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations} storeId={loja.id}>
+    <AdminShell storeName={store.name} nav={nav} billing={billingBanner(sub)} cobranca={cobrancaBanner(sub)} logoUrl={store.logoUrl} brandColor={store.primaryColor} prepStations={stations} storeId={loja.id}>
       {/* vigia global: apita + imprime pedido novo do link em QUALQUER tela (não só na Pedidos).
           Só monta onde faz sentido (perf 29/07): loja SEM delivery não recebe pedido de link — no
           Medellín ele ficava perguntando 900x/hora por pedido que nunca existiria. E garçom não
