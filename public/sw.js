@@ -1,7 +1,7 @@
 // Service worker mínimo — habilita instalação do PWA e um cache básico.
 // v2: ao ativar, APAGA caches antigos. Sem isso, o bundle JS novo convivia com o payload de PÁGINA
 // velho (RSC) → props como offline_enabled chegavam desatualizadas. Bump de versão = limpeza forçada.
-const CACHE = "acai-v4";
+const CACHE = "acai-v5";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(

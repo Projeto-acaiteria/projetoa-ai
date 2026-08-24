@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import PixInlineCheckout from "@/components/billing/PixInlineCheckout";
 import type { CobrancaBanner } from "@/lib/auth/subscription";
@@ -34,10 +34,13 @@ export default function BillingDueBanner({
   cobranca: CobrancaBanner;
   lojaNome: string;
 }) {
-  const { diasAteVencer, status, graceDays, plano, planoLabel, valorCents } = cobranca;
+  const { diasAteVencer, status, graceDays, plano, planoLabel, valorCents, travado } = cobranca;
 
   const [loading, setLoading] = useState(false);
-  const [aberto, setAberto] = useState(false);
+  // travado = mensalidade VENCIDA: o pop-up sobe sozinho e não sai da tela enquanto não pagar.
+  // Não tem ✕, clique fora não fecha e Esc não fecha. A saída é o pagamento (o polling do
+  // PixInlineCheckout vê virar active e dá refresh, aí cobrancaBanner some) ou o WhatsApp.
+  const [aberto, setAberto] = useState(travado);
   const [pix, setPix] = useState<PixData | null>(null);
   const [pago, setPago] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -143,11 +146,40 @@ export default function BillingDueBanner({
   }
 
   function fechar() {
+    if (travado) return; // vencida: só sai pagando
     setAberto(false);
     setErro(null);
   }
 
+  // Vencida: já sobe com o QR pronto pra quem tem cadastro (não obriga a clicar pra ver o valor).
+  // Quem não tem cadastro cai no formulário, que já é o estado inicial.
+  useEffect(() => {
+    if (travado && !pedirCadastro && !pix && !erro && !loading) void pegarPix();
+    // roda uma vez ao montar; os estados abaixo só existem pra não reentrar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Esc não fecha pop-up travado — o navegador nem tenta, mas o hábito do usuário é apertar Esc.
+  useEffect(() => {
+    if (!aberto || !travado) return;
+    const bloqueiaEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") e.preventDefault();
+    };
+    document.addEventListener("keydown", bloqueiaEsc);
+    // trava o scroll do painel atrás: a parede tem que parecer parede
+    const overflowAntes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", bloqueiaEsc);
+      document.body.style.overflow = overflowAntes;
+    };
+  }, [aberto, travado]);
+
   const inputStyle = { background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)" };
+
+  const whatsappLink =
+    "https://wa.me/5563992920080?text=" +
+    encodeURIComponent(`Olá! Tive um problema pra pagar a mensalidade do ComandaPRO (${lojaNome}). Pode me ajudar?`);
 
   return (
     <>
@@ -178,7 +210,11 @@ export default function BillingDueBanner({
         createPortal(
           <div
             className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-            style={{ background: "rgba(20,15,13,0.72)", backdropFilter: "blur(4px)" }}
+            style={{
+              // vencida: fundo mais fechado, porque não é um aviso — é parede
+              background: travado ? "rgba(20,15,13,0.92)" : "rgba(20,15,13,0.72)",
+              backdropFilter: travado ? "blur(8px)" : "blur(4px)",
+            }}
             onClick={fechar}
           >
             <div
@@ -190,15 +226,27 @@ export default function BillingDueBanner({
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onClick={fechar}
-                aria-label="Fechar"
-                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:text-white"
-                style={{ background: "rgba(255,255,255,0.06)" }}
-              >
-                ✕
-              </button>
+              {/* sem ✕ quando travado: não existe "depois eu vejo" */}
+              {!travado && (
+                <button
+                  type="button"
+                  onClick={fechar}
+                  aria-label="Fechar"
+                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:text-white"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  ✕
+                </button>
+              )}
+
+              {travado && !pago && (
+                <div className="mb-4 rounded-xl px-3 py-2.5 text-center" style={{ background: "rgba(225,29,72,0.12)", border: "1px solid rgba(225,29,72,0.35)" }}>
+                  <p className="text-sm font-bold text-red-300">Mensalidade vencida</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-slate-300">
+                    O painel volta a funcionar assim que o pagamento cair — leva segundos.
+                  </p>
+                </div>
+              )}
 
               {pago ? (
                 <div className="space-y-2 py-6 text-center">
@@ -264,6 +312,21 @@ export default function BillingDueBanner({
                   </button>
                 </div>
               ) : null}
+
+              {/* Saída de emergência do pop-up travado. NÃO libera o painel — mas sem isso, uma
+                  falha do Asaas deixaria o dono preso numa tela sem nenhuma ação possível, no meio
+                  do serviço. Ele fala com a gente e a gente destrava na mão. */}
+              {travado && !pago && (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)" }}
+                >
+                  Problema com o pagamento? Falar com a Impulso
+                </a>
+              )}
             </div>
           </div>,
           document.body,

@@ -31,10 +31,11 @@ export function isBlocked(sub: Subscription | null): boolean {
   if (sub.permanent_courtesy) return false;
   if (sub.refunded_at) return true;
   if (sub.status === "pending_payment" || sub.status === "cancelled" || sub.status === "expired") return true;
-  if (sub.status === "past_due") {
-    const grace = sub.grace_ends_at ? new Date(sub.grace_ends_at).getTime() : 0;
-    return grace < Date.now();
-  }
+  // past_due NÃO manda mais pra /admin/bloqueado. Quem vence entra no painel e leva o pop-up
+  // travado da cobrança por cima (BillingDueBanner) — a parede continua existindo, só que dentro
+  // do sistema, com o QR a um clique. Tirar o dono do painel pra uma tela preta fazia ele achar
+  // que tinha perdido tudo. Cancelado/expirado/estornado seguem na tela de fora: ali não é
+  // "pague pra continuar", é assinatura encerrada, outro assunto.
   return false;
 }
 
@@ -117,6 +118,7 @@ export type CobrancaBanner = {
   planoLabel: string;
   valorCents: number;
   precisaCadastro: boolean; // sem cadastro no Asaas → o modal pede nome + CPF/CNPJ antes do QR
+  travado: boolean; // vencida: o pop-up abre sozinho e NÃO fecha enquanto não pagar
 };
 
 export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null {
@@ -142,5 +144,6 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
     planoLabel: cfg.label,
     valorCents: cfg.cents,
     precisaCadastro: !sub.asaas_customer_id,
+    travado: sub.status === "past_due",
   };
 }
