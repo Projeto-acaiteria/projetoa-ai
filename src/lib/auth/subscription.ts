@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { db } from "@/lib/supabase";
 import { BILLING } from "@/config/billing";
+import { dateBR, todayBR } from "@/lib/date-br";
 
 export type SubStatus = "pending_payment" | "trial" | "active" | "past_due" | "cancelled" | "expired";
 
@@ -40,6 +41,13 @@ export function isBlocked(sub: Subscription | null): boolean {
 }
 
 const DAY = 86400000;
+
+/** Quantos dias de calendário BR faltam até `quando`. 0 = vence hoje, 1 = amanhã, negativo = passou. */
+function diasDeCalendarioBR(quando: string | Date): number {
+  const [ay, am, ad] = dateBR(quando).split("-").map(Number);
+  const [hy, hm, hd] = todayBR().split("-").map(Number);
+  return Math.round((Date.UTC(ay, am - 1, ad) - Date.UTC(hy, hm - 1, hd)) / DAY);
+}
 const STATUS_LABEL: Record<SubStatus, string> = {
   trial: "Em teste grátis", active: "Ativo", past_due: "Vencido",
   pending_payment: "Pagamento pendente", cancelled: "Cancelado", expired: "Expirado",
@@ -72,7 +80,7 @@ export function billingView(sub: Subscription | null): BillingView | null {
   const fimTrial = trialEndsAt(sub);
   const daysLeft = fimTrial
     ? Math.ceil((fimTrial.getTime() - Date.now()) / DAY) // trial: conta pelo fim do teste
-    : sub.pago_ate ? Math.ceil((new Date(sub.pago_ate).getTime() - Date.now()) / DAY) : null;
+    : sub.pago_ate ? diasDeCalendarioBR(sub.pago_ate) : null; // mesma régua da faixa: dia BR, não fração de 24h
   const graceDays = sub.grace_ends_at ? Math.max(0, Math.ceil((new Date(sub.grace_ends_at).getTime() - Date.now()) / DAY)) : null;
   const tone: "ok" | "warn" | "danger" = sub.permanent_courtesy
     ? "ok"
@@ -126,7 +134,11 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
   if (sub.status !== "active" && sub.status !== "past_due") return null;
   if (!sub.pago_ate) return null; // trial ainda não tem vencimento de mensalidade
 
-  const dias = Math.ceil((new Date(sub.pago_ate).getTime() - Date.now()) / DAY);
+  // Dias de CALENDÁRIO no fuso do Brasil, não fração de 24h. Com `ceil` sobre milissegundos,
+  // uma mensalidade que vence hoje às 23:59 aparecia como "vence amanhã" o dia inteiro — o dono
+  // lia que tinha mais um dia e não tinha. E contar em UTC (jeito do AgendaPRO) erra o dia aqui:
+  // 21h no Brasil já é o dia seguinte lá. Ver [[feedback_fuso_vercel_utc_bucket_dia]].
+  const dias = diasDeCalendarioBR(sub.pago_ate);
   if (dias > 3) return null;
 
   const graceDays = sub.grace_ends_at
