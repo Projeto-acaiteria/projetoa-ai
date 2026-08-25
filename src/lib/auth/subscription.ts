@@ -144,7 +144,6 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
   const dias = diasDeCalendarioBR(sub.pago_ate);
   if (dias > 3) return null;
 
-  const prazoAindaVale = !!sub.grace_ends_at && new Date(sub.grace_ends_at).getTime() > Date.now();
   const graceDays = sub.grace_ends_at
     ? Math.max(0, diasDeCalendarioBR(sub.grace_ends_at))
     : null;
@@ -166,8 +165,9 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
     // abre o sistema. Antes só existia a faixa, e faixa se ignora — quem está vencido há 5 dias
     // precisa esbarrar na cobrança, não caçar um botão no topo.
     abreSozinho: sub.status === "past_due" || dias <= 0,
-    // Trava de verdade só quando o prazo acabou. Enquanto a carência (ou a liberação manual que
-    // o Eduardo deu) estiver de pé, o pop-up fecha e a casa trabalha — o aviso é forte, não é muro.
-    travado: sub.status === "past_due" && !prazoAindaVale,
+    // Vencida = travado, ponto. Chegou a ter uma versão que deixava fechar enquanto houvesse
+    // prazo em aberto; Eduardo cortou (25/08): pop-up que fecha vira pop-up que se ignora, e a
+    // conversa sobre a mensalidade some. Só o pagamento tira ele da tela.
+    travado: sub.status === "past_due",
   };
 }

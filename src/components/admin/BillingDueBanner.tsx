@@ -275,14 +275,13 @@ export default function BillingDueBanner({
                     {venceuEm ? `Sua mensalidade venceu em ${dataBR(venceuEm)}` : "Sua mensalidade vence hoje"}
                   </p>
                   <p className="mt-0.5 text-[11px] leading-snug text-slate-300">
-                    {travado
-                      ? "O sistema volta a funcionar assim que o pagamento cair — leva segundos."
-                      : prazoAte && graceDays === 0
-                        ? "Pra seguir usando o sistema, o pagamento precisa ser feito hoje."
-                        : prazoAte
-                          ? `Pra seguir usando o sistema, pague até ${dataBR(prazoAte)}.`
-                          : "Pra seguir usando o sistema, o pagamento precisa ser feito hoje."}
+                    Pra seguir usando o sistema, o pagamento precisa ser feito hoje.
                   </p>
+                  {travado && (
+                    <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                      O sistema volta a funcionar assim que o pagamento cair — leva segundos.
+                    </p>
+                  )}
                 </div>
               )}
 
