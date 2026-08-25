@@ -126,7 +126,10 @@ export type CobrancaBanner = {
   planoLabel: string;
   valorCents: number;
   precisaCadastro: boolean; // sem cadastro no Asaas → o modal pede nome + CPF/CNPJ antes do QR
-  travado: boolean; // vencida: o pop-up abre sozinho e NÃO fecha enquanto não pagar
+  venceuEm: string | null; // data em que a mensalidade venceu de fato (past_due) — vai na mensagem
+  prazoAte: string | null; // até quando ainda dá pra usar (carência/liberação manual)
+  abreSozinho: boolean; // pop-up sobe ao abrir o sistema, sem precisar clicar na faixa
+  travado: boolean; // acabou o prazo: o pop-up não fecha enquanto não pagar
 };
 
 export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null {
@@ -141,8 +144,9 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
   const dias = diasDeCalendarioBR(sub.pago_ate);
   if (dias > 3) return null;
 
+  const prazoAindaVale = !!sub.grace_ends_at && new Date(sub.grace_ends_at).getTime() > Date.now();
   const graceDays = sub.grace_ends_at
-    ? Math.max(0, Math.ceil((new Date(sub.grace_ends_at).getTime() - Date.now()) / DAY))
+    ? Math.max(0, diasDeCalendarioBR(sub.grace_ends_at))
     : null;
 
   const planoId = (sub.plano && sub.plano in BILLING.planos ? sub.plano : "mensal") as keyof typeof BILLING.planos;
@@ -156,6 +160,14 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
     planoLabel: cfg.label,
     valorCents: cfg.cents,
     precisaCadastro: !sub.asaas_customer_id,
-    travado: sub.status === "past_due",
+    venceuEm: sub.status === "past_due" ? sub.pago_ate : null,
+    prazoAte: sub.grace_ends_at,
+    // Vencida (mesmo com prazo em aberto) ou vencendo HOJE: o pop-up sobe sozinho quando o dono
+    // abre o sistema. Antes só existia a faixa, e faixa se ignora — quem está vencido há 5 dias
+    // precisa esbarrar na cobrança, não caçar um botão no topo.
+    abreSozinho: sub.status === "past_due" || dias <= 0,
+    // Trava de verdade só quando o prazo acabou. Enquanto a carência (ou a liberação manual que
+    // o Eduardo deu) estiver de pé, o pop-up fecha e a casa trabalha — o aviso é forte, não é muro.
+    travado: sub.status === "past_due" && !prazoAindaVale,
   };
 }

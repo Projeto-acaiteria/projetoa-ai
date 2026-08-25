@@ -27,6 +27,24 @@ const docValido = (v: string) => {
   return d === 11 || d === 14;
 };
 
+const CHAVE_SESSAO = "cobranca-vista";
+
+/** O pop-up sobe UMA vez por sessão do navegador enquanto ainda há prazo — senão ele reabria a
+ *  cada troca de tela e a recepção não conseguiria trabalhar o turno. Travado ignora isso: aí
+ *  reabrir é o comportamento certo. sessionStorage morre ao fechar o navegador, então na próxima
+ *  vez que abrirem o sistema o aviso volta. */
+function jaVistoNestaSessao(travado: boolean): boolean {
+  if (travado || typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(CHAVE_SESSAO) === "1";
+  } catch {
+    return false; // navegador bloqueando storage: mostra o aviso, que é o lado seguro
+  }
+}
+
+const dataBR = (iso: string) =>
+  new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date(iso));
+
 export default function BillingDueBanner({
   cobranca,
   lojaNome,
@@ -34,13 +52,14 @@ export default function BillingDueBanner({
   cobranca: CobrancaBanner;
   lojaNome: string;
 }) {
-  const { diasAteVencer, status, graceDays, plano, planoLabel, valorCents, travado } = cobranca;
+  const { diasAteVencer, status, graceDays, plano, planoLabel, valorCents, travado, abreSozinho, venceuEm, prazoAte } = cobranca;
 
   const [loading, setLoading] = useState(false);
-  // travado = mensalidade VENCIDA: o pop-up sobe sozinho e não sai da tela enquanto não pagar.
-  // Não tem ✕, clique fora não fecha e Esc não fecha. A saída é o pagamento (o polling do
-  // PixInlineCheckout vê virar active e dá refresh, aí cobrancaBanner some) ou o WhatsApp.
-  const [aberto, setAberto] = useState(travado);
+  // abreSozinho = vencida ou vencendo hoje: o pop-up sobe quando o dono abre o sistema, sem clique.
+  // travado = o prazo acabou: além de subir sozinho, não sai da tela enquanto não pagar (sem ✕,
+  // clique fora e Esc não fecham). A saída é o pagamento — o polling vê virar active e dá refresh.
+  // Com prazo ainda em pé, ele fecha: o aviso é forte, mas a casa trabalha até o prazo virar.
+  const [aberto, setAberto] = useState(abreSozinho && !jaVistoNestaSessao(travado));
   const [pix, setPix] = useState<PixData | null>(null);
   const [pago, setPago] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -53,7 +72,9 @@ export default function BillingDueBanner({
   const urgente = venceu || venceHoje;
 
   const texto = venceu
-    ? "Sua mensalidade venceu"
+    ? venceuEm
+      ? `Sua mensalidade venceu em ${dataBR(venceuEm)}`
+      : "Sua mensalidade venceu"
     : venceHoje
       ? "Sua mensalidade vence hoje"
       : diasAteVencer === 1
@@ -61,9 +82,11 @@ export default function BillingDueBanner({
         : `Sua mensalidade vence em ${diasAteVencer} dias`;
 
   const complemento = venceu
-    ? graceDays && graceDays > 0
-      ? `Você tem ${graceDays} dia${graceDays === 1 ? "" : "s"} antes do painel bloquear.`
-      : "Pague pra não perder o acesso ao painel."
+    ? travado
+      ? "Pague pra voltar a usar o sistema."
+      : graceDays && graceDays > 0
+        ? `Pra seguir usando, pague até ${prazoAte ? dataBR(prazoAte) : "o prazo"}.`
+        : "Pra seguir usando o sistema, pague hoje."
     : "Pague pelo PIX aqui mesmo, sem sair do app.";
 
   const cor = venceu
@@ -146,7 +169,12 @@ export default function BillingDueBanner({
   }
 
   function fechar() {
-    if (travado) return; // vencida: só sai pagando
+    if (travado) return; // prazo acabou: só sai pagando
+    try {
+      window.sessionStorage.setItem(CHAVE_SESSAO, "1"); // não reabre a cada troca de tela no turno
+    } catch {
+      // storage bloqueado: sem problema, ele reabre — melhor insistir do que sumir
+    }
     setAberto(false);
     setErro(null);
   }
@@ -239,11 +267,21 @@ export default function BillingDueBanner({
                 </button>
               )}
 
-              {travado && !pago && (
+              {/* O aviso diz a DATA em que venceu e até quando dá pra usar. "Mensalidade vencida"
+                  sozinho não move ninguém; "venceu em 20/08, precisa pagar hoje" move. */}
+              {abreSozinho && !pago && (
                 <div className="mb-4 rounded-xl px-3 py-2.5 text-center" style={{ background: "rgba(225,29,72,0.12)", border: "1px solid rgba(225,29,72,0.35)" }}>
-                  <p className="text-sm font-bold text-red-300">Mensalidade vencida</p>
+                  <p className="text-sm font-bold text-red-300">
+                    {venceuEm ? `Sua mensalidade venceu em ${dataBR(venceuEm)}` : "Sua mensalidade vence hoje"}
+                  </p>
                   <p className="mt-0.5 text-[11px] leading-snug text-slate-300">
-                    O painel volta a funcionar assim que o pagamento cair — leva segundos.
+                    {travado
+                      ? "O sistema volta a funcionar assim que o pagamento cair — leva segundos."
+                      : prazoAte && graceDays === 0
+                        ? "Pra seguir usando o sistema, o pagamento precisa ser feito hoje."
+                        : prazoAte
+                          ? `Pra seguir usando o sistema, pague até ${dataBR(prazoAte)}.`
+                          : "Pra seguir usando o sistema, o pagamento precisa ser feito hoje."}
                   </p>
                 </div>
               )}
@@ -316,7 +354,7 @@ export default function BillingDueBanner({
               {/* Saída de emergência do pop-up travado. NÃO libera o painel — mas sem isso, uma
                   falha do Asaas deixaria o dono preso numa tela sem nenhuma ação possível, no meio
                   do serviço. Ele fala com a gente e a gente destrava na mão. */}
-              {travado && !pago && (
+              {abreSozinho && !pago && (
                 <a
                   href={whatsappLink}
                   target="_blank"
