@@ -1,4 +1,5 @@
 import { db } from "@/lib/supabase";
+import { dateBR } from "@/lib/date-br";
 
 // Liberação da assinatura por pagamento confirmado — UM lugar só, usado por dois caminhos:
 //   1. webhook do Asaas (`/api/webhooks/asaas`) — o caminho normal, empurrado pelo Asaas;
@@ -25,15 +26,22 @@ export async function liberarPorPagamento(input: {
   if (ins.error) return { liberou: false, motivo: "duplicado" };
 
   const now = new Date();
-  // renovação antecipada não queima o crédito que sobrou: conta a partir do vencimento, não de hoje
-  const base = sub.pago_ate && new Date(sub.pago_ate) > now ? new Date(sub.pago_ate) : now;
+  // renovação antecipada não queima o crédito que sobrou: conta a partir do vencimento, não de hoje.
+  // `new Date(now)` e não `now`: com o alias, o setMonth abaixo mutava o PRÓPRIO now e o
+  // setup_paid_at ia gravado um mês no futuro. Pegou o Medellín no 1º pagamento real (25/08 →
+  // gravou 25/09). Herdado do webhook antigo, que tinha o mesmo alias.
+  const base = sub.pago_ate && new Date(sub.pago_ate) > now ? new Date(sub.pago_ate) : new Date(now);
   base.setMonth(base.getMonth() + meses);
+  // Vencimento no FIM do dia, no fuso do Brasil. Sem isso o pago_ate herdava a hora do pagamento
+  // (o Medellín pagou 19:24 → venceria 19:24 do mês seguinte) e a mensalidade morria no meio do
+  // expediente, num bar que abre 18h.
+  const vence = `${dateBR(base)}T23:59:59-03:00`;
 
   await db()
     .from("subscriptions")
     .update({
       status: "active",
-      pago_ate: base.toISOString(),
+      pago_ate: vence,
       grace_ends_at: null,
       pix_link_atual: null,
       ...(sub.setup_paid_at ? {} : { setup_paid_at: now.toISOString() }),
