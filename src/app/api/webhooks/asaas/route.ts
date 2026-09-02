@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { liberarPorPagamento } from "@/lib/billing/liberar";
+import { fimCarenciaISO } from "@/lib/billing/carencia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,11 +42,11 @@ export async function POST(req: Request) {
     const r = await liberarPorPagamento({ storeId, paymentId: payment.id, event, meses });
     if (!r.liberou) return NextResponse.json({ ok: true, motivo: r.motivo });
   } else if (event === "PAYMENT_OVERDUE") {
-    const grace = new Date(now);
-    grace.setDate(grace.getDate() + 3);
+    // Carência contada do VENCIMENTO (mesma conta da tela) — o OVERDUE do Asaas chega na hora que
+    // ele quiser, e "agora + 3" fazia o prazo do cliente depender disso.
     await db()
       .from("subscriptions")
-      .update({ status: "past_due", grace_ends_at: grace.toISOString() })
+      .update({ status: "past_due", grace_ends_at: fimCarenciaISO(sub.pago_ate) })
       .eq("store_id", storeId);
   } else if (event === "PAYMENT_REFUNDED") {
     await db()

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { db } from "@/lib/supabase";
 import { BILLING } from "@/config/billing";
+import { fimCarenciaISO } from "@/lib/billing/carencia";
 import { dateBR, todayBR } from "@/lib/date-br";
 
 export type SubStatus = "pending_payment" | "trial" | "active" | "past_due" | "cancelled" | "expired";
@@ -48,6 +49,12 @@ function diasDeCalendarioBR(quando: string | Date): number {
   const [hy, hm, hd] = todayBR().split("-").map(Number);
   return Math.round((Date.UTC(ay, am - 1, ad) - Date.UTC(hy, hm - 1, hd)) / DAY);
 }
+/** dd/mm no fuso BR — o `dateBR` devolve YYYY-MM-DD, que ninguém lê numa faixa de aviso. */
+function diaMesBR(iso: string): string {
+  const [, m, d] = dateBR(iso).split("-");
+  return `${d}/${m}`;
+}
+
 const STATUS_LABEL: Record<SubStatus, string> = {
   trial: "Em teste grátis", active: "Ativo", past_due: "Vencido",
   pending_payment: "Pagamento pendente", cancelled: "Cancelado", expired: "Expirado",
@@ -61,6 +68,7 @@ export type BillingView = {
   pagoAte: string | null;
   daysLeft: number | null; // dias até o vencimento (negativo = já venceu)
   graceDays: number | null; // dias de graça restantes (past_due)
+  graceUntil: string | null; // último dia em que dá pra usar vencido (past_due)
   tone: "ok" | "warn" | "danger";
   courtesy: boolean;
 };
@@ -81,7 +89,13 @@ export function billingView(sub: Subscription | null): BillingView | null {
   const daysLeft = fimTrial
     ? Math.ceil((fimTrial.getTime() - Date.now()) / DAY) // trial: conta pelo fim do teste
     : sub.pago_ate ? diasDeCalendarioBR(sub.pago_ate) : null; // mesma régua da faixa: dia BR, não fração de 24h
-  const graceDays = sub.grace_ends_at ? Math.max(0, Math.ceil((new Date(sub.grace_ends_at).getTime() - Date.now()) / DAY)) : null;
+  // Dias que ainda dá pra trabalhar vencido — mesma régua de calendário BR do pop-up, ancorada no
+  // vencimento (não em grace_ends_at cru, que nasce na hora em que o cron/webhook por acaso rodou).
+  // `past_due` OU vencida ainda como active: entre a meia-noite e o cron das 08:00 a loja está
+  // vencida de fato, e a faixa tem que falar disso, não repetir "vence hoje".
+  const vencida = sub.status === "past_due" || (sub.status === "active" && daysLeft != null && daysLeft < 0);
+  const fimCarencia = vencida ? fimCarenciaISO(sub.pago_ate, sub.grace_ends_at) : null;
+  const graceDays = fimCarencia ? Math.max(0, diasDeCalendarioBR(fimCarencia)) : null;
   const tone: "ok" | "warn" | "danger" = sub.permanent_courtesy
     ? "ok"
     : sub.status === "past_due" || sub.status === "pending_payment" || sub.status === "expired"
@@ -94,7 +108,7 @@ export function billingView(sub: Subscription | null): BillingView | null {
     planoLabel: cfg?.label ?? "—",
     planoCents: cfg?.cents ?? null,
     pagoAte: sub.pago_ate ?? (fimTrial ? fimTrial.toISOString() : null), // trial mostra o fim do teste
-    daysLeft, graceDays, tone,
+    daysLeft, graceDays, graceUntil: fimCarencia, tone,
     courtesy: sub.permanent_courtesy,
   };
 }
@@ -107,10 +121,21 @@ export function billingBanner(sub: Subscription | null): { text: string; tone: "
   // (foi o que travou o Starteq no meio da venda). Mesma régua de 3 dias da mensalidade.
   if (sub!.status === "trial" && v.tone === "warn" && v.daysLeft != null)
     return { text: v.daysLeft <= 0 ? "Seu teste grátis termina hoje — assine pra não perder o acesso." : `Seu teste grátis termina em ${v.daysLeft} dia${v.daysLeft === 1 ? "" : "s"} — assine pra não perder o acesso.`, tone: "warn" };
+  // VENCIDA (inclusive a que ainda está `active` porque o cron das 08:00 não passou): a faixa fala
+  // da carência pela DATA, não por contagem — "você tem 2 dias" some no meio do expediente e
+  // ninguém sabe qual é o último dia. Passou a carência, o assunto é outro: já travou.
+  if (v.graceUntil) {
+    const travou = diasDeCalendarioBR(v.graceUntil) < 0;
+    return {
+      text: travou
+        ? "Mensalidade vencida — o sistema está travado. Pague pra voltar a usar."
+        : `Mensalidade vencida — dá pra usar até ${diaMesBR(v.graceUntil)}. Depois disso o sistema trava. Renove agora.`,
+      tone: "danger",
+    };
+  }
+  if (sub!.status === "past_due") return { text: "Mensalidade vencida — renove agora pra não travar.", tone: "danger" };
   if (sub!.status === "active" && v.tone === "warn" && v.daysLeft != null)
     return { text: v.daysLeft <= 0 ? "Sua mensalidade vence hoje — renove pra não travar." : `Sua mensalidade vence em ${v.daysLeft} dia${v.daysLeft === 1 ? "" : "s"} — renove pra não travar.`, tone: "warn" };
-  if (sub!.status === "past_due")
-    return { text: `Mensalidade vencida — você tem ${v.graceDays ?? 0} dia${v.graceDays === 1 ? "" : "s"} antes do bloqueio. Renove agora.`, tone: "danger" };
   return null;
 }
 
@@ -144,9 +169,13 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
   const dias = diasDeCalendarioBR(sub.pago_ate);
   if (dias > 3) return null;
 
-  const graceDays = sub.grace_ends_at
-    ? Math.max(0, diasDeCalendarioBR(sub.grace_ends_at))
-    : null;
+  // Vencida: o cliente ainda trabalha BILLING.carenciaDias dias (pop-up sobe, mas fecha). Passou
+  // disso, trava. Ancorado no vencimento, então vale já a partir da meia-noite — sem depender do
+  // cron das 08:00 ter passado pra existir uma carência gravada.
+  const venceu = sub.status === "past_due" || dias < 0;
+  const fimCarencia = venceu ? fimCarenciaISO(sub.pago_ate, sub.grace_ends_at) : null;
+  const diasDeCarencia = fimCarencia ? diasDeCalendarioBR(fimCarencia) : null;
+  const graceDays = diasDeCarencia == null ? null : Math.max(0, diasDeCarencia);
 
   const planoId = (sub.plano && sub.plano in BILLING.planos ? sub.plano : "mensal") as keyof typeof BILLING.planos;
   const cfg = BILLING.planos[planoId];
@@ -159,15 +188,16 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
     planoLabel: cfg.label,
     valorCents: cfg.cents,
     precisaCadastro: !sub.asaas_customer_id,
-    venceuEm: sub.status === "past_due" ? sub.pago_ate : null,
-    prazoAte: sub.grace_ends_at,
+    venceuEm: venceu ? sub.pago_ate : null,
+    prazoAte: fimCarencia,
     // Vencida (mesmo com prazo em aberto) ou vencendo HOJE: o pop-up sobe sozinho quando o dono
     // abre o sistema. Antes só existia a faixa, e faixa se ignora — quem está vencido há 5 dias
     // precisa esbarrar na cobrança, não caçar um botão no topo.
     abreSozinho: sub.status === "past_due" || dias <= 0,
-    // Vencida = travado, ponto. Chegou a ter uma versão que deixava fechar enquanto houvesse
-    // prazo em aberto; Eduardo cortou (25/08): pop-up que fecha vira pop-up que se ignora, e a
-    // conversa sobre a mensalidade some. Só o pagamento tira ele da tela.
-    travado: sub.status === "past_due",
+    // Travado = acabou a CARÊNCIA, não o vencimento (Eduardo, 02/09 — regra do ComandaPRO, veio do
+    // Medellín): 3 dias vencido o cliente trabalha e o pop-up fecha; do 4º dia em diante ele sobe
+    // sem ✕ e só o pagamento tira da tela. Em 25/08 isto era `status === "past_due"`, que travava
+    // logo no dia seguinte e comia a carência inteira.
+    travado: diasDeCarencia != null && diasDeCarencia < 0,
   };
 }

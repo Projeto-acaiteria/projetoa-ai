@@ -3,6 +3,9 @@
 // Recorrente via Asaas: cartão = subscription no cycle; PIX = cobrança avulsa pelo período.
 export const BILLING = {
   trialDias: 14, // onboarding: tempo de introduzir o sistema no cliente antes de cobrar
+  // Dias de calendário BR que o cliente ainda trabalha depois do vencimento (pop-up sobe mas fecha).
+  // No dia seguinte ao fim da carência o pop-up trava sem ✕ — regra cravada pelo Eduardo em 02/09.
+  carenciaDias: 3,
   planos: {
     mensal: { label: "Mensal", meses: 1, cents: 21_900, cycle: "MONTHLY" as const, equivMes: 219 },
     semestral: { label: "Semestral", meses: 6, cents: 118_200, cycle: "SEMIANNUALLY" as const, equivMes: 197 },

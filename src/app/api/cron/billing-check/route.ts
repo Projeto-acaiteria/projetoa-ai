@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { BILLING } from "@/config/billing";
+import { fimCarenciaISO } from "@/lib/billing/carencia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,12 +30,12 @@ export async function GET(req: Request) {
     out.trial_expirados++;
   }
 
-  // 2. Fallback: active com pago_ate vencido (caso o webhook OVERDUE não chegue) → past_due + 3d.
-  const grace = new Date(now);
-  grace.setDate(grace.getDate() + 3);
+  // 2. Fallback: active com pago_ate vencido (caso o webhook OVERDUE não chegue) → past_due, com a
+  // carência contada a partir do VENCIMENTO (não de "agora + 3": o cron roda 08:00, e ancorar na
+  // hora da execução dava um fim de carência diferente do que a tela do cliente mostra).
   const { data: vencidos } = await db()
     .from("subscriptions")
-    .select("store_id")
+    .select("store_id, pago_ate")
     .eq("status", "active")
     .eq("permanent_courtesy", false)
     .not("pago_ate", "is", null)
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
   for (const v of vencidos ?? []) {
     await db()
       .from("subscriptions")
-      .update({ status: "past_due", grace_ends_at: grace.toISOString() })
+      .update({ status: "past_due", grace_ends_at: fimCarenciaISO(v.pago_ate) })
       .eq("store_id", v.store_id);
     out.past_due++;
   }
