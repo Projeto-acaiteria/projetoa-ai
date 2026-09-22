@@ -455,7 +455,7 @@ export default function AcaiBuilder({ sizes, groups, brand, isOpen, rewards }: {
               <IconGift width={22} height={22} className="text-white" />
             </span>
             <div className="min-w-0">
-              <div className="text-base font-extrabold leading-tight text-white">Clube Cantinho do Açaí</div>
+              <div className="text-base font-extrabold leading-tight text-white">Clube {brand.name}</div>
               <div className="text-xs text-white/85">Junte pontos e troque por açaí grátis</div>
             </div>
           </div>

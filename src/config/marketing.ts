@@ -227,8 +227,8 @@ export const resolveNicho = (slug: string): { nicho: Nicho; alias: NichoAlias | 
 export const ALL_NICHO_SLUGS = NICHOS.flatMap((n) => [n.slug, ...(n.aliases?.map((a) => a.slug) ?? [])]);
 
 // Rotas do site institucional (pra sitemap). Não inclui o app (admin) nem os tenants (/<slug>).
+// (/funcionalidades saiu em 22/09: a página não existe e dava 404 no ar.)
 export const MARKETING_ROUTES = [
   "/",
-  "/funcionalidades",
   ...ALL_NICHO_SLUGS.map((slug) => `/segmentos/${slug}`),
 ];
