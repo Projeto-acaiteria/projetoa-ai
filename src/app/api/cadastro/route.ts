@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic";
 // Cadastro de nova loja (ComandaPRO Fase 4). Espelha o AgendaPRO: admin.createUser → store →
 // store_config (defaults do segmento) → subscription trial, com ROLLBACK manual (sem transação
 // cross-table). Signup público OFF — só este endpoint server-side cria conta.
-const RESERVADOS = ["admin", "api", "cadastro", "login", "app", "www", "cardapio", "bloqueado", "sobre", "checkout"];
+const RESERVADOS = ["admin", "api", "cadastro", "login", "app", "www", "cardapio", "bloqueado", "sobre", "checkout",
+  // rotas do site/app que ficam no mesmo nível do /<slug> da loja (22/09: respostas + as que faltavam)
+  "respostas", "segmentos", "entrar", "garcom", "sistema", "doc", "meus-pontos"];
 const RE_SLUG = /^[a-z0-9-]{3,50}$/;
 
 export async function POST(req: Request) {

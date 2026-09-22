@@ -14,6 +14,7 @@
 
 import { BILLING } from "@/config/billing";
 import { NICHOS } from "@/config/marketing";
+import { RESPOSTAS } from "@/lib/respostas";
 
 const BASE = "https://comandapro.net.br";
 
@@ -31,6 +32,8 @@ export async function GET() {
     // irmão usa a própria meta description, sem o CTA do fim ("Testa o ComandaPRO.")
     ...(n.aliases ?? []).map((a) => `- [${a.nome}](${BASE}/segmentos/${a.slug}): ${a.seoDescription.replace(/\s*Testa o ComandaPRO\.?\s*$/, "")}`),
   ]).join("\n");
+
+  const PERGUNTAS = RESPOSTAS.map((r) => `  - [${r.pergunta}](${BASE}/respostas/${r.slug})`).join("\n");
 
   const txt = `# ComandaPRO
 
@@ -66,6 +69,8 @@ ${PAGINAS}
 ## Links
 
 - [Página principal](${BASE}/): visão geral, funcionalidades e preço
+- [Respostas](${BASE}/respostas): dúvidas de quem toca açaiteria, bar, pizzaria e restaurante, respondidas em detalhe
+${PERGUNTAS}
 - [Criar conta](${BASE}/cadastro): ${dias} dias grátis
 - [Impressão térmica](${BASE}/ComandaPRO-Impressao.zip): instalador da impressão silenciosa
 

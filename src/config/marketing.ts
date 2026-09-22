@@ -3,6 +3,7 @@
 // apresentação de funcionalidade do Expresso (benefício + print real). Ver
 // segundo-cerebro/.../ESTUDO-SITE-COMANDAPRO.md. Fase 0 = estrutura + AEO; a copy rica
 // de cada seção é preenchida por rodada (regra: uma seção por vez, validada com o dono).
+import { RESPOSTAS } from "@/lib/respostas";
 import type { BusinessType } from "@/config/segments";
 import { BILLING } from "@/config/billing";
 
@@ -231,4 +232,6 @@ export const ALL_NICHO_SLUGS = NICHOS.flatMap((n) => [n.slug, ...(n.aliases?.map
 export const MARKETING_ROUTES = [
   "/",
   ...ALL_NICHO_SLUGS.map((slug) => `/segmentos/${slug}`),
+  "/respostas",
+  ...RESPOSTAS.map((r) => `/respostas/${r.slug}`),
 ];
