@@ -502,6 +502,7 @@ function SiteFooter() {
             <ul className="mt-3 space-y-2 text-sm text-white/60">
               <li><Link href="/cadastro" className="transition hover:text-white">Começar grátis</Link></li>
               <li><Link href="/login" className="transition hover:text-white">Entrar</Link></li>
+              <li><Link href="/respostas" className="transition hover:text-white">Respostas</Link></li>
               <li><a href="#precos" className="transition hover:text-white">Preço</a></li>
               <li><a href="#faq" className="transition hover:text-white">Dúvidas</a></li>
             </ul>
