@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 // Inter = tipografia de marca (padrão premium — Linear usa). Self-hosted, sem layout shift.
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -23,6 +24,11 @@ export const metadata: Metadata = {
     shortcut: "/icon-192.png",
     apple: "/apple-touch-icon.png",
   },
+  // Plano B de verificação do Search Console (tag HTML). O caminho principal é o próprio GA4;
+  // sem a env, o Next não emite a meta.
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
+    : {}),
 };
 
 export const viewport: Viewport = {
@@ -41,6 +47,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={inter.variable}>
       <body>
         <RegisterSW />
+        <GoogleAnalytics />
         {children}
       </body>
     </html>
