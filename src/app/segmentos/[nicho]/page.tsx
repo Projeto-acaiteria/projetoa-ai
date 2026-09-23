@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ nicho: st
 
 // "Tudo incluso" HONESTO por nicho — só lista o que as features do segmento realmente têm (segments.ts).
 function buildIncluso(f: Features): string[] {
-  const list = ["Cardápio digital no seu link"];
+  const list = ["Cardápio montado por nós, incluso", "Cardápio digital no seu link"];
   if (f.hasDelivery) list.push("Delivery próprio sem comissão");
   if (f.hasTables) list.push("Comanda, mesa e app do garçom");
   if (f.coverEnabled || f.stockDose) list.push("Couvert e dose/garrafa no controle");

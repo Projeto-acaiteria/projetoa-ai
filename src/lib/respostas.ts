@@ -85,6 +85,10 @@ export const RESPOSTAS: Resposta[] = [
         a: `Não. O preço é só a mensalidade — R$ ${MENSAL}/mês no mensal, R$ ${BILLING.planos.semestral.equivMes}/mês no semestral e R$ ${ANUAL}/mês no anual — com ${TRIAL} dias grátis para testar.`,
       },
       {
+        q: "Quem monta o cardápio no ComandaPRO?",
+        a: "A equipe do ComandaPRO monta o cardápio junto com o dono, pelo WhatsApp — produtos, preços, tamanhos e adicionais —, incluso na mensalidade. Funções específicas de cada negócio são estudadas caso a caso.",
+      },
+      {
         q: "O preço muda conforme o número de pedidos?",
         a: "Não. A mensalidade é fixa e o ComandaPRO não cobra percentual sobre as vendas, então o valor de cada pedido é todo do negócio.",
       },

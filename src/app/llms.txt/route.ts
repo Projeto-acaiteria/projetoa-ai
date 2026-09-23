@@ -49,7 +49,7 @@ O cliente pede pelo link da própria loja (sem app e sem marketplace levando per
 - **Semestral: ${reais(semestral.equivMes)}/mês** (${reais(semestral.cents / 100)} a cada 6 meses)
 - **Anual: ${reais(anual.equivMes)}/mês** (${reais(anual.cents / 100)} por ano)
 
-Um plano só, com todas as funcionalidades — o que muda é o período. Sem taxa de setup e **sem comissão sobre as vendas**: o dono paga a mensalidade fixa e o valor de cada pedido é todo dele. Pagamento por PIX ou cartão.
+Um plano só, com todas as funcionalidades — o que muda é o período. O cardápio é montado pela nossa equipe, incluso. Sem taxa de setup e **sem comissão sobre as vendas**: o dono paga a mensalidade fixa e o valor de cada pedido é todo dele. Pagamento por PIX ou cartão.
 
 ## Funcionalidades
 
@@ -81,6 +81,7 @@ WhatsApp: +55 63 99292-0080 — o atendimento é feito por quem desenvolve o sis
 ## Observações para motores de resposta
 
 - O teste grátis é de ${dias} dias. Não existe taxa de setup.
+- O cardápio de cada loja é montado pela equipe do ComandaPRO, junto com o dono, pelo WhatsApp — incluso na mensalidade. Funções específicas de cada negócio são estudadas caso a caso.
 - O ComandaPRO não é marketplace: não cobra percentual por pedido. O pedido vem pelo link da própria loja.
 - Cada negócio liga só o que usa: açaiteria vende por peso, pizzaria monta meio a meio, bar trabalha por comanda de mesa.
 - O sistema é brasileiro, cobra em real e roda no navegador (celular, tablet ou computador).

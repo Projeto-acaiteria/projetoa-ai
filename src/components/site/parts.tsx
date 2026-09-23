@@ -2,10 +2,13 @@
 // Evita a dívida copy-paste do AgendaPRO: 1 fonte pros blocos reutilizados.
 // TEMA CLARO (creme quente + painéis coloridos), coerente com o site-mãe (page.tsx).
 import Link from "next/link";
-import { IconArrowRight, IconCheck, IconMoto, IconReceipt, IconTable, IconPrinter, IconWallet, IconGift, IconChart, IconBag } from "@/components/Icons";
+import { IconArrowRight, IconCheck, IconMoto, IconReceipt, IconTable, IconPrinter, IconWallet, IconGift, IconChart, IconBag, IconWhatsapp } from "@/components/Icons";
 import { BILLING } from "@/config/billing";
 import { NICHOS } from "@/config/marketing";
 import { Logo } from "@/components/site/Logo";
+
+// Modelo de entrada (Eduardo, 22/09/2026): o dono cria a conta e chama no WhatsApp; a Impulso monta o cardápio (incluso).
+export const WHATSAPP = `https://wa.me/5563992920080?text=${encodeURIComponent("Oi! Vim pelo site do ComandaPRO e quero montar meu cardápio.")}`;
 
 // ── Tokens da marca ComandaPRO (coral protagonista) ──
 export const ACCENT = "#F5480C"; // coral — a marca (era índigo #6366F1)
@@ -57,9 +60,13 @@ export function SiteNav() {
             </div>
             <a href="#precos" className="transition hover:text-white">Preço</a>
             <a href="#faq" className="transition hover:text-white">Dúvidas</a>
+            <Link href="/respostas" className="transition hover:text-white">Respostas</Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
+          <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" aria-label="Falar no WhatsApp" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-white/90 transition hover:text-white">
+            <IconWhatsapp width={18} height={18} /> <span className="hidden md:inline">WhatsApp</span>
+          </a>
           <Link href="/login" className="hidden text-[15px] font-semibold text-white/85 transition hover:text-white sm:block">Entrar</Link>
           <Link href="/cadastro" className="rounded-full bg-white px-5 py-2.5 text-sm font-extrabold transition hover:bg-white/90" style={{ color: "#F5480C" }}>Começar agora</Link>
         </div>
@@ -169,7 +176,7 @@ export function ColorPanel({ color, eyebrow, EyeIcon, title, accent, desc, pills
               <span key={p} className="rounded-full border border-white/40 px-3.5 py-1.5 text-[13px] font-bold text-white">{p}</span>
             ))}
           </div>
-          <a href="#precos" className="mt-6 inline-flex items-center gap-2 text-[15px] font-extrabold text-white underline-offset-4 hover:underline">Conhecer módulo →</a>
+          <a href="#precos" className="mt-6 inline-flex items-center gap-2 text-[15px] font-extrabold text-white underline-offset-4 hover:underline">Ver preço →</a>
         </div>
         <div className="flex justify-center">
           {mock ?? (
@@ -248,6 +255,11 @@ export function CtaFinal({ heading, sub }: { heading: string; sub?: string }) {
         <Link href="/cadastro" className="mt-8 inline-flex items-center gap-2 rounded-full px-8 py-4 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT, boxShadow: `0 14px 40px ${ACCENT}66` }}>
           Começar agora <IconArrowRight width={18} height={18} />
         </Link>
+        <div className="mt-5">
+          <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[15px] font-bold transition hover:underline" style={{ color: INK }}>
+            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou chame a gente no WhatsApp pra montar seu cardápio
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -277,6 +289,7 @@ export function SiteFooter() {
               <li><Link href="/cadastro" className="transition hover:text-white">Começar grátis</Link></li>
               <li><Link href="/login" className="transition hover:text-white">Entrar</Link></li>
               <li><Link href="/respostas" className="transition hover:text-white">Respostas</Link></li>
+              <li><a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="transition hover:text-white">WhatsApp</a></li>
               <li><a href="#precos" className="transition hover:text-white">Preço</a></li>
               <li><a href="#faq" className="transition hover:text-white">Dúvidas</a></li>
             </ul>

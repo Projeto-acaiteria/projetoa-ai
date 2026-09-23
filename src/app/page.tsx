@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IconArrowRight, IconTable, IconReceipt, IconMoto, IconWallet, IconCard, IconBox, IconChart, IconPrinter, IconCheck, IconBag, IconGift, IconStar } from "@/components/Icons";
+import { IconArrowRight, IconTable, IconReceipt, IconMoto, IconWallet, IconCard, IconBox, IconChart, IconPrinter, IconCheck, IconBag, IconGift, IconStar, IconWhatsapp } from "@/components/Icons";
 import { BILLING } from "@/config/billing";
 import { NICHOS } from "@/config/marketing";
 import { Reveal } from "@/components/site/Reveal";
@@ -24,6 +24,7 @@ export const metadata: Metadata = {
 
 // FAQ em linguagem natural = munição de AEO (o que LLM/Google extraem). Alimenta a UI E o JSON-LD.
 const FAQS: { q: string; a: string }[] = [
+  { q: "Quem monta o meu cardápio?", a: "A gente. Você cria a conta e chama no WhatsApp; montamos o cardápio com você — produtos, preços, tamanhos e adicionais — sem custo a mais, está incluso na mensalidade. Se o seu negócio precisar de alguma função específica, a gente estuda com você." },
   { q: "Preciso pagar comissão por pedido?", a: "Não. Você paga só a mensalidade. O pedido chega pelo seu link e o valor da venda é todo seu — sem o marketplace levando percentual." },
   { q: "Meu cliente precisa baixar aplicativo?", a: "Não. Ele faz o pedido pelo link do seu cardápio, direto no navegador do celular, sem instalar nada." },
   { q: "Serve pro meu tipo de negócio?", a: "Sim. Açaiteria, bar, petiscaria, hamburgueria, pizzaria, sushi e mais — cada negócio liga só as funcionalidades que usa." },
@@ -35,7 +36,14 @@ const FAQS: { q: string; a: string }[] = [
   { q: "Preciso de vários sistemas diferentes?", a: "Não. Cardápio, comanda, mesa, cozinha, delivery, caixa e estoque estão num sistema só, e todos conversam entre si." },
 ];
 
+// Modelo de entrada (Eduardo, 22/09/2026): o dono cria a conta e chama no WhatsApp; A GENTE monta o
+// cardápio, incluso na mensalidade. Função sob medida = estudada caso a caso (nunca prometer grátis).
+const WHATSAPP = `https://wa.me/5563992920080?text=${encodeURIComponent("Oi! Vim pelo site do ComandaPRO e quero montar meu cardápio.")}`;
+// Loja de demonstração (dados fictícios, 15 produtos) — o "Ver demonstração" abre um cardápio de verdade.
+const DEMO_URL = "/burger-house-demo";
+
 const INCLUSO = [
+  "Cardápio montado por nós, incluso",
   "Cardápio digital + delivery próprio",
   "Comanda, mesa e app do garçom",
   "Cozinha (KDS) e impressão térmica",
@@ -113,6 +121,8 @@ const SEG_IMG: Record<string, { img: string; tag: string }> = {
   hamburgueria: { img: "/site/food-burger.jpg", tag: "Combos e adicionais · delivery e fidelidade" },
   pizzaria: { img: "/site/food-pizza.jpg", tag: "Meio a meio · combos e bordas" },
   sushi: { img: "/site/food-sushi.jpg", tag: "Combos · barcas · rodízio" },
+  // foto: Unsplash (Zulu Fernando, id YCIsQDGfd40) — até 22/09 o nicho estava sem entrada aqui e a foto saía quebrada
+  restaurante: { img: "/site/food-restaurante.jpg", tag: "Comanda por mesa · comida a quilo" },
 };
 function SegmentosSection() {
   return (
@@ -120,7 +130,7 @@ function SegmentosSection() {
       <div className="mx-auto max-w-2xl text-center">
         <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Pra qual negócio</span>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ color: INK }}>Escolha o seu segmento</h2>
-        <p className="mt-4 text-lg text-[#6B5D52]">Cada tipo de food service já vem com o cardápio e as regras certas.</p>
+        <p className="mt-4 text-lg text-[#6B5D52]">Cada tipo de food service tem o seu jeito — e a gente monta o seu cardápio desse jeito.</p>
       </div>
       <div className="mt-10 flex flex-wrap justify-center gap-5">
         {NICHOS.map((n) => {
@@ -147,7 +157,7 @@ function SegmentosSection() {
 // ── Seção DOR: dor antes da solução (método Expresso). Cada dor é respondida por uma
 // funcionalidade mais abaixo na página. Tom de dono, direto.
 const DORES = [
-  { Icon: IconCard, t: "O marketplace leva até ~30% de cada pedido", d: "Você trabalha, o cliente paga — e o app fica com o pedaço que era seu lucro." },
+  { Icon: IconCard, t: "O app de delivery fica com uma parte de cada pedido", d: "Some a comissão do último mês no extrato: é o pedaço que era seu lucro — até no cliente que já conhecia a sua loja." },
   { Icon: IconReceipt, t: "Pedido no caderno e no WhatsApp", d: "Comanda perdida, item esquecido, cozinha fazendo o que não foi pedido. No corre, o erro sai caro." },
   { Icon: IconBox, t: "Um sistema pro delivery, outro pra mesa, outro pro caixa", d: "Nenhum conversa com o outro. Você digita a mesma coisa três vezes e ainda dá diferença." },
   { Icon: IconChart, t: "Fim da noite e você não sabe o resultado", d: "Quanto vendeu, quanto sobrou no caixa, o que saiu do estoque. Decisão no achismo." },
@@ -176,6 +186,41 @@ function DorSection() {
       <p className="mt-10 text-center text-lg font-semibold text-[#5A4F45]">
         O ComandaPRO resolve as quatro — <span style={{ color: ACCENT }}>num sistema só.</span>
       </p>
+    </section>
+  );
+}
+
+// ── COMO COMEÇAR: o modelo de entrada (cria a conta → chama no WhatsApp → a gente monta).
+const PASSOS = [
+  { n: "1", t: "Crie sua conta", d: `Leva um minuto e você tem ${BILLING.trialDias} dias grátis pra testar, sem cartão.` },
+  { n: "2", t: "Chame a gente no WhatsApp", d: "Conta o que você vende, como atende e como cobra. Você fala com quem faz o sistema, não com robô." },
+  { n: "3", t: "A gente monta o seu cardápio", d: "Produtos, preços, tamanhos e adicionais do seu jeito — incluso na mensalidade. Precisa de algo específico? A gente estuda com você." },
+];
+function ComoComecarSection() {
+  return (
+    <section id="como-comecar" className="relative z-10 mx-auto max-w-6xl px-5 py-16">
+      <div className="mx-auto max-w-2xl text-center">
+        <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Como começar</span>
+        <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Você não monta nada sozinho.</h2>
+        <p className="mt-4 text-lg text-[#6B5D52]">A parte que mais trava — cadastrar o cardápio — é com a gente.</p>
+      </div>
+      <div className="mt-12 grid gap-4 sm:grid-cols-3">
+        {PASSOS.map((p) => (
+          <div key={p.n} className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-sm">
+            <div className="grid h-10 w-10 place-items-center rounded-full text-base font-extrabold text-white" style={{ background: ACCENT }}>{p.n}</div>
+            <div className="mt-4 text-lg font-bold" style={{ color: INK }}>{p.t}</div>
+            <p className="mt-1 text-sm leading-relaxed text-[#6B5D52]">{p.d}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <Link href="/cadastro" className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT }}>
+          Criar minha conta <IconArrowRight width={18} height={18} />
+        </Link>
+        <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3.5 text-[15px] font-bold shadow-sm transition hover:bg-[#FFF3E6]" style={{ color: INK }}>
+          <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> Falar no WhatsApp
+        </a>
+      </div>
     </section>
   );
 }
@@ -249,7 +294,7 @@ function ColorPanel({ color, eyebrow, EyeIcon, title, accent, desc, pills, img, 
               <span key={p} className="rounded-full border border-white/40 px-3.5 py-1.5 text-[13px] font-bold text-white">{p}</span>
             ))}
           </div>
-          <a href="#precos" className="mt-6 inline-flex items-center gap-2 text-[15px] font-extrabold text-white underline-offset-4 hover:underline">Conhecer módulo →</a>
+          <a href="#precos" className="mt-6 inline-flex items-center gap-2 text-[15px] font-extrabold text-white underline-offset-4 hover:underline">Ver preço →</a>
         </div>
         <div className="flex justify-center">
           {mock ?? (
@@ -288,7 +333,7 @@ function PhoneFrame({ src, alt, caption }: { src: string; alt: string; caption?:
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} className="h-[430px] w-full object-cover object-top" />
       </div>
-      {caption && <div className="mt-3 text-center text-xs font-semibold text-[#8A7B6E]">{caption}</div>}
+      {caption && <div className="mt-3 text-center text-xs font-semibold text-white/85">{caption}</div>}
     </div>
   );
 }
@@ -367,7 +412,7 @@ function FuncionalidadesSection() {
 // ── MULTI-SEGMENTO: prova com cardápios REAIS (Cantinho açaí × Medellín bar) lado a lado.
 function MultiSegmentoSection() {
   const casos = [
-    { src: "/site/cardapio-acai.jpg", alt: "Cardápio de açaiteria no ComandaPRO", nome: "Açaiteria", d: "Monta no copo, vende por peso, adicional grátis-até-N e fidelidade por pontos." },
+    { src: "/site/cardapio-acai.jpg", alt: "Cardápio de açaiteria no ComandaPRO", nome: "Açaiteria", d: "Monta no copo, vende por peso, os primeiros adicionais grátis e fidelidade por pontos." },
     { src: "/site/cardapio-bar.jpg", alt: "Cardápio de bar no ComandaPRO", nome: "Bar & Petiscaria", d: "Comanda por mesa, couvert, dose e garrafa, taxa de serviço e divisão de conta." },
   ];
   return (
@@ -416,7 +461,7 @@ function PrecoSection() {
       <div className="mx-auto max-w-2xl text-center">
         <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Preço</span>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Um plano. Tudo incluso.</h2>
-        <p className="mt-4 text-lg text-[#6B5D52]">Sem taxa de setup, sem comissão por pedido, sem contrato de permanência.</p>
+        <p className="mt-4 text-lg text-[#6B5D52]">Cardápio montado por nós, sem taxa de setup, sem comissão por pedido e sem contrato de permanência.</p>
       </div>
       <div className="mx-auto mt-12 max-w-md rounded-3xl border border-black/[0.06] bg-white shadow-sm p-8 text-center" style={{ boxShadow: `0 30px 80px -30px ${ACCENT}55` }}>
         <div className="text-sm font-semibold text-[#6B5D52]">a partir de</div>
@@ -474,6 +519,11 @@ function CtaFinal() {
         <Link href="/cadastro" className="mt-8 inline-flex items-center gap-2 rounded-full px-8 py-4 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT, boxShadow: `0 14px 40px ${ACCENT}66` }}>
           Começar agora <IconArrowRight width={18} height={18} />
         </Link>
+        <div className="mt-5">
+          <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[15px] font-bold transition hover:underline" style={{ color: INK }}>
+            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou chame a gente no WhatsApp pra montar seu cardápio
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -503,6 +553,7 @@ function SiteFooter() {
               <li><Link href="/cadastro" className="transition hover:text-white">Começar grátis</Link></li>
               <li><Link href="/login" className="transition hover:text-white">Entrar</Link></li>
               <li><Link href="/respostas" className="transition hover:text-white">Respostas</Link></li>
+              <li><a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="transition hover:text-white">WhatsApp</a></li>
               <li><a href="#precos" className="transition hover:text-white">Preço</a></li>
               <li><a href="#faq" className="transition hover:text-white">Dúvidas</a></li>
             </ul>
@@ -576,9 +627,13 @@ export default function Home() {
               </div>
               <a href="#precos" className="transition hover:text-white">Preço</a>
               <a href="#faq" className="transition hover:text-white">Dúvidas</a>
+              <Link href="/respostas" className="transition hover:text-white">Respostas</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" aria-label="Falar no WhatsApp" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-white/90 transition hover:text-white">
+              <IconWhatsapp width={18} height={18} /> <span className="hidden md:inline">WhatsApp</span>
+            </a>
             <Link href="/login" className="hidden text-[15px] font-semibold text-white/85 transition hover:text-white sm:block">Entrar</Link>
             <Link href="/cadastro" className="rounded-full bg-white px-5 py-2.5 text-sm font-extrabold transition hover:bg-white/90" style={{ color: "#F5480C" }}>Começar agora</Link>
           </div>
@@ -592,7 +647,9 @@ export default function Home() {
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} /> Food service, do jeito certo
           </div>
           <h1 className="text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl" style={{ color: INK }}>
-            Do primeiro pedido ao<br />fechamento do caixa.<br />
+            <span className="block">Do primeiro pedido</span>
+            <span className="block">ao fechamento</span>
+            <span className="block">do caixa.</span>
             <span className="relative inline-block" style={{ color: INK }}>
               <span className="absolute inset-x-[-6px] bottom-1.5 -z-10 h-4 -rotate-1 rounded-sm sm:h-5" style={{ background: "#FDE68A" }} />
               Num sistema só.
@@ -605,11 +662,15 @@ export default function Home() {
             <Link href="/cadastro" className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT, boxShadow: `0 14px 34px ${ACCENT}55` }}>
               Começar agora <IconArrowRight width={18} height={18} />
             </Link>
-            <a href="#demonstracao" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3.5 text-[15px] font-bold shadow-sm transition hover:bg-[#FFF3E6]" style={{ color: INK }}>
-              Ver demonstração
+            <a href={DEMO_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3.5 text-[15px] font-bold shadow-sm transition hover:bg-[#FFF3E6]" style={{ color: INK }}>
+              Ver cardápio de demonstração
             </a>
           </div>
-          <div className="mt-8 flex flex-wrap gap-2">
+          <p className="mt-5 flex max-w-lg items-start gap-2 text-[15px] font-semibold" style={{ color: INK }}>
+            <span className="mt-0.5 shrink-0" style={{ color: "#16A34A" }}><IconCheck width={18} height={18} /></span>
+            <span>Você não monta nada sozinho: <span style={{ color: ACCENT }}>a gente monta o seu cardápio</span>, incluso na mensalidade.</span>
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2">
             {[{ Icon: IconReceipt, l: "Comanda & mesa" }, { Icon: IconMoto, l: "Delivery próprio" }, { Icon: IconWallet, l: "Caixa & PDV" }].map(({ Icon, l }) => (
               <span key={l} className="inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-white px-3 py-1.5 text-[13px] font-semibold shadow-sm" style={{ color: MUT }}>
                 <span style={{ color: ACCENT }}><Icon width={15} height={15} /></span> {l}
@@ -668,6 +729,7 @@ export default function Home() {
 
       <Reveal><SegmentosSection /></Reveal>
       <Reveal><DorSection /></Reveal>
+      <Reveal><ComoComecarSection /></Reveal>
       <Reveal><FuncionalidadesSection /></Reveal>
       <Reveal><MultiSegmentoSection /></Reveal>
       <Reveal><FidelidadeSection /></Reveal>
