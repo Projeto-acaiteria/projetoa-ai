@@ -326,14 +326,29 @@ function BrowserFrame({ src, alt }: { src: string; alt: string }) {
 }
 
 // Moldura de celular com PRINT REAL do sistema (não mockup).
-function PhoneFrame({ src, alt, caption }: { src: string; alt: string; caption?: string }) {
+// href = cardápio público de verdade (abre em aba nova). Print vira porta pro produto funcionando.
+function PhoneFrame({ src, alt, caption, href }: { src: string; alt: string; caption?: string; href?: string }) {
   return (
     <div className="w-full max-w-[270px]">
-      <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
-      </div>
+      {(() => {
+        const frame = (
+          <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
+          </div>
+        );
+        return href ? (
+          <a href={href} target="_blank" rel="noopener" aria-label={`Abrir ${alt}`} className="block transition hover:-translate-y-1">{frame}</a>
+        ) : frame;
+      })()}
       {caption && <div className="mt-3 text-center text-xs font-semibold text-white/85">{caption}</div>}
+      {href && (
+        <div className="mt-4 flex justify-center">
+          <a href={href} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-bold shadow-md transition hover:opacity-90" style={{ color: "#241C17" }}>
+            Abrir cardápio <IconArrowRight width={15} height={15} />
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -344,7 +359,7 @@ const JORNADA = [
     title: "Seu cliente monta o pedido exato.", accent: "E o preço nunca sai errado.",
     desc: "No seu link, o cliente monta sozinho — açaí no copo, pizza meio a meio, combo com adicionais — e vê o preço subir ao vivo. O sistema confere o valor de novo antes de aceitar o pedido — ninguém consegue mexer no preço pelo celular.",
     pills: ["Açaí no copo", "Pizza meio a meio", "Combos e adicionais", "Sem app pra baixar"],
-    mock: <PhoneFrame src="/site/cardapio-pizzaria.jpg" alt="Cardápio digital de pizzaria no ComandaPRO" caption="Cardápio de exemplo · pizzaria" />,
+    mock: <PhoneFrame src="/site/cardapio-pizzaria.jpg" alt="Cardápio digital de pizzaria no ComandaPRO" caption="Cardápio de exemplo · pizzaria" href="/pizzaria-teste-dell" />,
   },
   {
     n: "02", Icon: IconMoto, eyebrow: "Delivery próprio",
@@ -412,20 +427,20 @@ function FuncionalidadesSection() {
 // ── MULTI-SEGMENTO: prova com cardápios REAIS (Cantinho açaí × Medellín bar) lado a lado.
 function MultiSegmentoSection() {
   const casos = [
-    { src: "/site/cardapio-acai.jpg", alt: "Cardápio de açaiteria no ComandaPRO", nome: "Açaiteria", d: "Monta no copo, vende por peso, os primeiros adicionais grátis e fidelidade por pontos." },
-    { src: "/site/cardapio-bar.jpg", alt: "Cardápio de bar no ComandaPRO", nome: "Bar & Petiscaria", d: "Comanda por mesa, couvert, dose e garrafa, taxa de serviço e divisão de conta." },
+    { src: "/site/cardapio-acai.jpg", alt: "Cardápio do Cantinho do Açaí no ComandaPRO", href: "/cantinho-do-acai", nome: "Açaiteria", d: "Monta no copo, vende por peso, os primeiros adicionais grátis e fidelidade por pontos." },
+    { src: "/site/cardapio-bar.jpg", alt: "Cardápio do Medellín Music Bar no ComandaPRO", href: "/medellin", nome: "Bar & Petiscaria", d: "Comanda por mesa, couvert, dose e garrafa, taxa de serviço e divisão de conta." },
   ];
   return (
     <section className="relative z-10 mx-auto max-w-6xl px-5 py-20">
       <div className="mx-auto max-w-2xl text-center">
         <span className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Multi-segmento</span>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Um sistema. A cara do seu negócio.</h2>
-        <p className="mt-4 text-lg text-[#6B5D52]">O cardápio, as regras e as telas mudam conforme o que você vende — não é sistema genérico. Estes são dois clientes reais rodando no ComandaPRO agora:</p>
+        <p className="mt-4 text-lg text-[#6B5D52]">O cardápio, as regras e as telas mudam conforme o que você vende — não é sistema genérico. Estes são dois clientes reais rodando no ComandaPRO agora — toque pra abrir o cardápio deles:</p>
       </div>
       <div className="mx-auto mt-12 grid max-w-3xl gap-10 sm:grid-cols-2">
         {casos.map((c) => (
           <div key={c.nome} className="flex flex-col items-center text-center">
-            <PhoneFrame src={c.src} alt={c.alt} />
+            <PhoneFrame src={c.src} alt={c.alt} href={c.href} />
             <div className="mt-4 text-lg font-extrabold" style={{ color: INK }}>{c.nome}</div>
             <p className="mt-1 max-w-xs text-sm text-[#6B5D52]">{c.d}</p>
           </div>

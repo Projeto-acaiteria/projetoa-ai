@@ -84,7 +84,7 @@ function SegmentLP({ nicho: n }: { nicho: Nicho }) {
         </div>
         <div className="flex justify-center lg:justify-end">
           {n.cardapioImg ? (
-            <PhoneFrame src={n.cardapioImg} alt={`Cardápio de ${n.nome} no ComandaPRO`} caption={n.cardapioCaption} />
+            <PhoneFrame src={n.cardapioImg} alt={`Cardápio de ${n.nome} no ComandaPRO`} caption={n.cardapioCaption} href={n.cardapioHref} />
           ) : (
             <div className="w-full max-w-sm rounded-3xl border border-black/[0.06] bg-white p-8 shadow-sm" style={{ boxShadow: `0 30px 80px -30px ${ACCENT}55` }}>
               <div className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Feito pra {n.nome}</div>

@@ -76,14 +76,29 @@ export function SiteNav() {
 }
 
 // Moldura de celular com print real (cardápio público, mobile).
-export function PhoneFrame({ src, alt, caption }: { src: string; alt: string; caption?: string }) {
+// href = cardápio público de verdade (abre em aba nova). Print vira porta pro produto funcionando.
+export function PhoneFrame({ src, alt, caption, href }: { src: string; alt: string; caption?: string; href?: string }) {
   return (
     <div className="w-full max-w-[270px]">
-      <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
-      </div>
+      {(() => {
+        const frame = (
+          <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
+          </div>
+        );
+        return href ? (
+          <a href={href} target="_blank" rel="noopener" aria-label={`Abrir ${alt}`} className="block transition hover:-translate-y-1">{frame}</a>
+        ) : frame;
+      })()}
       {caption && <div className="mt-3 text-center text-xs font-semibold text-[#8A7B6E]">{caption}</div>}
+      {href && (
+        <div className="mt-4 flex justify-center">
+          <a href={href} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-bold shadow-md transition hover:opacity-90" style={{ color: "#241C17" }}>
+            Abrir cardápio <IconArrowRight width={15} height={15} />
+          </a>
+        </div>
+      )}
     </div>
   );
 }
