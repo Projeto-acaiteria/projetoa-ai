@@ -81,7 +81,7 @@ export function PhoneFrame({ src, alt, caption }: { src: string; alt: string; ca
     <div className="w-full max-w-[270px]">
       <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-[430px] w-full object-cover object-top" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
       </div>
       {caption && <div className="mt-3 text-center text-xs font-semibold text-[#8A7B6E]">{caption}</div>}
     </div>
@@ -257,7 +257,7 @@ export function CtaFinal({ heading, sub }: { heading: string; sub?: string }) {
         </Link>
         <div className="mt-5">
           <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[15px] font-bold transition hover:underline" style={{ color: INK }}>
-            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou chame a gente no WhatsApp pra montar seu cardápio
+            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou fale com a gente no WhatsApp
           </a>
         </div>
       </div>

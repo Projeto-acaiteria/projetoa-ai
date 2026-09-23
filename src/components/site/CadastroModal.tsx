@@ -88,7 +88,7 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
       style={{ background: "rgba(20,16,24,0.55)", backdropFilter: "blur(4px)" }}
       role="dialog"
       aria-modal="true"
-      aria-label="Criar seu cardápio grátis"
+      aria-label="Criar sua conta grátis"
       onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
     >
       <div className="animate-pop relative w-full max-w-4xl overflow-hidden rounded-[28px] bg-white shadow-2xl">
@@ -97,8 +97,8 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
           {/* Painel de valor (esquerda) — colorido, food-alegre */}
           <div className="relative hidden flex-col justify-center overflow-hidden p-8 text-white md:flex" style={{ background: "linear-gradient(150deg, #FF8A3D 0%, #F5480C 100%)" }}>
             <div className="text-sm font-bold uppercase tracking-wider text-white/85">Comece grátis</div>
-            <h2 className="mt-3 text-3xl font-extrabold leading-[1.1] tracking-tight">Crie seu cardápio grátis em 2 minutos</h2>
-            <p className="mt-3 text-white/85">Sem instalar nada. Sem cartão pra testar. Pronto pra receber pedido hoje.</p>
+            <h2 className="mt-3 text-3xl font-extrabold leading-[1.1] tracking-tight">Crie sua conta. A gente monta seu cardápio.</h2>
+            <p className="mt-3 text-white/85">Sem instalar nada e sem cartão pra testar. Depois é só chamar a gente no WhatsApp — o cardápio montado por nós é incluso na mensalidade.</p>
             <ul className="mt-6 space-y-3 text-[15px] font-semibold">
               {["Cardápio digital no seu link", "Sem comissão de marketplace", `${BILLING.trialDias} dias grátis, cancela quando quiser`].map((b) => (
                 <li key={b} className="flex items-center gap-2.5"><span className="text-[#FFD84D]"><IconCheck width={18} height={18} /></span> {b}</li>
@@ -108,8 +108,8 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
 
           {/* Formulário (direita) */}
           <div className="p-7 sm:p-9">
-            <div className="text-lg font-extrabold md:hidden" style={{ color: INK }}>Crie seu cardápio grátis em 2 minutos</div>
-            <p className="mt-1 text-sm text-[#6B5D52] md:hidden">Sem cartão. Pronto pra receber pedido hoje.</p>
+            <div className="text-lg font-extrabold md:hidden" style={{ color: INK }}>Crie sua conta. A gente monta seu cardápio.</div>
+            <p className="mt-1 text-sm text-[#6B5D52] md:hidden">Sem cartão. O cardápio montado por nós é incluso.</p>
             <div className="mt-4 space-y-3 md:mt-0">
               <div>
                 <label className="mb-1 block text-sm font-semibold" style={{ color: INK }}>Seu nome</label>
@@ -130,9 +130,9 @@ export default function CadastroModal({ source = "home" }: { source?: string }) 
             <button onClick={enviar} disabled={!valido}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-[15px] font-bold text-white transition enabled:hover:opacity-90 disabled:opacity-50"
               style={{ background: ACCENT, boxShadow: `0 12px 34px ${ACCENT}55` }}>
-              Criar meu cardápio grátis <IconArrowRight width={18} height={18} />
+              Criar minha conta grátis <IconArrowRight width={18} height={18} />
             </button>
-            <div className="mt-3 text-center text-xs text-[#8A7B6E]">{BILLING.trialDias} dias grátis · sem cartão · leva 2 minutos</div>
+            <div className="mt-3 text-center text-xs text-[#8A7B6E]">{BILLING.trialDias} dias grátis · sem cartão · cardápio montado por nós</div>
           </div>
         </div>
       </div>

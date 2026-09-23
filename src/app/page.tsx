@@ -331,7 +331,7 @@ function PhoneFrame({ src, alt, caption }: { src: string; alt: string; caption?:
     <div className="w-full max-w-[270px]">
       <div className="site-lift overflow-hidden rounded-[32px] border-4 border-black/[0.06] bg-black" style={{ boxShadow: `0 30px 80px -24px ${ACCENT}55, 0 8px 30px rgba(0,0,0,.6)` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-[430px] w-full object-cover object-top" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" width={390} height={650} className="h-[430px] w-full object-cover object-top" />
       </div>
       {caption && <div className="mt-3 text-center text-xs font-semibold text-white/85">{caption}</div>}
     </div>
@@ -342,9 +342,9 @@ const JORNADA = [
   {
     n: "01", Icon: IconBag, eyebrow: "O pedido",
     title: "Seu cliente monta o pedido exato.", accent: "E o preço nunca sai errado.",
-    desc: "No seu link, o cliente monta sozinho — açaí no copo, pizza meio a meio, combo com adicionais — e vê o preço subir ao vivo. Quem calcula é o servidor, não o navegador: não tem como o cliente forçar preço errado.",
+    desc: "No seu link, o cliente monta sozinho — açaí no copo, pizza meio a meio, combo com adicionais — e vê o preço subir ao vivo. O sistema confere o valor de novo antes de aceitar o pedido — ninguém consegue mexer no preço pelo celular.",
     pills: ["Açaí no copo", "Pizza meio a meio", "Combos e adicionais", "Sem app pra baixar"],
-    mock: <PhoneFrame src="/site/cardapio-acai.jpg" alt="Cardápio digital do Cantinho do Açaí no ComandaPRO" caption="Cardápio real · Cantinho do Açaí" />,
+    mock: <PhoneFrame src="/site/cardapio-pizzaria.jpg" alt="Cardápio digital de pizzaria no ComandaPRO" caption="Cardápio de exemplo · pizzaria" />,
   },
   {
     n: "02", Icon: IconMoto, eyebrow: "Delivery próprio",
@@ -521,7 +521,7 @@ function CtaFinal() {
         </Link>
         <div className="mt-5">
           <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[15px] font-bold transition hover:underline" style={{ color: INK }}>
-            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou chame a gente no WhatsApp pra montar seu cardápio
+            <span style={{ color: "#16A34A" }}><IconWhatsapp width={18} height={18} /></span> ou fale com a gente no WhatsApp
           </a>
         </div>
       </div>
@@ -646,7 +646,7 @@ export default function Home() {
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-white px-3 py-1.5 text-[13px] font-semibold shadow-sm" style={{ color: MUT }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} /> Food service, do jeito certo
           </div>
-          <h1 className="text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl" style={{ color: INK }}>
+          <h1 className="text-[2.05rem] font-extrabold leading-[1.08] tracking-tight min-[400px]:text-[2.3rem] sm:text-6xl sm:leading-[1.05]" style={{ color: INK }}>
             <span className="block">Do primeiro pedido</span>
             <span className="block">ao fechamento</span>
             <span className="block">do caixa.</span>
@@ -684,7 +684,7 @@ export default function Home() {
           <div className="relative h-[440px] w-full max-w-[520px]">
             <div className="absolute inset-0 -z-10 rounded-[48px] opacity-70 blur-2xl" style={{ background: `radial-gradient(circle at 60% 40%, ${ACCENT}33, #FFD1E344 55%, #FFE0C244 75%, transparent 88%)` }} />
             {/* PAINEL do dono (base, atrás) — print real dos pedidos */}
-            <div className="site-lift absolute right-0 top-6 w-[400px] overflow-hidden rounded-xl border border-black/[0.06] bg-white" style={{ boxShadow: "0 30px 70px -18px rgba(80,40,20,.3)" }}>
+            <div className="site-lift absolute right-0 top-6 w-[88%] overflow-hidden sm:w-[400px] rounded-xl border border-black/[0.06] bg-white" style={{ boxShadow: "0 30px 70px -18px rgba(80,40,20,.3)" }}>
               <div className="flex items-center gap-1.5 bg-[#f3efe9] px-3 py-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" /><span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" /><span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
                 <span className="ml-2 rounded bg-black/[0.05] px-2 py-0.5 text-[10px] font-medium" style={{ color: MUT }}>comandapro.net.br/admin</span>

@@ -115,7 +115,7 @@ export const NICHOS: Nicho[] = [
     heroAccent: "não erra o adicional.",
     heroSub: "O cliente monta o combo e escolhe os adicionais no seu link, sem confusão. Balcão, mesa e delivery próprio sem comissão, com fidelidade por pontos pra ele voltar — do pedido ao caixa, num sistema só.",
     cardapioImg: "/site/cardapio-hamburgueria.jpg",
-    cardapioCaption: "Cardápio real · smash e combos",
+    cardapioCaption: "Cardápio de exemplo · smash e combos",
     destaques: ["Combos e adicionais", "Balcão, mesa e delivery", "Delivery 0% comissão", "Fidelidade por pontos", "Impressão na cozinha"],
     dores: ["Adicional anotado errado e lanche saindo trocado", "Marketplace levando até ~30% de cada lanche que você faz", "Cliente que pede uma vez e nunca mais volta"],
     faqs: [
@@ -137,7 +137,7 @@ export const NICHOS: Nicho[] = [
     heroAccent: "meio a meio de verdade.",
     heroSub: "Pizza meio a meio no cardápio — cobra o sabor mais caro ou a média, do seu jeito — combos e bordas no seu link. Delivery próprio sem comissão, impressão na cozinha e caixa integrado.",
     cardapioImg: "/site/cardapio-pizzaria.jpg",
-    cardapioCaption: "Cardápio real · pizza meio a meio",
+    cardapioCaption: "Cardápio de exemplo · pizza meio a meio",
     destaques: ["Pizza meio a meio", "Combos e bordas", "Delivery 0% comissão", "Impressão na cozinha", "Fidelidade por pontos"],
     dores: ["Pedido de meio a meio anotado errado no WhatsApp", "Marketplace levando até ~30% da pizza que você fez", "Cozinha fazendo a pizza errada por comanda ilegível"],
     faqs: [
@@ -160,7 +160,7 @@ export const NICHOS: Nicho[] = [
     heroAccent: "combos e rodízio.",
     heroSub: "Combos, barcas e rodízio no cardápio do seu link, comanda por mesa e delivery próprio sem comissão. Do pedido ao caixa, num sistema só — sem gambiarra de planilha.",
     cardapioImg: "/site/cardapio-sushi.jpg",
-    cardapioCaption: "Cardápio real · combos e barcas",
+    cardapioCaption: "Cardápio de exemplo · combos e barcas",
     destaques: ["Combos e barcas", "Rodízio", "Comanda por mesa", "Delivery 0% comissão", "Fidelidade por pontos"],
     dores: ["Barca e combo montados na mão, com erro de preço", "Comissão de marketplace comendo a margem do peixe", "Rodízio sem controle do que sai por mesa"],
     faqs: [
