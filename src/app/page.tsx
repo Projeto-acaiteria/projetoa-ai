@@ -674,26 +674,26 @@ function HeroMovimento() {
         </picture>
         {/* legibilidade: escurece de baixo (celular) e da esquerda (desktop) */}
         <div aria-hidden className="absolute inset-0 -z-10" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.1) 0%, rgba(20,12,8,.35) 45%, rgba(20,12,8,.9) 100%)" }} />
-        <div aria-hidden className="absolute inset-0 -z-10 hidden md:block" style={{ background: "linear-gradient(90deg, rgba(20,12,8,.9) 0%, rgba(20,12,8,.62) 34%, rgba(20,12,8,0) 64%)" }} />
+        <div aria-hidden className="absolute inset-0 -z-10 hidden md:block" style={{ background: "linear-gradient(90deg, rgba(20,12,8,.8) 0%, rgba(20,12,8,.5) 32%, rgba(20,12,8,0) 60%)" }} />
 
-        <div className="mx-auto flex min-h-[640px] max-w-7xl flex-col justify-end px-6 pb-10 pt-40 sm:min-h-[700px] md:justify-center md:pb-16 md:pt-16 lg:px-10">
-          <div className="max-w-[640px] text-white">
+        <div className="mx-auto flex min-h-[640px] max-w-[1560px] flex-col justify-end px-6 pb-10 pt-40 sm:min-h-[700px] md:justify-center md:pb-16 md:pt-16 lg:px-14 2xl:min-h-[760px] 2xl:px-20">
+          <div className="max-w-[640px] text-white 2xl:max-w-[760px]">
             <h1>
               <span className="cp-rise block text-sm font-bold uppercase tracking-[0.18em] text-white/70" style={{ animationDelay: ".05s" }}>
                 Sistema pra food service
               </span>
-              <span className="cp-rise mt-4 block text-[3.1rem] font-extrabold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.4rem]" style={{ animationDelay: ".15s" }}>
+              <span className="cp-rise mt-4 block text-[3.1rem] font-extrabold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.4rem] 2xl:text-[6.4rem]" style={{ animationDelay: ".15s" }}>
                 Feito pro{" "}
                 <span className="relative inline-block whitespace-nowrap">
                   movimento.
                   {/* traço à mão (SVG) — desenha depois do título entrar */}
-                  <svg aria-hidden viewBox="0 0 300 90" preserveAspectRatio="none" className="cp-draw pointer-events-none absolute -left-[9%] -top-[30%] h-[165%] w-[118%]">
+                  <svg aria-hidden viewBox="0 0 300 90" preserveAspectRatio="none" className="cp-draw pointer-events-none absolute -left-[8%] -top-[8%] h-[128%] w-[116%]">
                     <path pathLength={1} d="M40 20 C 110 4, 238 6, 282 26 C 304 38, 296 66, 250 78 C 180 92, 60 90, 22 70 C 2 58, 6 34, 36 24 C 60 16, 90 12, 120 12" fill="none" stroke={ACCENT} strokeWidth="4" strokeLinecap="round" />
                   </svg>
                 </span>
               </span>
             </h1>
-            <p className="cp-rise mt-6 max-w-[520px] text-lg leading-relaxed text-white/85 sm:text-xl" style={{ animationDelay: ".3s" }}>
+            <p className="cp-rise mt-6 max-w-[520px] text-lg leading-relaxed text-white/85 sm:text-xl 2xl:max-w-[600px] 2xl:text-2xl" style={{ animationDelay: ".3s" }}>
               Cardápio, comanda, mesa, cozinha, delivery e caixa no mesmo lugar. Você cria a conta e a gente monta o seu cardápio, incluso na mensalidade.
             </p>
             <div className="cp-rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: ".42s" }}>
@@ -709,7 +709,7 @@ function HeroMovimento() {
       </div>
 
       {/* rodando em: clientes reais (os dois já aparecem no site como clientes reais) */}
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-6 py-6 lg:px-10">
+      <div className="mx-auto flex max-w-[1560px] flex-wrap items-center gap-x-8 gap-y-2 px-6 py-6 lg:px-14 2xl:px-20">
         <span className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: MUT }}>Rodando agora em</span>
         <a href="/cantinho-do-acai" target="_blank" rel="noopener" className="text-lg font-extrabold tracking-tight transition hover:opacity-70" style={{ color: INK }}>Cantinho do Açaí</a>
         <a href="/medellin" target="_blank" rel="noopener" className="font-serif text-lg font-bold transition hover:opacity-70" style={{ color: INK }}>Medellín Music Bar</a>
