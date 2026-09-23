@@ -5,6 +5,12 @@ import RegisterSW from "@/components/RegisterSW";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 // Inter = tipografia de marca (padrão premium — Linear usa). Self-hosted, sem layout shift.
+// GA4 do site (propriedade "ComandaPRO", conta Impulso Digital, criada 22/09/2026). O ID de medição
+// é PÚBLICO (sai no HTML de todo site com Analytics), então mora no código — sem depender de login
+// na Vercel. Liga só no build de produção (VERCEL_ENV=production); NEXT_PUBLIC_GA_ID sobrepõe se existir.
+const GA_ID_PRODUCAO = "G-3VZXLSNN7V";
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID ?? (process.env.VERCEL_ENV === "production" ? GA_ID_PRODUCAO : undefined);
+
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
@@ -47,7 +53,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={inter.variable}>
       <body>
         <RegisterSW />
-        <GoogleAnalytics />
+        <GoogleAnalytics gaId={GA_ID} />
         {children}
       </body>
     </html>

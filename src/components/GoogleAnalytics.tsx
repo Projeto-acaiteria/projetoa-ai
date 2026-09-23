@@ -11,8 +11,8 @@
    carrega id de loja/pedido e a área de pontos é do cliente da loja. Isso
    não vai pro Google.
 
-   ⚠️ Sem NEXT_PUBLIC_GA_ID, não renderiza nada — dev e preview ficam
-   desligados sozinhos.
+   ⚠️ O ID chega por prop, decidido no layout (servidor): só o build de
+   PRODUÇÃO da Vercel liga. Dev local e preview ficam desligados sozinhos.
 
    ⚠️ <script> CRU, não next/script: no AgendaPRO o next/script sumia com o
    inline de inicialização e o gtag não mandava hit (tag "instalada", Tempo
@@ -24,8 +24,7 @@ import { usePathname } from "next/navigation";
 
 const AREAS_PRIVADAS = ["/admin", "/garcom", "/sistema", "/entrar", "/login", "/meus-pontos", "/doc"];
 
-export default function GoogleAnalytics() {
-  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+export default function GoogleAnalytics({ gaId }: { gaId?: string }) {
   const pathname = usePathname() ?? "/";
 
   if (!gaId) return null;
