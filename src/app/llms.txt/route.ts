@@ -55,7 +55,8 @@ Um plano só, com todas as funcionalidades — o que muda é o período. O card�
 
 - **Cardápio digital próprio**: link da loja (${BASE}/nome-da-loja) onde o cliente monta o pedido, sem baixar app. Montagem no copo (açaí), pizza meio a meio (cobra pelo sabor mais caro), combos e adicionais com os primeiros grátis.
 - **Delivery próprio sem comissão**: taxa de entrega por bairro, pedido mínimo e forma de pagamento (PIX, cartão ou dinheiro com troco) informada no pedido.
-- **Comanda e mesas**: comanda por mesa, garçom lançando pelo celular, QR code por mesa para o cliente pedir da mesa, couvert e dose (bar).
+- **Comanda e mesas**: comanda por mesa, cada garçom com acesso próprio lançando pelo celular, couvert e dose (bar).
+- **Cardápio na mesa (opcional)**: QR por mesa; o cliente pede e o pedido sai impresso na estação certa (bar ou cozinha) com o número da mesa e a observação. Pela mesma tela o cliente chama o garçom ou pede a conta. Pode ser desligado — aí o cardápio fica só para consulta.
 - **Balcão / PDV**: venda rápida no balcão e venda por peso na balança (açaí, sorvete, comida a quilo).
 - **Caixa**: abertura com fundo de troco, receita por forma de pagamento, sangria, fechamento e conferência.
 - **Cozinha e impressão térmica**: pedido roteado por estação (cozinha, bar, balcão) e cupom em impressora térmica 80mm.

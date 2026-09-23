@@ -198,6 +198,10 @@ export const RESPOSTAS: Resposta[] = [
         a: "Consegue, se a loja ativar: no ComandaPRO cada mesa pode ter um QR code próprio, e o pedido feito por ele já entra na conta daquela mesa.",
       },
       {
+        q: "O cliente consegue chamar o garçom ou pedir a conta pelo celular?",
+        a: "Consegue, pela mesma tela do QR da mesa: o chamado aparece na hora no painel de mesas. A função é opcional — a casa pode deixar o cardápio só para consulta.",
+      },
+      {
         q: "Funciona com couvert artístico?",
         a: "Funciona. O ComandaPRO tem couvert por pessoa e controle de dose para bar.",
       },

@@ -28,6 +28,7 @@ const FAQS: { q: string; a: string }[] = [
   { q: "Preciso pagar comissão por pedido?", a: "Não. Você paga só a mensalidade. O pedido chega pelo seu link e o valor da venda é todo seu — sem o marketplace levando percentual." },
   { q: "Meu cliente precisa baixar aplicativo?", a: "Não. Ele faz o pedido pelo link do seu cardápio, direto no navegador do celular, sem instalar nada." },
   { q: "Serve pro meu tipo de negócio?", a: "Sim. Açaiteria, bar, petiscaria, hamburgueria, pizzaria, sushi e mais — cada negócio liga só as funcionalidades que usa." },
+  { q: "O cliente consegue pedir pela mesa?", a: "Consegue, se você quiser. Cada mesa tem um QR: o cliente monta o pedido, envia, e ele sai na impressora certa (bar ou cozinha) com o número da mesa e a observação. Pela mesma tela ele chama o garçom ou pede a conta. Se preferir, desliga e o cardápio fica só pra consulta." },
   { q: "Preciso de impressora? Qual serve?", a: "Serve qualquer impressora térmica 80mm (não precisa ser fiscal). Tem um instalador de 1 clique que configura tudo, e a via da cozinha e a do balcão vão roteadas pra impressora certa de cada estação." },
   { q: "Consigo vender por peso, tipo açaí e marmita?", a: "Sim. O ComandaPRO trabalha com venda por peso (R$/kg) integrando a balança ou digitando as gramas." },
   { q: "Como funciona a maquininha de cartão?", a: "O sistema registra a forma de pagamento (Pix, cartão ou dinheiro com troco) em cada venda, pro seu caixa fechar certo. A maquininha continua sendo a sua, à parte — o ComandaPRO não processa o cartão nem cobra taxa sobre a venda." },
@@ -353,6 +354,35 @@ function PhoneFrame({ src, alt, caption, href }: { src: string; alt: string; cap
   );
 }
 
+function MesaQrMock() {
+  // Ilustração (não é print): o que o cliente vê no QR da mesa + o cupom que sai na estação.
+  return (
+    <div className="relative mx-auto w-full max-w-[340px] pb-24">
+      <div className="rounded-3xl bg-white p-4 text-[#241C17] shadow-2xl">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-extrabold">Mesa 12</span>
+          <span className="rounded-full bg-[#FFF3E6] px-2.5 py-1 text-[11px] font-bold" style={{ color: ACCENT }}>pelo QR</span>
+        </div>
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between rounded-xl bg-[#FAF6F1] px-3 py-2"><span>2× Caipirinha</span><span className="font-bold">R$ 36,00</span></div>
+          <div className="flex justify-between rounded-xl bg-[#FAF6F1] px-3 py-2"><span>1× Porção de fritas</span><span className="font-bold">R$ 32,00</span></div>
+        </div>
+        <div className="mt-3 rounded-xl py-2.5 text-center text-sm font-extrabold text-white" style={{ background: ACCENT }}>Enviar pedido</div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs font-bold">
+          <div className="rounded-xl border border-black/10 py-2">Chamar garçom</div>
+          <div className="rounded-xl border border-black/10 py-2">Pedir a conta</div>
+        </div>
+      </div>
+      <div className="absolute bottom-0 right-2 w-[170px] rotate-3 rounded-lg bg-white p-3 font-mono text-[11px] leading-tight text-black shadow-xl">
+        <div className="border-b border-dashed border-black/40 pb-1 text-center font-bold">BAR</div>
+        <div className="py-1 text-center text-base font-extrabold">MESA 12</div>
+        <div>2x Caipirinha</div>
+        <div className="font-bold underline">OBS: pouco gelo</div>
+      </div>
+    </div>
+  );
+}
+
 const JORNADA = [
   {
     n: "01", Icon: IconBag, eyebrow: "O pedido",
@@ -371,9 +401,16 @@ const JORNADA = [
   {
     n: "03", Icon: IconTable, eyebrow: "Comanda & mesa",
     title: "Cada mesa com a conta certa,", accent: "na hora.",
-    desc: "Uma comanda por mesa, o garçom lança pelo celular e cada item já vai roteado pra cozinha ou pro bar. Couvert, dose e a taxa de 10% entram automático, e a conta divide sem erro na hora de fechar.",
+    desc: "Uma comanda por mesa, cada garçom com o seu acesso lança pelo celular e cada item já vai roteado pra cozinha ou pro bar — tudo registrado. Couvert, dose e a taxa de 10% entram automático, e a conta divide sem erro na hora de fechar.",
     pills: ["Comanda por mesa", "App do garçom", "Couvert e dose", "Taxa de serviço 10%", "Divisão de conta"],
     mock: <BrowserFrame src="/site/tela-mesas.jpg" alt="Mapa de mesas com comandas abertas e total por mesa no ComandaPRO" />,
+  },
+  {
+    n: "03b", Icon: IconTable, eyebrow: "Cardápio na mesa",
+    title: "O cliente pede da mesa.", accent: "O bar já recebe impresso.",
+    desc: "O cliente escaneia o QR da mesa, monta o pedido e envia — sem chamar ninguém. O drink sai na impressora do bar e o prato na da cozinha, com o número da mesa grande e a observação do cliente. Pela mesma tela ele chama o garçom ou pede a conta, e o aviso aparece na hora no painel. Tudo opcional: se preferir, o cardápio fica só pra consulta e quem lança é o garçom.",
+    pills: ["QR por mesa", "Sai na impressora certa", "Mesa e observação no cupom", "Chamar garçom", "Pedir a conta", "Liga e desliga"],
+    mock: <MesaQrMock />,
   },
   {
     n: "04", Icon: IconPrinter, eyebrow: "Cozinha",
