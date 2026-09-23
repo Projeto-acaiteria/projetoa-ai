@@ -71,6 +71,7 @@ export default function CadastroPage() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [canal, setCanal] = useState("");
   const [check, setCheck] = useState<null | { available: boolean; reason?: string }>(null);
   const [checking, setChecking] = useState(false);
   const [erro, setErro] = useState("");
@@ -115,7 +116,7 @@ export default function CadastroPage() {
     try {
       const r = await fetch("/api/cadastro", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ negocio, segmento, slug: slugFinal, whatsapp, nome, email, senha, mesas: isSalao ? mesas : undefined }),
+        body: JSON.stringify({ negocio, segmento, slug: slugFinal, whatsapp, nome, email, senha, mesas: isSalao ? mesas : undefined, canal: canal || undefined }),
       });
       const d = await r.json();
       if (!r.ok) { setErro(d.error ?? "Não consegui criar a loja."); return; }
@@ -260,6 +261,19 @@ export default function CadastroPage() {
                   {senha && !senhaOk ? <span style={{ color: "#D97706" }}>precisa de 8+ caracteres, 1 maiúscula e 1 número</span>
                     : senha && senhaOk ? <span className="font-semibold" style={{ color: "#0f9d58" }}>✓ senha boa</span> : null}
                 </div>
+
+                {/* mt-41 · canal de aquisição (opcional) — mede se site/IA/Google estão trazendo loja */}
+                <label className="mb-1 mt-2 block text-sm font-semibold" style={{ color: BRAND.ink }}>Como você descobriu o ComandaPRO?</label>
+                <select value={canal} onChange={(e) => setCanal(e.target.value)} className={`${inp} mb-4`} style={inpStyle}>
+                  <option value="">Selecione (opcional)</option>
+                  <option value="indicacao">Indicação de amigo / cliente</option>
+                  <option value="google">Busca no Google</option>
+                  <option value="chatgpt_ia">ChatGPT ou outra IA</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="tiktok">TikTok</option>
+                  <option value="whatsapp_organico">WhatsApp / contato direto</option>
+                  <option value="outro">Outro</option>
+                </select>
 
                 {erro && <p className="mb-3 rounded-lg px-3 py-2 text-sm" style={{ background: BRAND.coralSoft, color: BRAND.coral }}>{erro}</p>}
 

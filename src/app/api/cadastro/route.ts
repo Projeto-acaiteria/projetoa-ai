@@ -17,6 +17,8 @@ const RESERVADOS = ["admin", "api", "cadastro", "login", "app", "www", "cardapio
   // rotas do site/app que ficam no mesmo nível do /<slug> da loja (22/09: respostas + as que faltavam)
   "respostas", "segmentos", "entrar", "garcom", "sistema", "doc", "meus-pontos"];
 const RE_SLUG = /^[a-z0-9-]{3,50}$/;
+// "Como você descobriu o ComandaPRO?" (mt-41) — opcional; mesmos valores do AgendaPRO, menos salão99.
+const CANAIS = ["indicacao", "google", "instagram", "tiktok", "chatgpt_ia", "whatsapp_organico", "outro"];
 
 export async function POST(req: Request) {
   let b: {
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
     email?: string;
     senha?: string;
     mesas?: number;
+    canal?: string;
   };
   try {
     b = await req.json();
@@ -72,7 +75,11 @@ export async function POST(req: Request) {
   // 2. loja
   const { data: store, error: sErr } = await db()
     .from("stores")
-    .insert({ slug, name: b.negocio.trim(), owner_id: userId })
+    .insert({
+      slug, name: b.negocio.trim(), owner_id: userId,
+      // valor fora da lista vira null (campo opcional — nunca derruba o cadastro)
+      acquisition_channel: typeof b.canal === "string" && CANAIS.includes(b.canal) ? b.canal : null,
+    })
     .select("id")
     .single();
   if (sErr || !store) {
