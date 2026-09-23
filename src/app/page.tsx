@@ -638,6 +638,152 @@ function JsonLd() {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }
 
+// ── HERO + PRODUTO AO VIVO (redesign 23/09/2026) ─────────────────────────────────────────────
+// Movimento só com transform/opacity (DESIGN.md) e desligado em prefers-reduced-motion.
+const HERO_CSS = `
+@keyframes cp-draw { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+@keyframes cp-rise { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes cp-zoom { from { transform: scale(1.08) } to { transform: scale(1) } }
+@keyframes cp-toast { 0%,8% { opacity:0; transform: translateY(-16px) } 14%,70% { opacity:1; transform:none } 78%,100% { opacity:0; transform: translateY(-8px) } }
+@keyframes cp-ticket { 0%,22% { opacity:0; transform: translateY(40px) rotate(-3deg) } 32%,72% { opacity:1; transform: translateY(0) rotate(-3deg) } 82%,100% { opacity:0; transform: translateY(12px) rotate(-3deg) } }
+@keyframes cp-card { 0%,4% { opacity:0; transform: translateX(28px) scale(.96) } 12%,74% { opacity:1; transform:none } 84%,100% { opacity:0; transform: translateX(0) scale(.98) } }
+@keyframes cp-ping { 0% { transform: scale(1); opacity:.7 } 80%,100% { transform: scale(2.4); opacity:0 } }
+.cp-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: cp-draw .9s cubic-bezier(.65,0,.35,1) .7s forwards }
+.cp-rise { opacity: 0; animation: cp-rise .7s cubic-bezier(.175,.885,.32,1.1) forwards }
+.cp-zoom { animation: cp-zoom 2.4s cubic-bezier(.2,.7,.2,1) forwards }
+.cp-toast { animation: cp-toast 7s ease-in-out infinite }
+.cp-ticket { animation: cp-ticket 7s ease-in-out infinite }
+.cp-card { animation: cp-card 7s ease-in-out infinite }
+.cp-ping { animation: cp-ping 1.6s cubic-bezier(0,0,.2,1) infinite }
+@media (prefers-reduced-motion: reduce) {
+  .cp-draw path { animation: none; stroke-dashoffset: 0 }
+  .cp-rise, .cp-zoom, .cp-toast, .cp-ticket, .cp-card, .cp-ping { animation: none; opacity: 1; transform: none }
+}`;
+
+function HeroMovimento() {
+  return (
+    <section className="relative z-10 px-3 pt-3 sm:px-4 sm:pt-4">
+      <style dangerouslySetInnerHTML={{ __html: HERO_CSS }} />
+      <div className="relative isolate overflow-hidden rounded-[28px] sm:rounded-[36px]" style={{ background: "#1a120d" }}>
+        {/* foto: Unsplash (Nicolas J Leclercq, id KBjDo_QA1lY), espelhada pra deixar a esquerda livre pro texto */}
+        <picture>
+          <source media="(min-width: 768px)" srcSet="/site/hero-cozinha-1920.jpg" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/site/hero-cozinha-900.jpg" alt="Cozinha de restaurante em plena correria" fetchPriority="high"
+            className="cp-zoom absolute inset-0 -z-10 h-full w-full object-cover" />
+        </picture>
+        {/* legibilidade: escurece de baixo (celular) e da esquerda (desktop) */}
+        <div aria-hidden className="absolute inset-0 -z-10" style={{ background: "linear-gradient(180deg, rgba(20,12,8,.1) 0%, rgba(20,12,8,.35) 45%, rgba(20,12,8,.9) 100%)" }} />
+        <div aria-hidden className="absolute inset-0 -z-10 hidden md:block" style={{ background: "linear-gradient(90deg, rgba(20,12,8,.9) 0%, rgba(20,12,8,.62) 34%, rgba(20,12,8,0) 64%)" }} />
+
+        <div className="mx-auto flex min-h-[640px] max-w-7xl flex-col justify-end px-6 pb-10 pt-40 sm:min-h-[700px] md:justify-center md:pb-16 md:pt-16 lg:px-10">
+          <div className="max-w-[640px] text-white">
+            <h1>
+              <span className="cp-rise block text-sm font-bold uppercase tracking-[0.18em] text-white/70" style={{ animationDelay: ".05s" }}>
+                Sistema pra food service
+              </span>
+              <span className="cp-rise mt-4 block text-[3.1rem] font-extrabold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.4rem]" style={{ animationDelay: ".15s" }}>
+                Feito pro{" "}
+                <span className="relative inline-block whitespace-nowrap">
+                  movimento.
+                  {/* traço à mão (SVG) — desenha depois do título entrar */}
+                  <svg aria-hidden viewBox="0 0 300 90" preserveAspectRatio="none" className="cp-draw pointer-events-none absolute -left-[9%] -top-[30%] h-[165%] w-[118%]">
+                    <path pathLength={1} d="M40 20 C 110 4, 238 6, 282 26 C 304 38, 296 66, 250 78 C 180 92, 60 90, 22 70 C 2 58, 6 34, 36 24 C 60 16, 90 12, 120 12" fill="none" stroke={ACCENT} strokeWidth="4" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </span>
+            </h1>
+            <p className="cp-rise mt-6 max-w-[520px] text-lg leading-relaxed text-white/85 sm:text-xl" style={{ animationDelay: ".3s" }}>
+              Cardápio, comanda, mesa, cozinha, delivery e caixa no mesmo lugar. Você cria a conta e a gente monta o seu cardápio, incluso na mensalidade.
+            </p>
+            <div className="cp-rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: ".42s" }}>
+              <Link href="/cadastro" className="inline-flex items-center gap-2 rounded-full px-7 py-4 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT, boxShadow: `0 14px 34px ${ACCENT}66` }}>
+                Começar agora <IconArrowRight width={18} height={18} />
+              </Link>
+              <a href={DEMO_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-2 rounded-full border border-white/35 px-7 py-4 text-[15px] font-bold text-white backdrop-blur-sm transition hover:bg-white/10">
+                Ver cardápio de demonstração
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* rodando em: clientes reais (os dois já aparecem no site como clientes reais) */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-6 py-6 lg:px-10">
+        <span className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: MUT }}>Rodando agora em</span>
+        <a href="/cantinho-do-acai" target="_blank" rel="noopener" className="text-lg font-extrabold tracking-tight transition hover:opacity-70" style={{ color: INK }}>Cantinho do Açaí</a>
+        <a href="/medellin" target="_blank" rel="noopener" className="font-serif text-lg font-bold transition hover:opacity-70" style={{ color: INK }}>Medellín Music Bar</a>
+      </div>
+    </section>
+  );
+}
+
+// Produto em ação (padrão Square/Stripe): o painel real grande, em fundo escuro, com o pedido
+// chegando animado. Cada animação conta um pedaço do fluxo: chega o aviso → o card entra na coluna →
+// o cupom sai na estação. Não é vídeo: é CSS em cima do print real (leve, sem autoplay de mídia).
+function ProdutoAoVivo() {
+  return (
+    <section className="relative z-10 px-3 sm:px-4">
+      <div className="relative overflow-hidden rounded-[28px] px-5 py-14 sm:rounded-[36px] sm:px-10 sm:py-20" style={{ background: "radial-gradient(120% 90% at 80% 0%, #2a1d16 0%, #120c09 60%)" }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+        <div className="relative mx-auto max-w-6xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl">
+            Entrou pedido, todo mundo vê.{" "}
+            <span style={{ color: "#A8998C" }}>O salão, a cozinha e o caixa na mesma tela, na hora.</span>
+          </h2>
+
+          <div className="relative mt-12 sm:mt-16">
+            <div className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl" style={{ boxShadow: `0 40px 120px -30px ${ACCENT}55, 0 20px 60px rgba(0,0,0,.6)` }}>
+              <div className="flex items-center gap-1.5 bg-[#1d1511] px-4 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" /><span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" /><span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                <span className="ml-3 truncate rounded-md bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/60">comandapro.net.br/admin · Pedidos</span>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/site/tela-pedidos.jpg" alt="Painel de pedidos do ComandaPRO com pedidos em preparo, prontos e concluídos" loading="lazy" className="w-full" />
+            </div>
+
+            {/* aviso de pedido novo */}
+            <div className="cp-toast absolute -top-5 right-2 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl sm:-top-6 sm:right-8">
+              <span className="relative flex h-3 w-3"><span className="cp-ping absolute inline-flex h-full w-full rounded-full" style={{ background: ACCENT }} /><span className="relative inline-flex h-3 w-3 rounded-full" style={{ background: ACCENT }} /></span>
+              <div className="text-left">
+                <div className="text-sm font-extrabold" style={{ color: INK }}>Novo pedido · Mesa 12</div>
+                <div className="text-xs" style={{ color: MUT }}>2× Caipirinha · 1× Fritas</div>
+              </div>
+            </div>
+
+            {/* card entrando na coluna (desktop) */}
+            <div className="cp-card absolute left-[23%] top-[37%] hidden w-[23%] min-w-[200px] rounded-xl border-2 bg-white p-3 shadow-2xl md:block" style={{ borderColor: ACCENT }}>
+              <div className="flex items-center justify-between text-xs font-bold"><span style={{ color: INK }}>#233 · Mesa 12</span><span className="rounded-full px-2 py-0.5 text-white" style={{ background: ACCENT }}>novo</span></div>
+              <div className="mt-2 space-y-1 text-xs" style={{ color: MUT }}><div>2× Caipirinha</div><div>1× Porção de fritas</div></div>
+            </div>
+
+            {/* cupom saindo na estação */}
+            <div className="cp-ticket absolute -bottom-8 left-3 w-[150px] rounded-md bg-white p-3 font-mono text-[11px] leading-tight text-black shadow-2xl sm:-bottom-10 sm:left-auto sm:right-10 sm:w-[180px]">
+              <div className="border-b border-dashed border-black/40 pb-1 text-center font-bold">BAR</div>
+              <div className="py-1.5 text-center text-lg font-extrabold">MESA 12</div>
+              <div>2x Caipirinha</div>
+              <div className="font-bold underline">OBS: pouco gelo</div>
+            </div>
+          </div>
+
+          <div className="mt-20 grid gap-8 text-white/80 sm:grid-cols-3">
+            {[
+              { t: "O aviso chega na hora", d: "Pedido do link, da mesa ou do balcão apita no painel, em qualquer tela." },
+              { t: "Cada estação recebe o seu", d: "Drink sai no bar, prato sai na cozinha, com a mesa e a observação." },
+              { t: "O caixa já sabe", d: "Quando a mesa fecha, a venda entra no caixa e baixa o estoque." },
+            ].map((x) => (
+              <div key={x.t} className="border-t border-white/15 pt-5">
+                <div className="text-base font-bold text-white">{x.t}</div>
+                <p className="mt-1.5 text-sm leading-relaxed">{x.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Chip({ Icon, label }: { Icon: React.ComponentType<{ width?: number; height?: number }>; label: string }) {
   return (
     <div className="flex items-center gap-2 rounded-full border border-black/[0.06] bg-white shadow-sm px-3 py-1.5 text-[13px] font-semibold text-[#5A4F45]">
@@ -692,93 +838,10 @@ export default function Home() {
         </header>
       </div>
 
-      {/* HERO */}
-      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-8 px-6 pb-12 pt-8 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:pt-10">
-        <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-white px-3 py-1.5 text-[13px] font-semibold shadow-sm" style={{ color: MUT }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} /> Food service, do jeito certo
-          </div>
-          <h1 className="text-[2.05rem] font-extrabold leading-[1.08] tracking-tight min-[400px]:text-[2.3rem] sm:text-6xl sm:leading-[1.05]" style={{ color: INK }}>
-            <span className="block">Do primeiro pedido</span>
-            <span className="block">ao fechamento</span>
-            <span className="block">do caixa.</span>
-            <span className="relative inline-block" style={{ color: INK }}>
-              <span className="absolute inset-x-[-6px] bottom-1.5 -z-10 h-4 -rotate-1 rounded-sm sm:h-5" style={{ background: "#FDE68A" }} />
-              Num sistema só.
-            </span>
-          </h1>
-          <p className="mt-6 max-w-lg text-lg leading-relaxed" style={{ color: MUT }}>
-            Cardápio, comanda, mesa, cozinha, delivery e caixa integrados — sem gambiarra de 5 apps que não conversam.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/cadastro" className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white transition hover:opacity-90" style={{ background: ACCENT, boxShadow: `0 14px 34px ${ACCENT}55` }}>
-              Começar agora <IconArrowRight width={18} height={18} />
-            </Link>
-            <a href={DEMO_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3.5 text-[15px] font-bold shadow-sm transition hover:bg-[#FFF3E6]" style={{ color: INK }}>
-              Ver cardápio de demonstração
-            </a>
-          </div>
-          <p className="mt-5 flex max-w-lg items-start gap-2 text-[15px] font-semibold" style={{ color: INK }}>
-            <span className="mt-0.5 shrink-0" style={{ color: "#16A34A" }}><IconCheck width={18} height={18} /></span>
-            <span>Você não monta nada sozinho: <span style={{ color: ACCENT }}>a gente monta o seu cardápio</span>, incluso na mensalidade.</span>
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {[{ Icon: IconReceipt, l: "Comanda & mesa" }, { Icon: IconMoto, l: "Delivery próprio" }, { Icon: IconWallet, l: "Caixa & PDV" }].map(({ Icon, l }) => (
-              <span key={l} className="inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-white px-3 py-1.5 text-[13px] font-semibold shadow-sm" style={{ color: MUT }}>
-                <span style={{ color: ACCENT }}><Icon width={15} height={15} /></span> {l}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative flex justify-center lg:justify-end">
-          {/* Composição em camadas (à la Expresso): PAINEL do dono atrás + CARDÁPIO na frente + pílulas + comida */}
-          <div className="relative h-[440px] w-full max-w-[520px]">
-            <div className="absolute inset-0 -z-10 rounded-[48px] opacity-70 blur-2xl" style={{ background: `radial-gradient(circle at 60% 40%, ${ACCENT}33, #FFD1E344 55%, #FFE0C244 75%, transparent 88%)` }} />
-            {/* PAINEL do dono (base, atrás) — print real dos pedidos */}
-            <div className="site-lift absolute right-0 top-6 w-[88%] overflow-hidden sm:w-[400px] rounded-xl border border-black/[0.06] bg-white" style={{ boxShadow: "0 30px 70px -18px rgba(80,40,20,.3)" }}>
-              <div className="flex items-center gap-1.5 bg-[#f3efe9] px-3 py-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" /><span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" /><span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-                <span className="ml-2 rounded bg-black/[0.05] px-2 py-0.5 text-[10px] font-medium" style={{ color: MUT }}>comandapro.net.br/admin</span>
-              </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/site/tela-pedidos.jpg" alt="Painel de pedidos do ComandaPRO" className="w-full" />
-            </div>
-            {/* CARDÁPIO do cliente (frente, sobreposto) — food chamativo (Flux) + UI de cardápio */}
-            <div className="float-a absolute bottom-0 left-0 z-10 w-[162px] overflow-hidden rounded-[26px] border-4 border-white bg-white" style={{ boxShadow: "0 26px 50px -12px rgba(80,40,20,.45)" }}>
-              <div className="relative h-[300px] w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/site/hero-burger.jpg" alt="Cardápio digital do cliente" className="h-full w-full object-cover" />
-                <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-extrabold shadow-sm" style={{ color: INK }}>ComandaPRO</div>
-                <div className="absolute inset-x-1.5 bottom-1.5 rounded-xl bg-white/95 px-2.5 py-2 shadow-lg backdrop-blur">
-                  <div className="text-[10px] font-extrabold" style={{ color: INK }}>Burger Artesanal</div>
-                  <div className="mt-0.5 flex items-center justify-between">
-                    <span className="text-[12px] font-extrabold" style={{ color: ACCENT }}>R$ 32,00</span>
-                    <span className="rounded-full px-2 py-1 text-[9px] font-bold text-white" style={{ background: ACCENT }}>Adicionar +</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* pílulas rotuladas (apontam as camadas) */}
-            <div className="absolute left-2 top-1 z-20 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold shadow-lg" style={{ color: INK }}>
-              <span style={{ color: ACCENT }}><IconReceipt width={14} height={14} /></span> Cardápio digital
-            </div>
-            <div className="absolute right-4 -top-1 z-20 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold shadow-lg" style={{ color: INK }}>
-              <span style={{ color: ACCENT }}><IconMoto width={14} height={14} /></span> Pedidos ao vivo
-            </div>
-            <div className="float-b absolute -left-3 bottom-24 z-20 rounded-2xl bg-white px-4 py-2.5 shadow-xl">
-              <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: MUT }}>Comissão</div>
-              <div className="text-xl font-extrabold" style={{ color: "#16A34A" }}>0%</div>
-            </div>
-            {/* comida real flutuando (cor) */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/site/food-pizza.jpg" alt="Pizza" className="float-c absolute -right-4 top-0 h-[86px] w-[86px] rounded-full border-4 border-white object-cover" style={{ boxShadow: "0 16px 30px -8px rgba(80,40,20,.4)" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/site/food-sushi.jpg" alt="Sushi" className="float-a absolute right-2 bottom-2 h-[74px] w-[74px] rounded-full border-4 border-white object-cover" style={{ boxShadow: "0 16px 30px -8px rgba(80,40,20,.4)" }} />
-          </div>
-        </div>
-      </section>
-
+      {/* HERO (23/09) — foto real em tela cheia (padrão Toast), título curto com traço à mão.
+          Substitui a montagem de telas pequena, que era a maior "cara de template". */}
+      <HeroMovimento />
+      <ProdutoAoVivo />
       <Reveal><SegmentosSection /></Reveal>
       <Reveal><DorSection /></Reveal>
       <Reveal><ComoComecarSection /></Reveal>
