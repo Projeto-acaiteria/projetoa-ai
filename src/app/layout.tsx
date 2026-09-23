@@ -30,11 +30,11 @@ export const metadata: Metadata = {
     shortcut: "/icon-192.png",
     apple: "/apple-touch-icon.png",
   },
-  // Plano B de verificação do Search Console (tag HTML). O caminho principal é o próprio GA4;
-  // sem a env, o Next não emite a meta.
-  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
-    ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
-    : {}),
+  // Verificação do Search Console (propriedade https://comandapro.net.br, conta edubchaves5).
+  // O método "Google Analytics" falhou em 22/09 (o GSC exige o gtag DENTRO do <head>; o nosso sai
+  // no <body>), então vai pela tag HTML. O valor é público (sai no HTML) — por isso mora no código.
+  // NÃO REMOVER: sem a meta o Search Console perde a verificação.
+  verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "MqlbULKlyzQi1GcZ5qZWpXmrTCSxktKKeUxNdynyyDk" },
 };
 
 export const viewport: Viewport = {
