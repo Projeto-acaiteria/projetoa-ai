@@ -155,6 +155,7 @@ export type CobrancaBanner = {
   prazoAte: string | null; // até quando ainda dá pra usar (carência/liberação manual)
   abreSozinho: boolean; // pop-up sobe ao abrir o sistema, sem precisar clicar na faixa
   travado: boolean; // acabou o prazo: o pop-up não fecha enquanto não pagar
+  reabrirMin: number | null; // vencida + loja na lista: fechado, o pop-up volta depois de N min
 };
 
 export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null {
@@ -199,5 +200,6 @@ export function cobrancaBanner(sub: Subscription | null): CobrancaBanner | null 
     // sem ✕ e só o pagamento tira da tela. Em 25/08 isto era `status === "past_due"`, que travava
     // logo no dia seguinte e comia a carência inteira.
     travado: diasDeCarencia != null && diasDeCarencia < 0,
+    reabrirMin: venceu ? (BILLING.reabrirCobrancaMin[sub.store_id] ?? null) : null,
   };
 }

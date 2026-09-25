@@ -6,6 +6,11 @@ export const BILLING = {
   // Dias de calendário BR que o cliente ainda trabalha depois do vencimento (pop-up sobe mas fecha).
   // No dia seguinte ao fim da carência o pop-up trava sem ✕ — regra cravada pelo Eduardo em 02/09.
   carenciaDias: 3,
+  // Loja vencida cujo pop-up volta sozinho a cada N minutos depois de fechado, até pagar (continua
+  // com ✕). Exclusivo por loja — pedido do Eduardo pro Medellín em 25/09, não é regra do produto.
+  reabrirCobrancaMin: {
+    "e2c9b699-8b92-4f95-a6b0-ef750a7721a4": 30, // Medellín Music Bar
+  } as Record<string, number>,
   planos: {
     mensal: { label: "Mensal", meses: 1, cents: 21_900, cycle: "MONTHLY" as const, equivMes: 219 },
     semestral: { label: "Semestral", meses: 6, cents: 118_200, cycle: "SEMIANNUALLY" as const, equivMes: 197 },

@@ -33,10 +33,15 @@ const CHAVE_SESSAO = "cobranca-vista";
  *  cada troca de tela e a recepção não conseguiria trabalhar o turno. Travado ignora isso: aí
  *  reabrir é o comportamento certo. sessionStorage morre ao fechar o navegador, então na próxima
  *  vez que abrirem o sistema o aviso volta. */
-function jaVistoNestaSessao(travado: boolean): boolean {
+function jaVistoNestaSessao(travado: boolean, reabrirMin: number | null): boolean {
   if (travado || typeof window === "undefined") return false;
   try {
-    return window.sessionStorage.getItem(CHAVE_SESSAO) === "1";
+    const v = window.sessionStorage.getItem(CHAVE_SESSAO);
+    if (!v) return false;
+    // Loja com reabertura: o valor é a hora em que fechou. O "1" antigo vira 1ms → já expirou,
+    // então quem fechou antes desta regra existir vê o pop-up de novo.
+    if (reabrirMin) return Date.now() - Number(v) < reabrirMin * 60_000;
+    return true;
   } catch {
     return false; // navegador bloqueando storage: mostra o aviso, que é o lado seguro
   }
@@ -53,13 +58,14 @@ export default function BillingDueBanner({
   lojaNome: string;
 }) {
   const { diasAteVencer, status, graceDays, plano, planoLabel, valorCents, travado, abreSozinho, venceuEm, prazoAte } = cobranca;
+  const reabrirMin = cobranca.reabrirMin ?? null;
 
   const [loading, setLoading] = useState(false);
   // abreSozinho = vencida ou vencendo hoje: o pop-up sobe quando o dono abre o sistema, sem clique.
   // travado = o prazo acabou: além de subir sozinho, não sai da tela enquanto não pagar (sem ✕,
   // clique fora e Esc não fecham). A saída é o pagamento — o polling vê virar active e dá refresh.
   // Com prazo ainda em pé, ele fecha: o aviso é forte, mas a casa trabalha até o prazo virar.
-  const [aberto, setAberto] = useState(abreSozinho && !jaVistoNestaSessao(travado));
+  const [aberto, setAberto] = useState(abreSozinho && !jaVistoNestaSessao(travado, reabrirMin));
   const [pix, setPix] = useState<PixData | null>(null);
   const [pago, setPago] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -171,7 +177,8 @@ export default function BillingDueBanner({
   function fechar() {
     if (travado) return; // prazo acabou: só sai pagando
     try {
-      window.sessionStorage.setItem(CHAVE_SESSAO, "1"); // não reabre a cada troca de tela no turno
+      // não reabre a cada troca de tela no turno; com reabrirMin guarda a hora pra contar o intervalo
+      window.sessionStorage.setItem(CHAVE_SESSAO, reabrirMin ? String(Date.now()) : "1");
     } catch {
       // storage bloqueado: sem problema, ele reabre — melhor insistir do que sumir
     }
@@ -182,10 +189,21 @@ export default function BillingDueBanner({
   // Vencida: já sobe com o QR pronto pra quem tem cadastro (não obriga a clicar pra ver o valor).
   // Quem não tem cadastro cai no formulário, que já é o estado inicial.
   useEffect(() => {
-    if (travado && !pedirCadastro && !pix && !erro && !loading) void pegarPix();
+    if ((travado || (reabrirMin && aberto)) && !pedirCadastro && !pix && !erro && !loading) void pegarPix();
     // roda uma vez ao montar; os estados abaixo só existem pra não reentrar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reabertura (loja na lista reabrirCobrancaMin): fechado, o pop-up volta sozinho com o PIX quando
+  // o intervalo vence — mesmo com a tela parada, sem ninguém trocar de página.
+  useEffect(() => {
+    if (!reabrirMin || travado || aberto) return;
+    const t = setInterval(() => {
+      if (!jaVistoNestaSessao(false, reabrirMin)) void pegarPix();
+    }, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reabrirMin, travado, aberto]);
 
   // Esc não fecha pop-up travado — o navegador nem tenta, mas o hábito do usuário é apertar Esc.
   useEffect(() => {
